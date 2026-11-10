@@ -75,6 +75,7 @@ SQLCipher-style encryption at rest for PGlite (AES-256-GCM through WebCrypto, bl
 - Commit only on your own harness branch (`agent/<n>-…`, `checkpoint/…`); never push to `main`. No attribution lines in commits or PRs (no Co-Authored-By, no "Generated with").
 - **16 GB machine:** run every install/build/lint/test/bench through `~/.claude/bin/heavy <cmd> > /tmp/pc-<issue>-<step>.log 2>&1; echo exit=$?`, in the foreground. Read `tail -40` of the log, plus `grep -nE 'FAIL|Error|✗|×' <log> | head -40` when it failed. Never let full output into context.
 - **WebKit** doesn't run on this host: use `scripts/harness/webkit.sh <cmd>` (Playwright's container image through podman). Exit 3 means WebKit isn't available here; record it as "CI covers it", not as a pass. So `npm run test:browser` for all engines means `npm run test:browser -- --project chromium --project firefox` plus `scripts/harness/webkit.sh npm run test:browser -- --project webkit`.
+- **Other machines:** `scripts/harness/remote.sh <mac|box> <cmd>` runs a command from your worktree on the Mac or the yantra-box mini PC (see docs/HARNESS.md, Machines). Use it when the issue or the harness says so.
 - **Never wait on CI.** Local verification is the merge gate. Don't poll `gh pr checks` or sleep. CI results are read once, at checkpoints.
 - **Lean context:** read only the issue, the plan sections it cites and the files you change. Return short summaries (≤150 words) to the harness.
 

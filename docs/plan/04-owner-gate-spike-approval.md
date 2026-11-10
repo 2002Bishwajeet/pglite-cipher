@@ -12,10 +12,10 @@ This is also where the review's S10 question is decided, before any package code
 Nothing under `src/` is built until this issue is closed with the decisions below written in a comment. The later issues read that comment. The decision is **provisional**: it is made from the engines an agent can run, and confirmed on devices in #<PC-04b>.
 
 ## Change
-No code. Read `spike/RESULTS.md` and `spike/results/*.json` (Node, Chromium, Firefox, WebKit if it ran). Apply the table below to those engines, then post one comment on this issue with exactly these lines, and close it as completed:
+No code. Read `spike/RESULTS.md` and `spike/results/*.json`: Node, Chromium, Firefox from #<PC-03>, and the device targets from #<PC-04c> (macOS WebKit and WKWebView, iPhone 15, iPad Air, Redmi; the iOS simulator counts for function only). Phone open time (G2) uses the iPhone if it was measured. Apply the table below to those engines, then post one comment on this issue with exactly these lines, and close it as completed:
 
 ```
-Provisional: yes (engines: <list>; device runs pending in #<PC-04b>)
+Provisional: yes (measured: <targets>; owner-pending: <targets, or none> in #<PC-04b>)
 Block size: 8192 | 32768 | 65536
 Store: indexeddb
 Open budget (100 MB): desktop 1500 ms, slowest target 3000 ms (owner question 4, recommended)
@@ -47,7 +47,7 @@ How to choose:
 - `spike/RESULTS.md` is missing, or doesn't have numbers for at least Node and Chromium.
 
 ## Metadata
-Depends on: #<PC-03>
+Depends on: #<PC-03>, #<PC-04c>
 Size: S
 Area: spike, security
 Model: sonnet

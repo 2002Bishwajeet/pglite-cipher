@@ -4,7 +4,7 @@ Title: Owner: confirm the spike numbers on real webviews (macOS, iPhone, Windows
 Labels: security   (NOT agent-ready: the owner does this; nothing depends on it)
 -->
 ## Context
-#<PC-04> made a provisional decision (block size, Go) from the engines an agent can run on the Linux host. The numbers that matter in the product come from the real webviews: WKWebView on macOS and iOS, WebView2 on Windows, Android WebView. This issue records them. It blocks nothing, so the harness keeps going; if a device contradicts #<PC-04>, reopen the format issue (#<PC-05>) with the numbers.
+Agents measure the devices they can reach in #<PC-04c> (Mac, iOS simulator, paired iPhone and iPad, Redmi over adb). This issue is only for the targets #<PC-04c> left `owner-pending`, and for Windows (WebView2). The numbers that matter in the product come from the real webviews: WKWebView on macOS and iOS, WebView2 on Windows, Android WebView. This issue records them. It blocks nothing, so the harness keeps going; if a device contradicts #<PC-04>, reopen the format issue (#<PC-05>) with the numbers.
 
 ## Change
 Owner steps (about an hour, any time):

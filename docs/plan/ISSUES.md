@@ -14,3 +14,4 @@ Placeholder → issue in 2002Bishwajeet/pglite-cipher (filed 2026-11-10). PC-10 
 | PC-08 | #8 |
 | PC-09 | #9 |
 | PC-11 | #10 |
+| PC-04c | #11 |

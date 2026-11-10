@@ -13,11 +13,22 @@ From a Claude Code session in this checkout (on `main`, clean):
 
 Watch it with `/workflows`. You don't need to answer anything: there are no owner gates inside the run. Anything that needs you stops that issue, not the run.
 
+## Machines
+
+| Machine | Role | How agents use it |
+|---|---|---|
+| G14 (CachyOS) | runs the harness; lane 1 builds and tests here | `~/.claude/bin/heavy <cmd>` |
+| yantra-box mini PC (Debian 13, Node 24) | lane 2 builds and tests here; the self-hosted CI runner (`actions-runner` user service) | `scripts/harness/remote.sh box <cmd>` |
+| MacBook Pro (macOS 27, Xcode 27.2) | real WebKit, WKWebView, iOS simulator, paired iPhone 15 and iPad Air | `scripts/harness/webkit.sh <cmd>` (Mac first, podman fallback), `remote.sh mac <cmd>` |
+| Redmi | Android Chrome for device benchmarks | `adb` on the G14, after Wireless debugging pairing |
+
+`remote.sh` syncs the worktree, installs dependencies once per lockfile on that machine, runs under that machine's heavy lock and copies `test-results/`, `spike/results/` and `bench/results/` back. Exit 4 = unreachable.
+
 ## What one wave does
 
 ```
 Select (Haiku)       git ff main · npm ci only if the lockfile changed · select.mjs --all
-  └─ per ready issue, 2 lanes:
+  └─ per ready issue, 2 lanes (lane 1 tests on the G14, lane 2 on the mini PC):
      Implement       own worktree · Model/Effort from the issue Metadata · self-verifies
      Simplify        Sonnet · only for non-S or big diffs
      Review ∥ Verify  Review: Opus (or Fable: issue `Review: fable`) · Verify: Sonnet, fresh context

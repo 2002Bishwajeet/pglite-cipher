@@ -115,7 +115,10 @@ const BENCH_SCHEMA = {
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40).replace(/-$/, '')
 const cdInto = (w) => `\`cd ${w.worktreePath}\` first (if it is gone: \`git -C ${repoRoot} worktree add ${w.worktreePath} ${w.branch}\`, then cd)`
 const DEPS = `Dependencies: if \`package-lock.json\` exists and \`cmp -s package-lock.json ${repoRoot}/package-lock.json\` succeeds and ${repoRoot}/node_modules exists, \`ln -s ${repoRoot}/node_modules node_modules\`; otherwise run \`npm ci\` under heavy.`
-const HEAVY = 'Heavy commands (npm ci, build, lint, test, test:browser, bench, node scripts that start PGlite): only as `~/.claude/bin/heavy <cmd> > /tmp/pc-<tag>-<step>.log 2>&1; echo exit=$?`, foreground, timeout 600000. Read `tail -40` of the log; on failure add `grep -nE "FAIL|Error|✗|×" <log> | head -40`. WebKit runs only through `scripts/harness/webkit.sh <cmd>` (wrap that in heavy too); its exit 3 means "not runnable here, CI covers it". Where an issue says `npm run test:browser` for all engines, run it as `npm run test:browser -- --project chromium --project firefox` plus `scripts/harness/webkit.sh npm run test:browser -- --project webkit`.'
+const HEAVY_LOCAL = 'Heavy commands (npm ci, build, lint, test, test:browser, bench, node scripts that start PGlite): only as `~/.claude/bin/heavy <cmd> > /tmp/pc-<tag>-<step>.log 2>&1; echo exit=$?`, foreground, timeout 600000. Read `tail -40` of the log; on failure add `grep -nE "FAIL|Error|✗|×" <log> | head -40`. WebKit runs only through `scripts/harness/webkit.sh <cmd>` (wrap that in heavy too); its exit 3 means "not runnable here, CI covers it". Where an issue says `npm run test:browser` for all engines, run it as `npm run test:browser -- --project chromium --project firefox` plus `scripts/harness/webkit.sh npm run test:browser -- --project webkit`.'
+// Lane 2 runs its heavy commands on the yantra-box mini PC, so two issues can build and test at once.
+const HEAVY_BOX = 'Heavy commands (npm ci, build, lint, test, test:browser, bench, node scripts that start PGlite): run them on the yantra-box mini PC as `scripts/harness/remote.sh box <cmd> > /tmp/pc-<tag>-<step>.log 2>&1; echo exit=$?` (it syncs this worktree, installs per lockfile there and takes that machine\'s heavy lock), foreground, timeout 600000; exit 4 means the box is unreachable: then use `~/.claude/bin/heavy <cmd>` locally. Read `tail -40` of the log; on failure add `grep -nE "FAIL|Error|✗|×" <log> | head -40`. ' + HEAVY_LOCAL.slice(HEAVY_LOCAL.indexOf('WebKit runs only'))
+const heavyFor = (host) => (host === 'box' ? HEAVY_BOX : HEAVY_LOCAL)
 const NO_CI = 'Never wait on CI: no `gh pr checks`, no `gh run watch`, no sleep loops.'
 
 // ---------- stage prompts ----------
@@ -132,7 +135,7 @@ function implementPrompt(it) {
   return `You are implementing GitHub issue #${it.number} of ${REPO}: "${it.title}".
 1. You are in a fresh git worktree. \`pwd\`, then: if branch \`${it.branch}\` exists (\`git rev-parse --verify -q ${it.branch}\` or on origin), check it out and continue from it; otherwise \`git checkout -b ${it.branch} origin/main\`. ${DEPS}
 2. Read the issue once: \`gh issue view ${it.number} -R ${REPO} --comments\`. Read only the plan and research sections it cites, and the code you change. Follow it exactly, including its STOP conditions: if one applies, return status "stopped" with the condition and details. Do not improvise around it.
-3. ${HEAVY}
+3. ${it.heavy}
 4. Stay inside this worktree and the issue's scope. CLAUDE.md's rules apply (no test weakening, WebCrypto only, no secrets in logs).
 5. Self-verify before returning: run every command in the issue's \`## Verification\` section and fix what fails. Put each command and its exit code in selfCheck.
 6. Commit on the branch (conventional message referencing #${it.number}; no attribution lines). Do NOT push or open a PR. ${NO_CI}
@@ -143,7 +146,7 @@ Return the fields of the schema; summary ≤150 words.`
 function simplifyPrompt(it, w) {
   return `You are the simplifier for ${it.tag} of ${REPO}, branch ${w.branch}. ${cdInto(w)}; work only there. Do NOT invoke skills or spawn subagents.
 Read \`git diff origin/main...HEAD\`. Cut over-engineering in lines this branch added: unrequested options or abstractions, single-use helpers, re-implemented built-ins, defensive code for impossible cases, dead code, verbose comments. Keep behaviour, every test, validation and error handling on data-loss and crypto paths. Never touch tests' strength (iterations, cases, properties).
-If you changed anything: ${HEAVY} Run build, lint and test (Node) that way; if one fails and you can't fix it quickly, \`git checkout -- .\`. Commit passing edits as \`refactor: simplify ${it.tag}\` (no attribution). Do not push.
+If you changed anything: ${it.heavy} Run build, lint and test (Node) that way; if one fails and you can't fix it quickly, \`git checkout -- .\`. Commit passing edits as \`refactor: simplify ${it.tag}\` (no attribution). Do not push.
 Return the implementer schema (status "done", same worktreePath and branch) with summary = what you removed, or "nothing to simplify".`
 }
 
@@ -160,7 +163,7 @@ Implementer summary: ${w.summary}`
 
 function verifyPrompt(it, w) {
   return `You are the verifier for ${it.tag} of ${REPO}, branch ${w.branch}. ${cdInto(w)}; work only there. READ-ONLY on source: never edit, commit or push.
-- ${it.number ? `Read the issue: \`gh issue view ${it.number} -R ${REPO}\`. Run every command in its \`## Verification\` section, in order.` : 'This is a checkpoint: run build, lint, test and test:browser (chromium, firefox; WebKit through webkit.sh).'} ${HEAVY}
+- ${it.number ? `Read the issue: \`gh issue view ${it.number} -R ${REPO}\`. Run every command in its \`## Verification\` section, in order.` : 'This is a checkpoint: run build, lint, test and test:browser (chromium, firefox; WebKit through webkit.sh).'} ${it.heavy}
 - A WebKit run that exits 3 is exitCode "ci-covers", not a failure. Anything only the owner can do (real devices, Tauri webviews) goes in ownerOnly with exitCode "owner-run".
 - Check that \`git diff origin/main...HEAD\` doesn't weaken tests (\`.skip\`, \`.only\`, \`todo\`, smaller fast-check numRuns, deleted assertions). Each one is a problem.
 - verdict "pass" only if every command you ran exited 0 (or ci-covers or owner-run) and problems is empty. ${NO_CI}
@@ -172,7 +175,7 @@ function fixPrompt(it, w, problems) {
   return `You worked on ${it.tag} of ${REPO}, branch ${w.branch}. ${cdInto(w)}; work only there. ${DEPS}
 Fix these problems found by the reviewer and verifier:
 ${problems.map((p) => `- ${p}`).join('\n')}
-Stay in scope; never weaken a test to make it pass. Re-run the failing commands. ${HEAVY} Commit (no attribution). Do not push. ${NO_CI}
+Stay in scope; never weaken a test to make it pass. Re-run the failing commands. ${it.heavy} Commit (no attribution). Do not push. ${NO_CI}
 If a fix needs to leave the scope, or a STOP condition now applies, return status "stopped". Return the implementer schema; update selfCheck.`
 }
 
@@ -207,14 +210,14 @@ function checkpointPrompt(cp) {
 2. Commit nothing yet. Invoke the code-review skill (Skill tool, skill "code-review", args "high") on the changes ${cp.base}..HEAD; if it needs a target, give it this branch and say the base is ${cp.base}. Then invoke the simplify skill (Skill tool, skill "simplify") on the same range. These skills may spawn reviewers that edit files: after each, run \`git status\` and \`git log origin/main..HEAD\`, keep only edits in this worktree, never anything pushed to main (if something was pushed elsewhere, report it in details).
 3. Fix every confirmed blocker or major finding that's within what the merged issues asked for; list the rest in details. Never weaken a test.
 4. Read main's CI once: \`gh run list -R ${REPO} --branch main --limit 3 --json headSha,conclusion,workflowName,databaseId\`. If the newest completed run failed, \`gh run view <id> -R ${REPO} --log-failed | tail -60\`, fix it here if it is a code or test problem, else note it (for example, minutes exhausted). ${NO_CI}
-5. ${HEAVY} Run build, lint, test and test:browser (chromium, firefox; WebKit through webkit.sh) that way. Commit fixes as \`chore(checkpoint-${cp.k}): …\` (no attribution). Do not push.
+5. ${HEAVY_LOCAL} Run build, lint, test and test:browser (chromium, firefox; WebKit through webkit.sh) that way. Commit fixes as \`chore(checkpoint-${cp.k}): …\` (no attribution). Do not push.
 Return the implementer schema: summary = findings fixed and left (≤150 words), changedFiles [] if nothing changed.`
 }
 
 function benchPrompt() {
   return `Run the final benchmark of pglite-cipher on main and commit the results.
 1. In this fresh worktree: \`git checkout -b agent/bench-${date} origin/main\`. ${DEPS}
-2. Read \`bench/README.md\` (or \`spike/README.md\` if bench/ doesn't exist; if neither exists return ran=false). Run the full benchmark it documents for Node, Chromium and Firefox, and WebKit through webkit.sh, at 10 MB and 100 MB. ${HEAVY}
+2. Read \`bench/README.md\` (or \`spike/README.md\` if bench/ doesn't exist; if neither exists return ran=false). Run the full benchmark it documents for Node, Chromium and Firefox, and WebKit through webkit.sh, at 10 MB and 100 MB. ${HEAVY_LOCAL}
 3. Save the JSON under \`bench/results/${date}/\` and write \`bench/results/${date}/SUMMARY.md\`: the environment (CPU, RAM, OS, browser versions), the gate table G1–G8 (target, value, pass) per engine, and what only the owner can measure (Tauri webviews, iPhone, Android).
 4. Commit as \`bench: results ${date}\` (no attribution). Do not push.
 Return ran, resultsDir (absolute), gates and a summary (≤120 words). Also return worktreePath and branch in the summary text as "worktree=<path> branch=<branch>".`
@@ -239,7 +242,7 @@ async function runItem(it) {
   let effort = it.effort || EFFORT[it.size] || 'high'
   const reviewModel = it.review || (/fable/.test(model) ? 'fable' : 'opus')
 
-  let w = await agent(it.prompt, { label: `${it.kind} ${tag}`, phase: it.kind === 'checkpoint' ? 'Checkpoint' : 'Implement', schema: IMPL_SCHEMA, isolation: 'worktree', model, effort })
+  let w = await agent(it.prompt || implementPrompt(it), { label: `${it.kind} ${tag}`, phase: it.kind === 'checkpoint' ? 'Checkpoint' : 'Implement', schema: IMPL_SCHEMA, isolation: 'worktree', model, effort })
   if (!w) return { tag, result: 'stopped: implementer died', merged: false }
   if (w.status === 'done' && !(w.changedFiles || []).length && it.kind === 'checkpoint') return { tag, result: 'checkpoint clean: ' + w.summary, merged: false, clean: true }
 
@@ -283,14 +286,13 @@ const issueItem = (r) => ({
   kind: 'issue', tag: `#${r.number}`, number: r.number, title: r.title, size: r.size,
   model: r.model, effort: r.effort, review: r.review,
   branch: `agent/${r.number}-${slug(r.title)}`,
-  get prompt() { return implementPrompt(this) },
 })
 
 const checkpointItem = (k, base, head) => {
   const cp = { k, base, head, branch: `checkpoint/${k}-${head.slice(0, 7)}` }
   return {
     kind: 'checkpoint', tag: `checkpoint ${k}`, number: null, title: `Checkpoint ${k}: review and simplify ${base.slice(0, 7)}..${head.slice(0, 7)}`,
-    size: 'M', model: 'opus', effort: 'high', review: 'opus', branch: cp.branch, prompt: checkpointPrompt(cp),
+    size: 'M', model: 'opus', effort: 'high', review: 'opus', branch: cp.branch, prompt: checkpointPrompt(cp), heavy: HEAVY_LOCAL,
   }
 }
 
@@ -323,9 +325,9 @@ for (let wave = 1; wave <= maxWaves; wave++) {
   if (dryRun) { report.push(...sel.ready.map((r) => ({ tag: `#${r.number}`, result: 'dry run: would run' }))); break }
 
   const queue = sel.ready.map(issueItem)
-  await parallel(Array.from({ length: Math.min(LANES, queue.length) }, () => async () => {
+  await parallel(Array.from({ length: Math.min(LANES, queue.length) }, (_, lane) => async () => {
     while (queue.length) {
-      const it = queue.shift()
+      const it = { ...queue.shift(), heavy: heavyFor(lane === 1 ? 'box' : 'local') }
       const row = await runItem(it).catch((e) => ({ tag: it.tag, result: `error: ${e.message}`, merged: false }))
       report.push(row)
       if (row.merged) mergesSinceCheckpoint++
