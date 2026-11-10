@@ -14,6 +14,8 @@ It is the most dangerous part of the package. The store is strict: at open, a bl
 - `msync` calls `MEMFS.stream_ops.write` directly, so a wrapper around `write` never sees it.
 - A file truncated and extended again between two syncs keeps stale blocks in the store unless the low point is remembered.
 
+The tracker works in files and block indexes, and stays that way. Format v1 (#<PC-05>) stores every block under a random id and keeps the files in an encrypted table, but turning `(fileId, index)` into a block id, and a delete range into a list of ids, is the job of the filesystem (#<PC-08>), which holds the file map. Nothing here knows a block id. "Inode" below means a node's metadata as the tracker reports it; in the store it becomes a file-table entry. The format stores no modification time, so the filesystem ignores an inode whose only change is its `mtime`; the tracker still reports it, and still uses `mtime` for its own safety net.
+
 `spike/RESULTS.md` lists the operations Postgres really makes; read it first. The spike's `traceFs.ts` shows how to wrap the operations from a `preRun` hook.
 
 ## Change
@@ -29,11 +31,11 @@ New code in `src/tracker/`, tests in `test/tracker/`. No crypto and no IndexedDB
    - Any other `stream_ops` or `node_ops` key the spike found to change contents.
    `B` is the block size, passed in.
 2. **Per live node the tracker keeps:** `fileId`, `persistedBlocks` (how many blocks the store holds for it after the last successful sync), `minSizeSinceSync`, a dirty-block set (a sorted range list or a bitmap, not a `Set` of numbers for a 1 GB file), `inodeDirty`, and a shadow of `(size, mtime)` as of the last snapshot.
-3. **Dead nodes:** a node that was unlinked or replaced goes to a `deadFiles` list with its `fileId` and `persistedBlocks`, so the sync can delete its inode and its whole block range. Writes to a dead node that Postgres still holds open are ignored. A node created and removed between two syncs produces nothing.
+3. **Dead nodes:** a node that was unlinked or replaced goes to a `deadFiles` list with its `fileId` and `persistedBlocks`, so the sync can remove its file-table entries and every one of its blocks. Writes to a dead node that Postgres still holds open are ignored. A node created and removed between two syncs produces nothing.
 4. **`snapshot(): Snapshot`**, fully synchronous. Returns:
    - `blocks`: for each dirty block still inside the file, a **copy** of its bytes padded with zeros to `B` (copy, because the engine may write again while the sync is encrypting);
    - `inodes`: for each node with dirty blocks or a dirty inode, `{ fileId, path, type, mode, size, mtime, blocks, target }`;
-   - `deleteRanges`: for each live node whose block count shrank below `persistedBlocks`, `[fileId, newBlocks, persistedBlocks)`; for each dead node, its inode key and `[fileId, 0, persistedBlocks)`;
+   - `deleteRanges`: for each live node whose block count shrank below `persistedBlocks`, `[fileId, newBlocks, persistedBlocks)`; for each dead node, its `fileId` (in a `deadFiles` list) and `[fileId, 0, persistedBlocks)`. These are ranges of block **indexes**; the store has no ranges, and #<PC-08> turns them into block ids;
    then clears the dirty state. After a truncate-then-extend, every block from the low-water mark up is in `blocks`.
 5. **`commit(snapshot)`** sets `persistedBlocks` and the shadows after the sync succeeded. **`requeue(snapshot)`** merges a failed snapshot back: block ranges become dirty again unless the node is now dead; delete ranges are kept; nodes that died meanwhile keep only their deletes (review S7).
 6. **Safety net.** At the start of `snapshot()`, walk the nodes under `root` (about 1,000) and compare each one's `usedBytes` and `mtime` with the shadow. A node that differs and has no dirty block and no dirty inode is a tracking gap: mark the whole file dirty, increment `tracker.stats.trackingGaps`, and `console.warn` once per sync with the path's depth only (never the path or contents). The tests assert the counter stays 0; in production it turns a silent data loss into a slower sync.

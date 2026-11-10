@@ -13,7 +13,7 @@ The first version of this epic covered the database only. The database is one of
 - Customer wording and the words not to use: `docs/plan/01-sqlcipher-comparison.md` section 4 in the private repository.
 
 ## How it is built
-- **Database:** `pglite-cipher`, a private repository (`2002Bishwajeet/pglite-cipher`), consumed as an **optional** submodule at `vendor/pglite-cipher`. SQLCipher's design adapted to PGlite: Postgres runs on an in-memory copy; changed 8 KB blocks are sealed with AES-256-GCM and written in one atomic batch per sync. The public repository and the PWA build work without the submodule (#553).
+- **Database:** `pglite-cipher`, a private repository (`2002Bishwajeet/pglite-cipher`), consumed as an **optional** submodule at `vendor/pglite-cipher`. SQLCipher's design adapted to PGlite: Postgres runs on an in-memory copy; changed 8 KB blocks are sealed with AES-256-GCM and written in one atomic batch per sync. On disk the store is equal-size blocks under random ids, with the file names and sizes in an encrypted table and no readable header: it shows how big it is and when it is written, and nothing about the files inside. The public repository and the PWA build work without the submodule (#553).
 - **Keys and credentials:** the OS keychain, through Rust commands that check their caller.
 - **Everything else:** moved into the encrypted database, sealed with a keychain key, or no longer written.
 

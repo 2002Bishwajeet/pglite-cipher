@@ -1,3 +1,11 @@
+# Owner answers (2026-11-10)
+
+The owner said: "go with what Fable suggests". So every question below is answered with its recommendation:
+1 = **A** (encryption in the first public native build; PC-10 and J-08 not filed) · 2 = **A** (IndexedDB, our format) · 3 = **A** (real lock) · 4 = the recommended budget (100 MB: 1.5 s desktop, 3 s slowest phone; the phone is named in PC-04b) · 5 = A · 6 = accept · 7 = app-level gate · 8 = allow both, never silently · 9 = accept · 10 = FLAG_SECURE only with the lock · 11 = external review before any public claim · 12 = J-15's window now · 13 = the placeholder from PC-02 until the owner names the holder · 14 = keep them public.
+PC-04 applies the decision table provisionally to the engines an agent can measure; device runs are PC-04b and block nothing.
+
+---
+
 # Owner questions
 
 Only decisions that are yours. Each has options and my recommendation. Decisions you already made on 2026-11-10 (native-only, SQLCipher's design adapted to PGlite, keys and credentials in the keychain, query cache in PGlite, wipe leftovers, quality over speed, private repository, optional submodule, premium stays private) are applied in the plan and not asked again.
@@ -31,7 +39,7 @@ What changes with C: PC-05 shrinks to the manifest-free record layout (no crypto
 
 Issue stub if B or C is chosen (file in `2002Bishwajeet/journal`):
 
-> **Native: Rust block store for the encrypted database.** Context: PC-04's comment says `Store: rust-file | rust-sqlcipher`. Change: `src-tauri/src/block_store.rs` implementing pglite-cipher's `StorageBackend` semantics (PC-07's conformance suite is the contract: `isEmpty`, `get`, paged `readRange`, all-or-nothing `commit` with `expectMutable`, `deleteRanges`, `clear`) over (B) an append-only extent file plus a metadata log with a generation pointer, `fsync` and directory `fsync`, or (C) `rusqlite` with `bundled-sqlcipher`, tables `inode(file_id, body)` and `block(file_id, idx, data)`, one SQLite transaction per commit, the key set with `PRAGMA key = "x'…'"` from the keychain inside Rust. Transport: the faster of G7's two paths; a loopback endpoint requires the per-launch secret. A TypeScript `RustBackend` in Journal that passes PC-07's conformance suite through the real IPC in a Tauri test build. Verification: the conformance suite, the crash matrix with the process killed (`kill -9`) at every commit, G1–G4 on the bench page. STOP: SQLCipher does not build for iOS or Android; throughput below G7's recorded numbers. Depends on: #101, #553. Size: L.
+> **Native: Rust block store for the encrypted database.** Context: PC-04's comment says `Store: rust-file | rust-sqlcipher`. Change: `src-tauri/src/block_store.rs` implementing pglite-cipher's `StorageBackend` semantics (PC-07's conformance suite is the contract: `isEmpty`, `count`, `get` of the three slots, `getMany`, paged `readRange` over opaque block ids, all-or-nothing `commit` with `expectRoot` and deletes by id, `clear`) over (B) a file of equal-size slots with a slot index and a free-slot list of its own, plus a metadata log with a generation pointer, `fsync` and directory `fsync` (the index maps opaque ids to slots and reveals nothing more), or (C) `rusqlite` with `bundled-sqlcipher`, one table `record(key, body)` for the same slots and block ids, one SQLite transaction per commit, the key set with `PRAGMA key = "x'…'"` from the keychain inside Rust. Transport: the faster of G7's two paths; a loopback endpoint requires the per-launch secret. A TypeScript `RustBackend` in Journal that passes PC-07's conformance suite through the real IPC in a Tauri test build. Verification: the conformance suite, the crash matrix with the process killed (`kill -9`) at every commit, G1–G4 on the bench page. STOP: SQLCipher does not build for iOS or Android; throughput below G7's recorded numbers. Depends on: #101, #553. Size: L.
 
 ## 3. What does "locked" mean?  *(the spec's Q6; shapes J-12, J-13, J-14)*
 
@@ -103,7 +111,7 @@ The plan keeps only the filesystem private. The keychain commands, the lock, the
 | Nonce budget | HKDF subkey per session, no forced rotation | SQLCipher 5's answer, at WebCrypto's cost |
 | Two-tier keys (spec Q2) | Yes; `changeKey` instant, `rotateDataKey` full; Settings offers one action that does both | |
 | Block size (spec Q3) | 8 KB unless the spike picks 32 or 64 | Decided by gate G5 |
-| Leaks (spec Q4) | File count, sizes to the block, write timing, and that it is a pglite-cipher store | Padding fixes exact sizes (review S3) |
+| Leaks (spec Q4) | The total number of blocks, write timing, and that an IndexedDB database exists. Not the file count, the file sizes, or that it is a pglite-cipher store (your two changes of 2026-11-10: opaque header, packed block space) | Parity with SQLCipher on what the stored bytes show; `01` section 2 has the exact list, including the one difference (a session's records share a salt) |
 | Durability (review's question 3) | Relaxed by default; strict on hide, close, import, rotation | Confirmed on PC-04's `Durability:` line |
 | Credentials with encryption (review's question 4) | A release rule: no "encrypted at rest" without J-05, J-06, J-09, J-15, J-16 | Review B1 |
 | Migration trigger | Automatic at first boot, never a setting; three failures then a button | "Secure, don't block" |

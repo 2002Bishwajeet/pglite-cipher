@@ -1,4 +1,5 @@
 <!--
+NOT FILED (owner, 2026-11-10: question 1 = A). Encryption is in the first public native build, so no user ever has a plaintext native database to import. Kept for reference only.
 FILING: NEW issue in 2002Bishwajeet/pglite-cipher (placeholder PC-10).
 Title: Import an existing plain idb:// data directory: verified, header last
 Labels: agent-ready, security
@@ -21,12 +22,16 @@ Three ways the first design lost data (review finding B2), which this issue must
 1. **`readIdbFsImage(dbName): AsyncIterable<{ path, mode, mtime, contents? }>`**: opens the IDBFS database **read-only**, never creates it (if `indexedDB.open` fires `upgradeneeded` for a database that did not exist, abort and delete the empty database, and report "no source"), and yields entries in pages. It does not modify the source.
 2. **`importPlainDataDir({ source, backend, key, blockSize, origin, onProgress }): Promise<ImportReport>`**:
    1. **Preconditions:** `backend.isEmpty()` must be true, else `StoreExistsError` (the caller decides what to do with an existing or partial store; this function never overwrites). The source must contain `PG_VERSION`.
-   2. Write both static header copies (new `storeId`, new DEK). **No mutable header.** From here until step 5 the store is "records without a mutable header", which `EncryptedFs` refuses to open (`IncompleteStoreError`).
-   3. Stream the source: for each entry, assign a `fileId`, seal its blocks and its inode, and commit in batches of at most 512 records. Keep, per file, a SHA-256 of the plain-text contents and the tags of the records written. Never hold more than one source file plus one batch in memory; a 1 GB relation segment is read through its single IDBFS record, so say so in the README (peak memory is the largest file plus one batch).
-   4. **Verify by reading back:** re-read every record from the backend in pages, open it, rebuild each file's bytes as a running SHA-256, and compare with the hash from step 3; compare file count, sizes and modes. Any difference: `clear()` the backend and throw `ImportVerifyError` naming the file's *kind* (WAL, relation, other), never its contents.
-   5. **Commit marker:** write the mutable header with `state: "ready"`, the manifest digest, `gen: 1`, `origin` (the caller's string, for example `idbfs:/pglite/my-db`), with `expectMutable: null` and `durability: "strict"`. Only now is the store valid.
+   2. Write both header copies (new `storeId`, new DEK, `createHeader`). **No root.** From here until step 5 the store is "records without a root", which `EncryptedFs` refuses to open (`IncompleteStoreError`).
+   3. Stream the source: for each entry, assign a `fileId`, give each of its blocks a fresh random block id, seal the blocks, and commit in batches of at most 512 records. Keep, per file, a SHA-256 of the plain-text contents, its ordered block ids and the tags of the records written: this is the file map. When every file is in, pack the file table from the map (`packEntries`, #<PC-05>) and commit its blocks. The source's modification times are not carried over (format v1 stores none). Never hold more than one source file plus one batch in memory, besides the file map; a 1 GB relation segment is read through its single IDBFS record, so say so in the README (peak memory is the largest file plus one batch).
+   4. **Verify by reading back.** Block ids are random, so the store's own order is no file's order, and a file is read back through its id list:
+      - `count()` equals `2 + table blocks + data blocks`: nothing is in the store that the map does not list;
+      - fetch the table blocks (`getMany`), open them, run `assembleFiles`: the result equals the map (paths, types, modes, sizes, ordered ids);
+      - for each file, fetch its blocks by `getMany` in index order, in pages of 512, open each with its file and index, rebuild the file's bytes, and compare their SHA-256 with the hash from step 3. One file at a time, so the memory bound of step 3 holds.
+      Any difference: `clear()` the backend and throw `ImportVerifyError` naming the file's *kind* (WAL, relation, other), never its path or contents.
+   5. **Commit marker:** write the root with `state: "ready"`, both digests, the list of table block ids, `gen: 1`, `origin` (the caller's string, for example `idbfs:/pglite/my-db`; it is inside the encrypted root), with `expectRoot: null` and `durability: "strict"`. Only now is the store valid.
    6. Return `{ files, blocks, bytes, ms }`. **This function never deletes the source.** Deleting is the caller's step, after it has also opened the new store with Postgres.
-3. **`discardIncompleteStore(backend)`**: `clear()` only if the store has no mutable header or its state is `"populating"`; throws if the store is `"ready"`. This is the only sanctioned way to remove a partial import.
+3. **`discardIncompleteStore(backend)`**: `clear()` only if the store has no root (slot 2) or its state is `"populating"`; throws if the store is `"ready"`. This is the only sanctioned way to remove a partial import.
 4. **README:** a "Migrating a plain database" section with the required order for callers:
    1. Close the plain-text engine after a final awaited, strict flush. Hold a lock so no other tab opens it.
    2. If the encrypted store is `"ready"`: it wins. Do not import again. Go to step 5.
@@ -39,7 +44,8 @@ Three ways the first design lost data (review finding B2), which this issue must
 - **Source untouched:** the IDBFS database's records are byte-identical before and after an import, successful or failed.
 - **Never creates the source:** importing from a name that does not exist reports "no source" and leaves no database of that name.
 - **Crash at every batch (`FaultyBackend`):** kill at each commit of steps 2–5. In every case: `EncryptedFs` open throws `IncompleteStoreError` (or, after step 5 committed, opens fine); `discardIncompleteStore` empties it; a second import succeeds.
-- **Read-back catches damage:** a backend wrapper that corrupts one stored block makes the import throw `ImportVerifyError` and leave the backend empty.
+- **Read-back catches damage:** a backend wrapper that corrupts one stored block, one that exchanges the values under two block ids of different files, and one that adds a record under a random id, each make the import throw `ImportVerifyError` and leave the backend empty.
+- **Nothing of the source's shape is left:** after an import, the store's keys are `0`, `1`, `2` and random ids, every block value has one length, and no stored value contains a source path.
 - **Refuses to overwrite:** import into a `"ready"` store throws `StoreExistsError` and changes nothing; `discardIncompleteStore` on a `"ready"` store throws.
 - **Bytes, not meaning:** a source whose files have arbitrary sizes (not multiples of the block) imports byte for byte. The import copies files; making the source consistent first is the caller's flush, and the README says so.
 - **Memory:** with a counting backend, never more than one batch of ciphertext is held.
