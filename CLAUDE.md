@@ -65,7 +65,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## What this repository is
 
-SQLCipher-style encryption at rest for PGlite (AES-256-GCM through WebCrypto, blocks in IndexedDB), consumed by Journal's native apps as an optional git submodule. Private. The plan is `docs/plan/` (start at `00-overview.md`); background in `docs/research/`. Once the scaffold lands, `AGENTS.md` has the commands and layout.
+SQLCipher-style encryption at rest for PGlite (AES-256-GCM through WebCrypto, blocks in IndexedDB), consumed by Journal's native apps as an optional git submodule. Private. The plan is `docs/plan/` (start at `00-overview.md`); background in `docs/research/`. `AGENTS.md` has the commands, layout and rules.
 
 ## Rules
 
