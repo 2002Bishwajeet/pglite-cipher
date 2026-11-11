@@ -168,6 +168,9 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
   const sizeOf = (node: MemNode) => node.usedBytes ?? 0;
   const blocksOf = (bytes: number) => Math.ceil(bytes / B);
   const children = (dir: MemNode) => dir.contents as Record<string, MemNode | undefined>;
+  const forChildren = (dir: MemNode, fn: (child: MemNode) => void) => {
+    for (const child of Object.values(children(dir))) if (child) fn(child);
+  };
   const tracked = (dir: MemNode) => dir === rootNode || live.has(dir);
 
   /** Starts tracking a node, and a directory's subtree, as new to the store. */
@@ -189,14 +192,14 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
     };
     st.dirty.add(0, blocksOf(sizeOf(node)));
     live.set(node, st);
-    if (type === 'directory') for (const child of Object.values(children(node))) if (child) adopt(child);
+    if (type === 'directory') forChildren(node, adopt);
     return st;
   }
 
   function kill(node: MemNode): void {
     const st = live.get(node);
     if (!st) return;
-    if (typeOf(node.mode) === 'directory') for (const child of Object.values(children(node))) if (child) kill(child);
+    if (typeOf(node.mode) === 'directory') forChildren(node, kill);
     live.delete(node);
     st.dead = true;
     dead.push(st);
@@ -207,7 +210,7 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
     const st = live.get(node);
     if (!st) return;
     st.inodeDirty = true;
-    if (typeOf(node.mode) === 'directory') for (const child of Object.values(children(node))) if (child) touch(child);
+    if (typeOf(node.mode) === 'directory') forChildren(node, touch);
   }
 
   function markWrite(st: NodeState, oldSize: number, pos: number, len: number): void {
@@ -288,7 +291,7 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
   } catch {
     // Not there yet: initdb creates PGDATA, and mknod recognises it.
   }
-  if (rootNode) for (const child of Object.values(children(rootNode))) if (child) adopt(child);
+  if (rootNode) forChildren(rootNode, adopt);
 
   /** Every trackable node under the root, parents before children. */
   function walk(visit: (node: MemNode, type: NodeType, path: string, depth: number) => void): void {
