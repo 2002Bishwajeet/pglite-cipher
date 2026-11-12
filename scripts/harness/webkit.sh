@@ -16,4 +16,7 @@ img="mcr.microsoft.com/playwright:v${ver}-noble"
 podman image exists "$img" || podman pull -q "$img" >/dev/null || { echo "[webkit] cannot pull $img; CI covers WebKit" >&2; exit 3; }
 # The main checkout (parent of the shared .git) holds node_modules; harness worktrees live inside it.
 root=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd)
-exec podman run --rm --ipc=host --userns=keep-id -e CI=1 -v "$root:$root:Z" -w "$PWD" "$img" "$@"
+# Local fallback: take the machine-wide heavy lock (the Mac path takes the Mac's) and cap the
+# container at 4 GB, so a WebKit bench can't run beside a host build and get the session OOM-killed.
+exec ~/.claude/bin/heavy podman run --rm --ipc=host --userns=keep-id --memory=4g --memory-swap=4g \
+  -e CI=1 -v "$root:$root:Z" -w "$PWD" "$img" "$@"
