@@ -29,9 +29,13 @@ const stat = (xs: readonly number[]): Stat => ({ p50: round(pct(xs, 50)), p95: r
 
 const statusEl = document.getElementById('status');
 const outEl = document.getElementById('out');
+// Device runs (issue #11): with `&post=<target>` the page reports progress and its result to the
+// collector of spike/device/serve.mjs, which saves the result as spike/results/<target>.json.
+const postTarget = new URLSearchParams(location.search).get('post');
 const log = (msg: string) => {
   if (statusEl) statusEl.textContent = msg;
   console.log(`[bench] ${msg}`);
+  if (postTarget) void fetch('./log', { method: 'POST', body: `${postTarget} ${msg}` }).catch(() => undefined);
 };
 const errorText = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e));
 
@@ -499,11 +503,30 @@ const show = (result: Json) => {
   log('done');
 };
 
+/** Sends the result to the collector, then sets `window.__benchPosted` (what the device drivers wait for). */
+const post = async (body: Json) => {
+  if (!postTarget) return;
+  try {
+    const r = await fetch('./result', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: postTarget, ...body }) });
+    log(r.ok ? `posted as ${postTarget}` : `collector answered ${String(r.status)}`);
+  } catch (e) {
+    log(`post failed: ${errorText(e)}`);
+  }
+  (window as unknown as { __benchPosted?: boolean }).__benchPosted = true;
+};
+
 const start = (parts: string[], runs: number) => {
-  run(parts, runs).then(show, (e: unknown) => {
-    (window as unknown as { __benchError?: string }).__benchError = errorText(e);
-    log(`failed: ${errorText(e)}`);
-  });
+  void run(parts, runs).then(
+    (result) => {
+      show(result);
+      return post(result);
+    },
+    (e: unknown) => {
+      (window as unknown as { __benchError?: string }).__benchError = errorText(e);
+      log(`failed: ${errorText(e)}`);
+      return post({ error: errorText(e) });
+    },
+  );
 };
 
 document.getElementById('run')?.addEventListener('click', () => {
