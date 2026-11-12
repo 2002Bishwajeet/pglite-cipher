@@ -89,6 +89,8 @@ export interface Tracker {
   loadState(files: Iterable<StoredFile>): void;
   /** Every node under the root is owed to the store (first population, import). */
   markAllDirty(): void;
+  /** A snapshot is outstanding, or a change was seen since the last one. */
+  hasDirty(): boolean;
 }
 
 interface NodeState {
@@ -450,6 +452,12 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
         st.dirty.add(0, blocksOf(sizeOf(st.node)));
         st.inodeDirty = true;
       }
+    },
+
+    hasDirty() {
+      if (pending !== null || dead.some((st) => st.inStore)) return true;
+      for (const st of live.values()) if (st.inodeDirty || !st.dirty.isEmpty) return true;
+      return false;
     },
   };
 }

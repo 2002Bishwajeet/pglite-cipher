@@ -216,6 +216,11 @@ export class SubkeyCache {
     this.dek = dek;
   }
 
+  /** Distinct subkeys derived so far. */
+  get size(): number {
+    return this.keys.size;
+  }
+
   forSalt(salt: Bytes): Promise<CryptoKey> {
     const hex = toHex(salt);
     let key = this.keys.get(hex);
