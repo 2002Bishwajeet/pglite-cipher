@@ -21,8 +21,11 @@ export {
   type EncryptedFsStats,
   type OpenMode,
   type OpenProgress,
+  type RotateOptions,
+  type RotateProgress,
   type SyncStats,
 } from './encryptedFs.ts';
+export { verifyStore, type VerifyOptions, type VerifyProblem, type VerifyProgress, type VerifyReason, type VerifyResult } from './verify.ts';
 export type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from './backend/backend.ts';
 export { IndexedDbBackend } from './backend/indexeddb.ts';
 export { MemoryBackend } from './backend/memory.ts';

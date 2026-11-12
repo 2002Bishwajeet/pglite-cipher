@@ -174,6 +174,34 @@ export class FileMap {
   }
 }
 
+/**
+ * The map of a store to rotate into: the same files, and a fresh id for every block, none of them
+ * an id of `map`. Its table is packed but not stored; the rotation's catch-up packs it again.
+ */
+export function remap(map: FileMap): FileMap {
+  const taken = new Set(map.live);
+  const draw = (): string => {
+    for (;;) {
+      const id = toHex(newBlockId());
+      if (!taken.has(id)) {
+        taken.add(id);
+        return id;
+      }
+    }
+  };
+  const files = [...map.files.values()].map(({ fileId, path, type, mode, size, target, ids }) => ({
+    fileId,
+    path,
+    type,
+    mode,
+    size,
+    target,
+    ids: ids.map(() => fromHex(draw())),
+  }));
+  const blocks = packEntries(files, map.blockSize).map((entries) => ({ id: draw(), tag: new Uint8Array(0), entries }));
+  return FileMap.load({ files: new Map(files.map((f) => [toHex(f.fileId), f])), blocks: new Map() }, blocks, map.blockSize);
+}
+
 /** A block of a file to seal and put under `id`. */
 export interface BlockWrite {
   id: string;

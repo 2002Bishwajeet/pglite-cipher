@@ -37,6 +37,14 @@ export class IndexedDbBackend implements StorageBackend {
     this.#name = databaseName;
   }
 
+  /**
+   * The two databases `<name>.a` and `<name>.b`, for `EncryptedFs`'s `backend: [a, b]`: a data-key
+   * rotation writes the new store into the empty one, so an open finds the current store by itself.
+   */
+  static pair(name: string): [IndexedDbBackend, IndexedDbBackend] {
+    return [new IndexedDbBackend(`${name}.a`), new IndexedDbBackend(`${name}.b`)];
+  }
+
   async isEmpty(): Promise<boolean> {
     return (await this.count()) === 0;
   }
@@ -121,6 +129,36 @@ export class IndexedDbBackend implements StorageBackend {
   async clear(): Promise<void> {
     const store = this.#transaction(await this.#database(), 'readwrite').objectStore(STORE);
     await done(store.clear());
+  }
+
+  /**
+   * Deletes the database. The backend stays usable: its next call creates the database again,
+   * empty. Another connection that keeps the database open delays the deletion until it closes.
+   */
+  async destroy(): Promise<void> {
+    if (this.#closed !== null) throw new Error(this.#closed);
+    const db = this.#db;
+    this.#db = null;
+    await db?.then(
+      (open) => {
+        open.close();
+      },
+      () => undefined,
+    );
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(this.#name);
+      request.onsuccess = () => {
+        resolve();
+      };
+      // The records are gone already (EncryptedFs clears first); the database follows when the
+      // other connection closes.
+      request.onblocked = () => {
+        resolve();
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('IndexedDbBackend: the database was not deleted'));
+      };
+    });
   }
 
   async close(): Promise<void> {

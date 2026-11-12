@@ -32,6 +32,8 @@ export interface StorageBackend {
   commit(batch: CommitBatch): Promise<void>;
   /** Removes every record. */
   clear(): Promise<void>;
+  /** Optional: removes the storage itself (IndexedDB: the database). The backend stays usable and starts empty. */
+  destroy?(): Promise<void>;
   close(): Promise<void>;
 }
 
