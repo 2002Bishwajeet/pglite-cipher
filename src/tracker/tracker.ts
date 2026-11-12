@@ -91,6 +91,8 @@ export interface Tracker {
   markAllDirty(): void;
   /** A snapshot is outstanding, or a change was seen since the last one. */
   hasDirty(): boolean;
+  /** Every tracked regular file and its node: what a rotation copies blocks from. */
+  files(): Array<{ fileId: Uint8Array; node: MemNode }>;
 }
 
 interface NodeState {
@@ -458,6 +460,10 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
       if (pending !== null || dead.some((st) => st.inStore)) return true;
       for (const st of live.values()) if (st.inodeDirty || !st.dirty.isEmpty) return true;
       return false;
+    },
+
+    files() {
+      return [...live.values()].filter((st) => typeOf(st.node.mode) === 'file').map((st) => ({ fileId: st.fileId, node: st.node }));
     },
   };
 }

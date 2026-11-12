@@ -82,6 +82,10 @@ export class FaultyBackend implements StorageBackend {
     return this.#inner.clear();
   }
 
+  async destroy(): Promise<void> {
+    await this.#inner.destroy?.();
+  }
+
   close(): Promise<void> {
     return this.#inner.close();
   }
