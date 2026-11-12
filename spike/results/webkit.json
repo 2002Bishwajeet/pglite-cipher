@@ -1,0 +1,942 @@
+{
+  "browser": "webkit",
+  "parts": {
+    "gates10": {
+      "sizeMB": 10,
+      "variants": {
+        "plain": {
+          "buildMs": 33787.7,
+          "g1": {
+            "ms": {
+              "p50": 435.48,
+              "p95": 621.84,
+              "max": 645.14,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 494.44,
+              "p95": 694.08,
+              "max": 702.86,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 512.9,
+              "p95": 942.86,
+              "max": 992.1,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1192.96,
+              "p95": 1624.54,
+              "max": 1965.42,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          }
+        },
+        "proto-8k": {
+          "buildMs": 12532.56,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838145,
+            "records": 8347
+          },
+          "g1": {
+            "ms": {
+              "p50": 4.92,
+              "p95": 18.58,
+              "max": 18.86,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 8.86,
+              "p95": 24.5,
+              "max": 24.72,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 900.7,
+              "p95": 1125.9,
+              "max": 1146.34,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2050,
+              "p95": 2051,
+              "max": 2051,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1478.04,
+              "p95": 1922.5,
+              "max": 2051,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1263.98,
+              "p95": 1607.7,
+              "max": 1652,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 50.84,
+              "p95": 136.34,
+              "max": 151.72,
+              "n": 20
+            },
+            "tableBlocks": 25,
+            "blocks": 8321,
+            "salts": 3
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 6,
+              "max": 18,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 6,
+              "max": 18,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        },
+        "proto-32k": {
+          "buildMs": 11284.32,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838145,
+            "records": 2547
+          },
+          "g1": {
+            "ms": {
+              "p50": 3.42,
+              "p95": 13.94,
+              "max": 37.04,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 5.04,
+              "p95": 13.74,
+              "max": 17.08,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 140.9,
+              "p95": 246.76,
+              "max": 260.84,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 514,
+              "p95": 514,
+              "max": 514,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 608.8,
+              "p95": 940.54,
+              "max": 1013.48,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 487.72,
+              "p95": 698.4,
+              "max": 891.78,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 7.8,
+              "p95": 23.46,
+              "max": 31.2,
+              "n": 20
+            },
+            "tableBlocks": 4,
+            "blocks": 2542,
+            "salts": 3
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 2,
+              "max": 3,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        },
+        "proto-64k": {
+          "buildMs": 6310.3,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838145,
+            "records": 1642
+          },
+          "g1": {
+            "ms": {
+              "p50": 1.12,
+              "p95": 2.58,
+              "max": 16.62,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 2.4,
+              "p95": 3.64,
+              "max": 13.24,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 110.64,
+              "p95": 214.14,
+              "max": 289.16,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 668.58,
+              "p95": 920.86,
+              "max": 1137.36,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 522.36,
+              "p95": 744.38,
+              "max": 947.82,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 6.7,
+              "p95": 23.08,
+              "max": 30.22,
+              "n": 20
+            },
+            "tableBlocks": 2,
+            "blocks": 1639,
+            "salts": 3
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 1,
+              "max": 2,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        }
+      },
+      "gates": {
+        "g2BudgetMs": 400,
+        "note": "p50 throughout; p95 is beside it in the variant numbers",
+        "proto-8k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": "not available",
+          "G4": false,
+          "G9": false,
+          "G9_fileMap": false,
+          "G9_g1p50": true
+        },
+        "proto-32k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": "not available",
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-64k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": "not available",
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "G5": "none passes G2"
+      },
+      "measuredAt": "2026-11-12T06:20:56.879Z",
+      "runs": 20
+    },
+    "gates100": {
+      "sizeMB": 100,
+      "variants": {
+        "plain": {
+          "buildMs": 56178.62,
+          "g1": {
+            "ms": {
+              "p50": 931.62,
+              "p95": 1161.72,
+              "max": 1488.38,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 2081.76,
+              "p95": 2748.46,
+              "max": 2761.72,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 2050.84,
+              "p95": 2914.68,
+              "max": 3032,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 2763.96,
+              "p95": 3531.7,
+              "max": 3682.82,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          }
+        },
+        "proto-8k": {
+          "buildMs": 32210.38,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567873,
+            "records": 26501
+          },
+          "g1": {
+            "ms": {
+              "p50": 2.4,
+              "p95": 6.46,
+              "max": 82.4,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 1.84,
+              "p95": 4.1,
+              "max": 4.62,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 5,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 448.12,
+              "p95": 559.4,
+              "max": 605.54,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2050,
+              "p95": 2051,
+              "max": 2051,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 2088.48,
+              "p95": 2670.74,
+              "max": 2766.8,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1899.94,
+              "p95": 2355.96,
+              "max": 2493.56,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 64.96,
+              "p95": 133.58,
+              "max": 187.52,
+              "n": 20
+            },
+            "tableBlocks": 64,
+            "blocks": 26436,
+            "salts": 4
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 7,
+              "max": 36,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 3,
+              "p95": 9,
+              "max": 36,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        },
+        "proto-32k": {
+          "buildMs": 50505.14,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567873,
+            "records": 7079
+          },
+          "g1": {
+            "ms": {
+              "p50": 5.5,
+              "p95": 38.2,
+              "max": 143.5,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 8.52,
+              "p95": 18.4,
+              "max": 21.38,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 356.44,
+              "p95": 546.12,
+              "max": 619.24,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 514,
+              "p95": 515,
+              "max": 515,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1711.88,
+              "p95": 2963.66,
+              "max": 3505.4,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1503.74,
+              "p95": 2625.12,
+              "max": 3104.66,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 27.66,
+              "p95": 49.06,
+              "max": 107.48,
+              "n": 20
+            },
+            "tableBlocks": 7,
+            "blocks": 7071,
+            "salts": 4
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 3,
+              "max": 5,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 3,
+              "max": 5,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        },
+        "proto-64k": {
+          "buildMs": 49796.22,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567873,
+            "records": 3908
+          },
+          "g1": {
+            "ms": {
+              "p50": 5.86,
+              "p95": 16.42,
+              "max": 88.46,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 6.72,
+              "p95": 16.24,
+              "max": 18.56,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 146.28,
+              "p95": 195.12,
+              "max": 206.64,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1207.18,
+              "p95": 1833.74,
+              "max": 1890.32,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1057.54,
+              "p95": 1658.32,
+              "max": 1677.2,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 13.04,
+              "p95": 23.9,
+              "max": 42.84,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "blocks": 3904,
+            "salts": 3
+          },
+          "g3": {
+            "source": "not available",
+            "wasmHeapBytes": 197918720
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 2,
+              "max": 2,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        }
+      },
+      "gates": {
+        "g2BudgetMs": 1500,
+        "note": "p50 throughout; p95 is beside it in the variant numbers",
+        "proto-8k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": "not available",
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-32k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": "not available",
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-64k": {
+          "G1": true,
+          "G1b": true,
+          "G2": true,
+          "G3": "not available",
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "G5": 65536
+      },
+      "measuredAt": "2026-11-12T06:31:22.951Z",
+      "runs": 20
+    },
+    "extras": {
+      "g6": {
+        "aesGcm": true,
+        "hkdfDeriveKeyToAesGcm": true,
+        "unwrapKeyRawIntoHkdf": true,
+        "idbDurability_strict": "strict",
+        "idbDurability_relaxed": "relaxed",
+        "idbNumberKeysOrderedFirst": true,
+        "idbStringKeyRangeGetAll": true,
+        "idb2048PutsThen2048DeletesMs": {
+          "puts": 239.52,
+          "deletes": 199.46
+        }
+      },
+      "g8DeriveKeyMs": {
+        "p50": 0.06,
+        "p95": 0.14,
+        "max": 1.78,
+        "n": 1000
+      },
+      "aesGcm": {
+        "8k": {
+          "calls": 12800,
+          "encryptMs": 155.54,
+          "encryptMBps": 642.92,
+          "encryptUsPerCall": 12.15,
+          "decryptMs": 134.2,
+          "decryptMBps": 745.16,
+          "decryptUsPerCall": 10.48
+        },
+        "32k": {
+          "calls": 3200,
+          "encryptMs": 123.88,
+          "encryptMBps": 807.23,
+          "encryptUsPerCall": 38.71,
+          "decryptMs": 96.34,
+          "decryptMBps": 1037.99,
+          "decryptUsPerCall": 30.11
+        },
+        "64k": {
+          "calls": 1600,
+          "encryptMs": 106.56,
+          "encryptMBps": 938.44,
+          "encryptUsPerCall": 66.6,
+          "decryptMs": 58.46,
+          "decryptMBps": 1710.57,
+          "decryptUsPerCall": 36.54
+        }
+      },
+      "measuredAt": "2026-11-12T06:31:25.152Z",
+      "runs": 20
+    },
+    "year": {
+      "sessions": 365,
+      "blockSize": 8192,
+      "liveSalts": 366,
+      "records": 7252,
+      "deriveKeyP50Ms": 0.08,
+      "saltsTimesDeriveKeyMs": 29.28,
+      "G8": true,
+      "totalMs": 203836.04,
+      "measuredAt": "2026-11-12T06:34:50.323Z",
+      "runs": 20
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15"
+}

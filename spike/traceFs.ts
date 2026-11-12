@@ -287,7 +287,7 @@ export class TraceFS extends MemoryFS {
   }
 
   override async closeFs(): Promise<void> {
-    if (this.pg) this.last = snapshot(this.pg.Module.FS as unknown as EmFs);
+    if (this.pg) this.last = snapshot((this.pg.Module as unknown as { FS: EmFs }).FS);
     await super.closeFs();
   }
 }

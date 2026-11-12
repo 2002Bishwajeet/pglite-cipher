@@ -41,7 +41,7 @@ export interface EmFs {
 }
 
 /** The Emscripten FS of a started PGlite instance. */
-export const fsOf = (pg: PGlite): EmFs => pg.Module.FS as unknown as EmFs;
+export const fsOf = (pg: PGlite): EmFs => (pg.Module as unknown as { FS: EmFs }).FS;
 
 export type Around = (name: string, args: unknown[], call: () => unknown) => unknown;
 

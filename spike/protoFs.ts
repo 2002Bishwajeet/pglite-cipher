@@ -2,8 +2,10 @@
 // Packed layout: every block is a record of 44 + blockSize bytes (salt 16 | nonce 12 | ciphertext
 // and tag) under a random 16-byte id (32 hex characters), overwritten in place for as long as the
 // block exists. An in-memory file map is packed into file-table blocks of the same size; the root
-// record under the number key 2 lists the table blocks' ids. No key wrapping, no header envelope,
-// no digests, no error handling beyond throwing. Nothing here ships.
+// record under the number key 2 lists the table blocks' ids. A file's ids are stored as runs
+// (fragments); its size and mode count only in its last fragment (the tail run), so a file that
+// grows or shrinks rewrites the table block of its tail run and no other. No key wrapping, no header
+// envelope, no digests, no error handling beyond throwing. Nothing here ships.
 import { MemoryFS } from '@electric-sql/pglite';
 import type { PGlite } from '@electric-sql/pglite';
 import { PGDATA, hookMemfs, walk, withPreRun } from './memfs.ts';
@@ -12,7 +14,7 @@ import type { EmFs, FsNode, FsStream } from './memfs.ts';
 export type BlockSize = 8192 | 32768 | 65536;
 type Bytes = Uint8Array<ArrayBuffer>;
 
-const STORE = 'blocks';
+export const STORE = 'blocks';
 const ROOT_KEY = 2;
 const HEADER = 28; // salt 16 + nonce 12
 const FRAG_FIXED = 38; // file id 16, path length 2, mode 4, size 8, start 4, count 4
@@ -80,7 +82,11 @@ export const openDb = (name: string): Promise<IDBDatabase> => {
 };
 
 export const deleteDb = async (name: string): Promise<void> => {
-  await req(indexedDB.deleteDatabase(name));
+  const r = indexedDB.deleteDatabase(name);
+  r.onblocked = () => {
+    console.warn(`[bench] deleteDatabase is blocked by an open connection: ${name}`);
+  };
+  await req(r);
 };
 
 /** HKDF base key from 32 raw bytes. */
@@ -109,6 +115,7 @@ interface Entry {
   mode: number;
   size: number;
   ids: string[];
+  /** Ordered by start. The last one is the tail run, and only its size and mode count. */
   frags: Frag[];
   node?: FsNode;
 }
@@ -130,6 +137,8 @@ export interface SyncStat {
   tableBlocks: number;
   deleted: number;
   root: boolean;
+  /** Files created, grown, shrunk, renamed or removed since the previous sync. */
+  entries: number;
 }
 
 export interface OpenStat {
@@ -162,7 +171,7 @@ export class ProtoFS extends MemoryFS {
   private readonly outside = new Set<number>();
   private readonly byIno = new Map<number, Entry>();
   private tbs: TableBlock[] = [];
-  private tail?: TableBlock;
+  private tail: TableBlock | undefined;
   private readonly dirtyTbs = new Set<TableBlock>();
   private rootDirty = false;
   readonly syncStats: SyncStat[] = [];
@@ -235,8 +244,10 @@ export class ProtoFS extends MemoryFS {
   private markWrite(node: FsNode, pos: number, len: number, oldSize: number) {
     if (len <= 0 || !this.isData(node)) return;
     const size = node.usedBytes;
+    // An in-place write marks its own range; a write that changes the size marks from the old end.
     const from = size === oldSize ? pos : Math.min(pos, oldSize, size);
-    this.mark(node, Math.floor(from / this.bs), Math.ceil(Math.max(pos + len, size) / this.bs));
+    const to = size === oldSize ? pos + len : Math.max(pos + len, size);
+    this.mark(node, Math.floor(from / this.bs), Math.ceil(to / this.bs));
   }
 
   private markResize(node: FsNode, oldSize: number, size: number) {
@@ -317,10 +328,10 @@ export class ProtoFS extends MemoryFS {
     return tb;
   }
 
-  private place(e: Entry, prefer: TableBlock[]) {
+  /** Places the ids of `e` from `start` on in new fragments after its existing ones. */
+  private place(e: Entry, prefer: TableBlock[], start = 0) {
     const fixed = FRAG_FIXED + utf8.encode(e.path).length;
     const total = e.ids.length;
-    let start = 0;
     do {
       const tb = this.pick(fixed + (total > start ? 16 : 0), prefer);
       const count = Math.min(total - start, Math.floor((this.cap - tb.used - fixed) / 16));
@@ -331,6 +342,38 @@ export class ProtoFS extends MemoryFS {
       this.dirtyTbs.add(tb);
       start += count;
     } while (start < total);
+  }
+
+  /**
+   * Fits the fragments of `e` to its id count after a size change: drops the runs past the end,
+   * trims or extends the tail run in place, and spills what does not fit into new fragments. Writes
+   * the tail run's table block (it holds the size) and only the blocks whose runs changed.
+   */
+  private retail(e: Entry) {
+    const total = e.ids.length;
+    let tail = e.frags[e.frags.length - 1];
+    if (!tail) {
+      this.place(e, []);
+      return;
+    }
+    while (e.frags.length > 1 && tail.start >= total) {
+      e.frags.pop();
+      tail.tb.frags.delete(tail);
+      tail.tb.used -= this.fragBytes(tail);
+      this.dirtyTbs.add(tail.tb);
+      tail = e.frags[e.frags.length - 1] ?? tail;
+    }
+    const end = tail.start + tail.count;
+    if (end > total) {
+      tail.tb.used -= 16 * (end - total);
+      tail.count = total - tail.start;
+    } else if (end < total) {
+      const fit = Math.min(total - end, Math.floor((this.cap - tail.tb.used) / 16));
+      tail.count += fit;
+      tail.tb.used += 16 * fit;
+      if (end + fit < total) this.place(e, [], end + fit);
+    }
+    this.dirtyTbs.add(tail.tb);
   }
 
   private encodeTable(tb: TableBlock): Bytes {
@@ -374,6 +417,9 @@ export class ProtoFS extends MemoryFS {
       if (!e) {
         e = { fileId, path, mode, size, ids: [], frags: [] };
         files.set(fid, e);
+      } else if (e.frags.every((g) => g.start <= start)) {
+        e.size = size; // a later run: the tail run's size and mode count
+        e.mode = mode;
       }
       for (let i = 0; i < count; i++, off += 16) e.ids[start + i] = hex(plain.subarray(off, off + 16));
       const f: Frag = { entry: e, start, count, tb };
@@ -392,25 +438,30 @@ export class ProtoFS extends MemoryFS {
     return buf;
   }
 
-  private reconcile(changed: Set<Entry>, removed: string[]) {
+  /**
+   * Walks PGDATA: new and renamed entries go to `moved` (all their runs rewritten), a mode change
+   * to `resized` (the tail run rewritten). Returns the number of entries removed.
+   */
+  private reconcile(moved: Set<Entry>, resized: Set<Entry>, removed: string[]): number {
     const fs = this.fs;
     if (!fs) throw new Error('not initialised');
     const seen = new Set<Entry>();
+    let gone = 0;
     walk(fs, (path, node) => {
       if (fs.isLink(node.mode)) throw new Error('symlink in PGDATA: not supported by the prototype');
       let e = this.byIno.get(node.id);
       if (!e) {
         e = { fileId: random(16), path, mode: node.mode, size: 0, ids: [], frags: [] };
         this.byIno.set(node.id, e);
-        changed.add(e);
+        moved.add(e);
         if (fs.isFile(node.mode)) this.mark(node, 0, Math.ceil(node.usedBytes / this.bs));
       } else if (e.path !== path) {
         e.path = path;
-        changed.add(e);
+        moved.add(e);
       }
       if (e.mode !== node.mode) {
         e.mode = node.mode;
-        changed.add(e);
+        resized.add(e);
       }
       seen.add(e);
     });
@@ -419,7 +470,9 @@ export class ProtoFS extends MemoryFS {
       this.byIno.delete(ino);
       removed.push(...e.ids);
       this.unplace(e);
+      gone++;
     }
+    return gone;
   }
 
   // ---- sync and open --------------------------------------------------------------------------
@@ -430,8 +483,9 @@ export class ProtoFS extends MemoryFS {
     if (this.loading || !fs || !db) return;
     const t0 = now();
     const removed: string[] = [];
-    const changed = new Set<Entry>();
-    if (this.structural) this.reconcile(changed, removed);
+    const moved = new Set<Entry>();
+    const resized = new Set<Entry>();
+    const gone = this.structural ? this.reconcile(moved, resized, removed) : 0;
     this.structural = false;
 
     // Copy every dirty block synchronously, before the first await.
@@ -443,16 +497,10 @@ export class ProtoFS extends MemoryFS {
       const nb = Math.ceil(size / this.bs);
       if (size !== e.size) {
         e.size = size;
-        changed.add(e);
+        resized.add(e);
       }
-      if (e.ids.length > nb) {
-        removed.push(...e.ids.splice(nb));
-        changed.add(e);
-      }
-      while (e.ids.length < nb) {
-        e.ids.push(randomId());
-        changed.add(e);
-      }
+      if (e.ids.length > nb) removed.push(...e.ids.splice(nb));
+      while (e.ids.length < nb) e.ids.push(randomId());
       const contents = node.contents as Uint8Array;
       for (const i of blocks) {
         if (i >= nb) continue;
@@ -463,7 +511,8 @@ export class ProtoFS extends MemoryFS {
     }
     this.dirty.clear();
 
-    for (const e of changed) this.place(e, this.unplace(e));
+    for (const e of moved) this.place(e, this.unplace(e));
+    for (const e of resized) if (!moved.has(e)) this.retail(e);
     let tableBlocks = 0;
     for (const tb of this.dirtyTbs) {
       if (tb.frags.size === 0) {
@@ -492,7 +541,14 @@ export class ProtoFS extends MemoryFS {
     for (const id of removed) store.delete(id);
     if (root) store.put(root, ROOT_KEY);
     await done(tx);
-    this.syncStats.push({ ms: now() - t0, dataBlocks: jobs.length - tableBlocks, tableBlocks, deleted: removed.length, root: !!root });
+    this.syncStats.push({
+      ms: now() - t0,
+      dataBlocks: jobs.length - tableBlocks,
+      tableBlocks,
+      deleted: removed.length,
+      root: !!root,
+      entries: new Set([...moved, ...resized]).size + gone,
+    });
   }
 
   override async initialSyncFs(): Promise<void> {
@@ -525,6 +581,7 @@ export class ProtoFS extends MemoryFS {
     const place = new Map<string, [Entry, number]>();
     let expected = 0;
     for (const e of files.values()) {
+      e.frags.sort((a, b) => a.start - b.start);
       e.ids.forEach((id, i) => place.set(id, [e, i]));
       expected += e.ids.length;
     }

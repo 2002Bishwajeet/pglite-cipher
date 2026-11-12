@@ -12,10 +12,12 @@ import { createPg, runWorkload } from './workload.ts';
 const tableChange = (s: SyncEvent) => s.creates.length + s.sizeChanges.length + s.renames.length + s.removes.length > 0;
 
 function summarizeSyncs(syncs: SyncEvent[]) {
-  const byPhase: Record<string, { syncs: number; withTableChange: number; creates: number; sizeChanges: number; renames: number; removes: number; sizeChangedFiles: Record<string, number> }> = {};
+  // A write commit is a sync with at least one write; the others (a SELECT) are no-op syncs.
+  const byPhase: Record<string, { syncs: number; writeCommits: number; withTableChange: number; creates: number; sizeChanges: number; renames: number; removes: number; sizeChangedFiles: Record<string, number> }> = {};
   for (const s of syncs) {
-    const p = (byPhase[s.phase] ??= { syncs: 0, withTableChange: 0, creates: 0, sizeChanges: 0, renames: 0, removes: 0, sizeChangedFiles: {} });
+    const p = (byPhase[s.phase] ??= { syncs: 0, writeCommits: 0, withTableChange: 0, creates: 0, sizeChanges: 0, renames: 0, removes: 0, sizeChangedFiles: {} });
     p.syncs++;
+    if (s.writes > 0) p.writeCommits++;
     if (tableChange(s)) p.withTableChange++;
     p.creates += s.creates.length;
     p.sizeChanges += s.sizeChanges.length;
@@ -23,7 +25,7 @@ function summarizeSyncs(syncs: SyncEvent[]) {
     p.removes += s.removes.length;
     for (const f of s.sizeChanges) p.sizeChangedFiles[f] = (p.sizeChangedFiles[f] ?? 0) + 1;
   }
-  return { total: syncs.length, withTableChange: syncs.filter(tableChange).length, byPhase };
+  return { total: syncs.length, writeCommits: syncs.filter((s) => s.writes > 0).length, withTableChange: syncs.filter(tableChange).length, byPhase };
 }
 
 async function probeSyncBehaviour() {
