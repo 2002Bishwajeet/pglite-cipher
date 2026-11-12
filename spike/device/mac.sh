@@ -28,7 +28,8 @@ case $target in
   *) echo "usage: mac.sh <mac-webkit|mac-wkwebview|ios-sim|iphone-15|ipad-air-m3> [parts] [runs]" >&2; exit 2 ;;
 esac
 
-[ -f bench/dist/index.html ] || npm run bench:build >/tmp/pc-device-build.log 2>&1 || { tail -20 /tmp/pc-device-build.log; exit 1; }
+# Always rebuild: remote.sh's rsync excludes dist, so a build left by an earlier run would go stale.
+npm run bench:build >/tmp/pc-device-build.log 2>&1 || { tail -20 /tmp/pc-device-build.log; exit 1; }
 node spike/device/serve.mjs --port "$port" --until "$target" &
 srv=$!
 booted='' ts=''
