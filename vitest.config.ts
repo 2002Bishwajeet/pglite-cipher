@@ -3,7 +3,7 @@ import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 const shared = {
-  include: ['test/**/*.test.ts'],
+  include: ['test/**/*.test.ts', 'spike/**/*.test.ts'],
 };
 
 // PGlite loads .wasm and .data files and uses SharedArrayBuffer-dependent features in some
@@ -25,7 +25,7 @@ const browserProject = (browser: 'chromium' | 'firefox' | 'webkit') => ({
     ...shared,
     name: browser,
     // Tests that read the repository (node:fs) are Node-only.
-    exclude: ['test/**/*.node.test.ts'],
+    exclude: ['test/**/*.node.test.ts', 'spike/**/*.node.test.ts'],
     browser: {
       enabled: true,
       headless: true,

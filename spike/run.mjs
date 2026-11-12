@@ -1,0 +1,63 @@
+// Throwaway spike code (issue #2): runs the benchmark page headless in Playwright's browsers and
+// saves what it reports to spike/results/<browser>.json (merged per part, so parts can run apart).
+// Usage: node spike/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year] [--runs 20]
+// Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node spike/run.mjs webkit
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { build, preview } from 'vite';
+import * as playwright from 'playwright';
+
+const args = process.argv.slice(2);
+const opt = (name, fallback) => {
+  const i = args.indexOf(`--${name}`);
+  return i < 0 ? fallback : args.splice(i, 2)[1];
+};
+const parts = opt('parts', 'gates10,gates100,extras,year').split(',');
+const runs = Number(opt('runs', '20'));
+const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
+const config = fileURLToPath(new URL('../bench/vite.config.ts', import.meta.url));
+const results = new URL('./results/', import.meta.url);
+const PART_TIMEOUT = 60 * 60 * 1000;
+
+if (!existsSync(new URL('../bench/dist/index.html', import.meta.url))) await build({ configFile: config, logLevel: 'warn' });
+const server = await preview({ configFile: config, logLevel: 'warn' });
+const base = server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:47900/';
+mkdirSync(results, { recursive: true });
+
+let failed = false;
+try {
+  for (const name of browsers) {
+    const file = new URL(`${name}.json`, results);
+    const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
+    // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
+    const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
+    const browser = await playwright[name].launch({ headless: true, args: launchArgs });
+    try {
+      for (const part of parts) {
+        const page = await browser.newPage();
+        page.on('console', (m) => {
+          if (m.text().startsWith('[bench]') || m.type() === 'error') console.log(`${new Date().toISOString().slice(11, 19)} [${name}] ${m.type()}: ${m.text()}`);
+        });
+        page.on('pageerror', (e) => {
+          console.log(`[${name}] pageerror: ${e.message}`);
+        });
+        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}`);
+        await page.waitForFunction(() => window.__benchResult || window.__benchError, undefined, { timeout: PART_TIMEOUT, polling: 1000 });
+        const { result, error } = await page.evaluate(() => ({ result: window.__benchResult, error: window.__benchError }));
+        await page.close();
+        if (error || !result) throw new Error(`${name} ${part}: ${String(error)}`);
+        const { [part]: value, ...meta } = result;
+        if (value && typeof value === 'object' && 'error' in value) failed = true;
+        merged.userAgent = meta.userAgent;
+        merged.parts[part] = { ...value, measuredAt: meta.finishedAt, runs };
+        writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`);
+        console.log(`[${name}] ${part} saved to spike/results/${name}.json`);
+      }
+    } finally {
+      await browser.close();
+    }
+  }
+} finally {
+  await server.close();
+}
+process.exit(failed ? 1 : 0);

@@ -1,0 +1,958 @@
+{
+  "browser": "chromium",
+  "parts": {
+    "gates10": {
+      "sizeMB": 10,
+      "variants": {
+        "plain": {
+          "buildMs": 13255.84,
+          "g1": {
+            "ms": {
+              "p50": 90.66,
+              "p95": 119.82,
+              "max": 214.65,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 136.21,
+              "p95": 277,
+              "max": 305.32,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 211.81,
+              "p95": 349.88,
+              "max": 414.65,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 746.48,
+              "p95": 1091.02,
+              "max": 1340.81,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 481670413,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          }
+        },
+        "proto-8k": {
+          "buildMs": 6260.01,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838147,
+            "records": 8347
+          },
+          "g1": {
+            "ms": {
+              "p50": 0.69,
+              "p95": 1.38,
+              "max": 1.45,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 1.23,
+              "p95": 1.95,
+              "max": 2.06,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 288.6,
+              "p95": 471.52,
+              "max": 480.47,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2050,
+              "p95": 2051,
+              "max": 2051,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1523.17,
+              "p95": 2043.89,
+              "max": 2161.02,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1389.59,
+              "p95": 1840.99,
+              "max": 1872.34,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 22.21,
+              "p95": 70.52,
+              "max": 82.04,
+              "n": 20
+            },
+            "tableBlocks": 25,
+            "blocks": 8321,
+            "salts": 3
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 435027476,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 6,
+              "max": 18,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 6,
+              "max": 18,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        },
+        "proto-32k": {
+          "buildMs": 5217.31,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838147,
+            "records": 2547
+          },
+          "g1": {
+            "ms": {
+              "p50": 0.8,
+              "p95": 3.16,
+              "max": 4,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 1.53,
+              "p95": 2.23,
+              "max": 2.28,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 148.25,
+              "p95": 285.31,
+              "max": 409.66,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 514,
+              "p95": 514,
+              "max": 514,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1110.27,
+              "p95": 1492.32,
+              "max": 1823.22,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 964.43,
+              "p95": 1361.39,
+              "max": 1679.41,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 19.47,
+              "p95": 40.75,
+              "max": 88.34,
+              "n": 20
+            },
+            "tableBlocks": 4,
+            "blocks": 2542,
+            "salts": 3
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 373993973,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 2,
+              "max": 3,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        },
+        "proto-64k": {
+          "buildMs": 6595.76,
+          "dataDir": {
+            "files": 990,
+            "bytes": 67838147,
+            "records": 1642
+          },
+          "g1": {
+            "ms": {
+              "p50": 0.94,
+              "p95": 2.78,
+              "max": 4.73,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 2.72,
+              "p95": 3.62,
+              "max": 6.51,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 135.9,
+              "p95": 274.99,
+              "max": 297.85,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 770.79,
+              "p95": 1132.55,
+              "max": 1249.89,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 604.4,
+              "p95": 962.79,
+              "max": 1100.14,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 10.06,
+              "p95": 23.41,
+              "max": 36,
+              "n": 20
+            },
+            "tableBlocks": 2,
+            "blocks": 1639,
+            "salts": 3
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 374944931,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 175,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 1,
+              "max": 2,
+              "n": 175
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 54
+            },
+            "changingSyncs": 54
+          }
+        }
+      },
+      "gates": {
+        "g2BudgetMs": 400,
+        "note": "p50 throughout; p95 is beside it in the variant numbers",
+        "proto-8k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": false,
+          "G9_g1p50": true
+        },
+        "proto-32k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-64k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "G5": "none passes G2"
+      },
+      "measuredAt": "2026-11-12T05:50:51.442Z",
+      "runs": 20
+    },
+    "extras": {
+      "g6": {
+        "aesGcm": true,
+        "hkdfDeriveKeyToAesGcm": true,
+        "unwrapKeyRawIntoHkdf": true,
+        "idbDurability_strict": "strict",
+        "idbDurability_relaxed": "relaxed",
+        "idbNumberKeysOrderedFirst": true,
+        "idbStringKeyRangeGetAll": true,
+        "idb2048PutsThen2048DeletesMs": {
+          "puts": 136.09,
+          "deletes": 117.26
+        }
+      },
+      "g8DeriveKeyMs": {
+        "p50": 0.015,
+        "p95": 0.03,
+        "max": 0.11,
+        "n": 1000
+      },
+      "aesGcm": {
+        "8k": {
+          "calls": 12800,
+          "encryptMs": 173.86,
+          "encryptMBps": 575.18,
+          "encryptUsPerCall": 13.58,
+          "decryptMs": 157.65,
+          "decryptMBps": 634.32,
+          "decryptUsPerCall": 12.32
+        },
+        "32k": {
+          "calls": 3200,
+          "encryptMs": 108.54,
+          "encryptMBps": 921.28,
+          "encryptUsPerCall": 33.92,
+          "decryptMs": 106.84,
+          "decryptMBps": 936.02,
+          "decryptUsPerCall": 33.39
+        },
+        "64k": {
+          "calls": 1600,
+          "encryptMs": 89.82,
+          "encryptMBps": 1113.34,
+          "encryptUsPerCall": 56.14,
+          "decryptMs": 112.23,
+          "decryptMBps": 891.03,
+          "decryptUsPerCall": 70.14
+        }
+      },
+      "measuredAt": "2026-11-12T05:31:03.608Z",
+      "runs": 20
+    },
+    "gates100": {
+      "sizeMB": 100,
+      "variants": {
+        "plain": {
+          "buildMs": 30484.15,
+          "g1": {
+            "ms": {
+              "p50": 75.42,
+              "p95": 96.2,
+              "max": 169.02,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 515.84,
+              "p95": 687.22,
+              "max": 910.55,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 545.55,
+              "p95": 671.22,
+              "max": 682.27,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 775.69,
+              "p95": 1187.1,
+              "max": 1387.04,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 966279984,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          }
+        },
+        "proto-8k": {
+          "buildMs": 22722.54,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567875,
+            "records": 26501
+          },
+          "g1": {
+            "ms": {
+              "p50": 0.75,
+              "p95": 1.85,
+              "max": 2.87,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 4,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 0.96,
+              "p95": 2.16,
+              "max": 2.27,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 5,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 191.93,
+              "p95": 216.41,
+              "max": 221,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2050,
+              "p95": 2051,
+              "max": 2051,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 3423.94,
+              "p95": 11865.89,
+              "max": 11953.56,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 3329.56,
+              "p95": 11101.17,
+              "max": 11522.54,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 34.77,
+              "p95": 230.44,
+              "max": 239.71,
+              "n": 20
+            },
+            "tableBlocks": 64,
+            "blocks": 26436,
+            "salts": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 671290585,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 7,
+              "max": 36,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 3,
+              "p95": 9,
+              "max": 36,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        },
+        "proto-32k": {
+          "buildMs": 35290.03,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567875,
+            "records": 7079
+          },
+          "g1": {
+            "ms": {
+              "p50": 1.06,
+              "p95": 4.27,
+              "max": 8.15,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 1.86,
+              "p95": 2.47,
+              "max": 2.59,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 147.36,
+              "p95": 267.02,
+              "max": 293.05,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 514,
+              "p95": 515,
+              "max": 515,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 2552.97,
+              "p95": 4046.21,
+              "max": 5170.66,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 2451.08,
+              "p95": 3881.76,
+              "max": 5024.89,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 23.25,
+              "p95": 40.21,
+              "max": 57.78,
+              "n": 20
+            },
+            "tableBlocks": 7,
+            "blocks": 7071,
+            "salts": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 757125327,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 3,
+              "max": 5,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 3,
+              "max": 5,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        },
+        "proto-64k": {
+          "buildMs": 27051.03,
+          "dataDir": {
+            "files": 997,
+            "bytes": 266567875,
+            "records": 3908
+          },
+          "g1": {
+            "ms": {
+              "p50": 6.84,
+              "p95": 21.04,
+              "max": 39.25,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g1b": {
+            "ms": {
+              "p50": 10.13,
+              "p95": 19.66,
+              "max": 22.44,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 3,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0
+          },
+          "g4": {
+            "ms": {
+              "p50": 279.53,
+              "p95": 522.49,
+              "max": 628.97,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 1431.59,
+              "p95": 2738.05,
+              "max": 2975.41,
+              "n": 20
+            },
+            "protoOpenMs": {
+              "p50": 1306.88,
+              "p95": 2457.88,
+              "max": 2641.79,
+              "n": 20
+            },
+            "fileMapMs": {
+              "p50": 20.08,
+              "p95": 58.91,
+              "max": 78.04,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "blocks": 3904,
+            "salts": 3
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 671654485,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "g9": {
+            "syncs": 184,
+            "tableBlocksPerSync": {
+              "p50": 0,
+              "p95": 2,
+              "max": 2,
+              "n": 184
+            },
+            "tableBlocksPerChangingSync": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 63
+            },
+            "changingSyncs": 63
+          }
+        }
+      },
+      "gates": {
+        "g2BudgetMs": 1500,
+        "note": "p50 throughout; p95 is beside it in the variant numbers",
+        "proto-8k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-32k": {
+          "G1": true,
+          "G1b": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "proto-64k": {
+          "G1": true,
+          "G1b": true,
+          "G2": true,
+          "G3": false,
+          "G4": true,
+          "G9": false,
+          "G9_fileMap": true,
+          "G9_g1p50": true
+        },
+        "G5": 65536
+      },
+      "measuredAt": "2026-11-12T05:57:53.285Z",
+      "runs": 20
+    },
+    "year": {
+      "sessions": 365,
+      "blockSize": 8192,
+      "liveSalts": 366,
+      "records": 7252,
+      "deriveKeyP50Ms": 0.01,
+      "saltsTimesDeriveKeyMs": 3.66,
+      "G8": true,
+      "totalMs": 357669.19,
+      "measuredAt": "2026-11-12T05:41:17.149Z",
+      "runs": 20
+    }
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36"
+}
