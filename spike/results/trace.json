@@ -28,7 +28,7 @@
         "doc_search": 5,
         "kv": 2
       },
-      "blobChecksum": "d777f7cd4097eccfeb0b08637f40d3bb"
+      "blobChecksum": "5739542b64c4923fd9336575e0396c71"
     },
     "afterReopen": {
       "counts": {
@@ -36,7 +36,7 @@
         "doc_search": 5,
         "kv": 2
       },
-      "blobChecksum": "d777f7cd4097eccfeb0b08637f40d3bb"
+      "blobChecksum": "5739542b64c4923fd9336575e0396c71"
     },
     "walFiles": [
       "000000010000000000000002",
@@ -45,22 +45,22 @@
     ]
   },
   "ops": {
-    "lookup": 4282,
+    "lookup": 4279,
     "mknod": 2544,
     "setattr": 6213,
-    "write": 16633,
+    "write": 16627,
     "symlink": 4,
     "readlink": 4,
     "getattr": 100,
     "read": 6254,
     "readdir": 33,
-    "llseek": 7105,
+    "llseek": 7098,
     "mmap": 4,
     "unlink": 9,
     "rename": 12
   },
   "otherOps": {
-    "lookup": 4282,
+    "lookup": 4279,
     "readlink": 4,
     "getattr": 100,
     "read": 6254,
@@ -10302,18 +10302,18 @@
       }
     },
     "base/N/N": {
-      "count": 12083,
-      "bytes": 112156672,
+      "count": 12077,
+      "bytes": 112107520,
       "viaMsync": 0,
       "unalignedOffset": 0,
       "unalignedLength": 0,
       "pastEof": 0,
       "unlinkedNode": 0,
       "offsetMod": {
-        "0": 12083
+        "0": 12077
       },
       "lengthMod": {
-        "0": 12083
+        "0": 12077
       }
     },
     "base/N/N_fsm": {
@@ -16293,7 +16293,7 @@
       "grow": 0,
       "shrink": 0,
       "same": 0,
-      "growByWrite": 5806
+      "growByWrite": 5803
     },
     "base/N/N_fsm": {
       "setattrWithSize": 0,
@@ -17286,10 +17286,12 @@
   },
   "syncSummary": {
     "total": 2930,
-    "withTableChange": 1477,
+    "writeCommits": 2342,
+    "withTableChange": 1479,
     "byPhase": {
       "initdb": {
         "syncs": 2,
+        "writeCommits": 2,
         "withTableChange": 2,
         "creates": 999,
         "sizeChanges": 804,
@@ -17325,6 +17327,7 @@
       },
       "schema": {
         "syncs": 2,
+        "writeCommits": 1,
         "withTableChange": 1,
         "creates": 16,
         "sizeChanges": 21,
@@ -17336,7 +17339,8 @@
       },
       "insert": {
         "syncs": 2300,
-        "withTableChange": 1364,
+        "writeCommits": 2200,
+        "withTableChange": 1367,
         "creates": 3,
         "sizeChanges": 1417,
         "renames": 1,
@@ -17349,6 +17353,7 @@
       },
       "update": {
         "syncs": 399,
+        "writeCommits": 20,
         "withTableChange": 1,
         "creates": 0,
         "sizeChanges": 1,
@@ -17360,6 +17365,7 @@
       },
       "transaction": {
         "syncs": 21,
+        "writeCommits": 19,
         "withTableChange": 12,
         "creates": 0,
         "sizeChanges": 12,
@@ -17371,6 +17377,7 @@
       },
       "delete": {
         "syncs": 2,
+        "writeCommits": 2,
         "withTableChange": 1,
         "creates": 0,
         "sizeChanges": 1,
@@ -17382,6 +17389,7 @@
       },
       "vacuum": {
         "syncs": 1,
+        "writeCommits": 1,
         "withTableChange": 1,
         "creates": 14,
         "sizeChanges": 14,
@@ -17394,6 +17402,7 @@
       },
       "checkpoint": {
         "syncs": 1,
+        "writeCommits": 1,
         "withTableChange": 1,
         "creates": 1,
         "sizeChanges": 2,
@@ -17406,19 +17415,21 @@
       },
       "wal-switch": {
         "syncs": 194,
-        "withTableChange": 93,
+        "writeCommits": 94,
+        "withTableChange": 92,
         "creates": 1,
-        "sizeChanges": 247,
+        "sizeChanges": 244,
         "renames": 1,
         "removes": 0,
         "sizeChangedFiles": {
-          "base/N/N": 245,
+          "base/N/N": 242,
           "base/N/N_fsm": 1,
           "pg_wal/xlogtemp.N": 1
         }
       },
       "close": {
         "syncs": 2,
+        "writeCommits": 1,
         "withTableChange": 0,
         "creates": 0,
         "sizeChanges": 0,
@@ -17428,6 +17439,7 @@
       },
       "reopen": {
         "syncs": 5,
+        "writeCommits": 1,
         "withTableChange": 1,
         "creates": 4,
         "sizeChanges": 4,
@@ -17442,6 +17454,7 @@
       },
       "after-reopen": {
         "syncs": 1,
+        "writeCommits": 0,
         "withTableChange": 0,
         "creates": 0,
         "sizeChanges": 0,

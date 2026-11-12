@@ -8,8 +8,8 @@ ROG G14 that other harness jobs share: timings are noisy, see "Noise" below).
 **Verdict: STOP condition 4 applies.** G2 at 10 MB (≤ 400 ms) fails in Chromium at every unit
 size: plain `idb://` itself takes 361-746 ms to open the same data directory, so the 400 ms
 budget is below what PGlite needs to start on its smallest store. G2 at 100 MB passes at 64 KB in
-Chromium and at 32 and 64 KB in Firefox. G3 fails as measured, for plain `idb://` too. Every other
-gate passes at 32 and 64 KB on both engines.
+Chromium and WebKit and at 32 and 64 KB in Firefox. G3 fails as measured, for plain `idb://` too.
+Every other gate passes at 32 and 64 KB on all three engines.
 
 ## 1. Filesystem-operation trace (steps 1-3)
 
@@ -107,7 +107,29 @@ Writes inside PGDATA by file class:
 A write commit is a sync with at least one write; the others (a `SELECT`) are left out. A sync
 changes the file table when it creates, grows, shrinks, renames or removes a file.
 
-TRACE_TABLE
+From `spike/results/trace.json` (Node, the step 3 workload). "Changes the table" counts the write
+commits that create, grow, shrink, rename or remove at least one file.
+
+| Phase | Syncs | Write commits | Write commits that change the table | Creates | Size changes | Renames | Removes | Main cause |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| initdb | 2 | 2 | 2 | 999 | 804 | 2 | 1 | the data directory is created |
+| schema | 2 | 1 | 1 | 16 | 21 | 0 | 0 | new relations |
+| 2,000 inserts of 4 KB blobs | 2,300 | 2,200 | **1,367 (62 %)** | 3 | 1,417 | 1 | 0 | `base/N/N` grew 1,414 times (the blob table's TOAST relation) |
+| 200 one-row `UPDATE`s | 399 | 20 | **1 (5 %)** | 0 | 1 | 0 | 0 | one relation page |
+| 20 `pg.transaction()`s | 21 | 19 | **12 (63 %)** | 0 | 12 | 0 | 0 | relation growth |
+| deletes | 2 | 2 | 1 | 0 | 1 | 0 | 0 | |
+| `VACUUM` | 1 | 1 | 1 | 14 | 14 | 0 | 2 | visibility and free-space maps |
+| `CHECKPOINT` | 1 | 1 | 1 | 1 | 2 | 2 | 0 | `replorigin_checkpoint.tmp`, `pg_subtrans` |
+| writes up to 2 WAL switches | 194 | 94 | **92 (98 %)** | 1 | 244 | 1 | 0 | relation growth (these writes are inserts too); one `xlogtemp` create + rename per segment |
+| close | 2 | 1 | 0 | 0 | 0 | 0 | 0 | |
+| reopen | 5 | 1 | 1 | 4 | 4 | 5 | 1 | `postmaster.pid`, `pg_internal.init` |
+| after reopen | 1 | 0 | 0 | 0 | 0 | 0 | 0 | |
+| **Whole workload** | **2,930** | **2,342** | **1,479 (63 %)** | | | | | |
+
+The update phase has 399 syncs (the 200 `UPDATE`s and the live query's re-runs), of which only 20
+wrote anything to the filesystem. PGlite reports `synchronous_commit = on` and `fsync = off`; why
+the other `UPDATE` syncs wrote nothing was not investigated here (#8 should check that a committed
+`UPDATE` reaches the filesystem before its sync).
 
 The growth is almost all the TOAST relation of the blob table: a 4,096-byte blob is 3 TOAST chunks
 of about 2 KB, an 8 KB page holds 4, so the TOAST file gains a page on about 2 of every 3 inserts.
@@ -175,23 +197,41 @@ at 10 MB: plain 361, 8 KB 1,034, 32 KB 732, 64 KB 449; at 100 MB: plain 542, 8 K
 
 ### WebKit
 
-WEBKIT_SECTION
+Playwright's WebKit 27.2 build in its Linux container image (`scripts/harness/webkit.sh`), headless.
+Not Safari and not WKWebView.
+
+| | plain | 8 KB | 32 KB | 64 KB |
+| --- | --- | --- | --- | --- |
+| G1 sync, one-row UPDATE, 100 MB | 932 / 1,162 | 2.40 / 6.46 ✅ | 5.50 / 38.2 ✅ | 5.86 / 16.4 ✅ |
+| G1b sync, one 4 KB insert, 10 MB | 494 / 694 | 8.86 / 24.5 ✅ | 5.04 / 13.7 ✅ | 2.40 / 3.64 ✅ |
+| G1b sync, one 4 KB insert, 100 MB | 2,082 / 2,748 | 1.84 / 4.10 ✅ | 8.52 / 18.4 ✅ | 6.72 / 16.2 ✅ |
+| G1b table blocks per sync (p50 / p95), both sizes | | 1 / 1 ✅ | 1 / 1 ✅ | 1 / 1 ✅ |
+| G2 open, 10 MB (≤ 400 ms, ≤ 2× plain) | 1,193 / 1,625 | 1,478 / 1,923 ❌ | 609 / 941 ❌ | 669 / 921 ❌ |
+| G2 open, 100 MB (≤ 1,500 ms, ≤ 2× plain) | 2,764 / 3,532 | 2,088 / 2,671 ❌ | 1,712 / 2,964 ❌ | 1,207 / 1,834 ✅ |
+| G4 segment switch, 10 MB (≤ 500 ms) | 513 / 943 | 901 / 1,126 ❌ | 141 / 247 ✅ | 111 / 214 ✅ |
+| G4 segment switch, 100 MB (≤ 500 ms) | 2,051 / 2,915 | 448 / 559 ✅ | 356 / 546 ✅ | 146 / 195 ✅ |
+| G9 file-map phase of the open, 10 MB (≤ 20 ms) | | 50.8 ❌ | 7.8 ✅ | 6.7 ✅ |
+| G9 file-map phase of the open, 100 MB (≤ 75 ms) | | 65.0 ✅ | 27.7 ✅ | 13.0 ✅ |
+| G9 table blocks in the G1 sync (p50 / max) | | 0 / 1 (2 at 100 MB) | 0 / 1 | 0 / 1 |
+| G9 table blocks in the open | | 25 / 64 | 4 / 7 | 2 / 3 |
+
+Plain `idb://` misses the absolute G2 budgets on its own here (1.2 s at 10 MB, 2.8 s at 100 MB).
 
 ### Gates across targets
 
 | Gate | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- |
-| G1 sync (≤ 2× plain, 100 MB) | ✅ all units (0.75-6.8 ms vs 75 ms) | ✅ all units | WEBKIT_G1 |
-| G1b sync (≤ 1 table block p50, ≤ 2× plain) | ✅ all units, 10 and 100 MB | ✅ all units | WEBKIT_G1B |
-| G2 open, 100 MB (≤ 1.5 s, ≤ 2× plain) | ✅ 64 KB only | ✅ 32 and 64 KB | WEBKIT_G2_100 |
-| G2 open, 10 MB (≤ 400 ms) | ❌ every unit (plain: 746 ms) | ❌ every unit (plain: 673 ms) | WEBKIT_G2_10 |
-| G3 memory (≤ data + 64 MB) | ❌ as measured, plain too (see below) | not available | WEBKIT_G3 |
-| G4 segment switch (≤ 500 ms) | ✅ all units | ✅ 32 and 64 KB; ❌ 8 KB | WEBKIT_G4 |
-| G5 unit size | 64 KB | 32 KB | WEBKIT_G5 |
-| G6 support | ✅ all present | ✅ all present | WEBKIT_G6 |
+| G1 sync (≤ 2× plain, 100 MB) | ✅ all units (0.75-6.8 ms vs 75 ms) | ✅ all units | ✅ all units (1.1-5.9 ms vs 932 ms) |
+| G1b sync (≤ 1 table block p50, ≤ 2× plain) | ✅ all units, 10 and 100 MB | ✅ all units | ✅ all units |
+| G2 open, 100 MB (≤ 1.5 s, ≤ 2× plain) | ✅ 64 KB only | ✅ 32 and 64 KB | ✅ 64 KB only (plain: 2,764 ms) |
+| G2 open, 10 MB (≤ 400 ms) | ❌ every unit (plain: 746 ms) | ❌ every unit (plain: 673 ms) | ❌ every unit (plain: 1,193 ms) |
+| G3 memory (≤ data + 64 MB) | ❌ as measured, plain too (see below) | not available | not available |
+| G4 segment switch (≤ 500 ms) | ✅ all units | ✅ 32 and 64 KB; ❌ 8 KB | ✅ 32 and 64 KB; ❌ 8 KB at 10 MB |
+| G5 unit size | 64 KB | 32 KB | 64 KB |
+| G6 support | ✅ all present | ✅ all present | ✅ all present |
 | G7 Rust store | owner (Tauri only) | owner | owner |
-| G8 subkeys (≤ 150 ms) | ✅ 366 salts × 0.010 ms = 3.7 ms | ✅ 366 × 0.08 ms = 29 ms | WEBKIT_G8 |
-| G9 file table | ✅ at 32 and 64 KB; 8 KB misses the 10 MB file-map budget (22 vs 20 ms) | ✅ all units | WEBKIT_G9 |
+| G8 subkeys (≤ 150 ms) | ✅ 366 salts × 0.010 ms = 3.7 ms | ✅ 366 × 0.08 ms = 29 ms | ✅ 366 × 0.08 ms = 29 ms |
+| G9 file table | ✅ at 32 and 64 KB; 8 KB misses the 10 MB file-map budget (22 vs 20 ms) | ✅ all units | ✅ at 32 and 64 KB; 8 KB misses the 10 MB file-map budget (51 vs 20 ms) |
 
 **G9 and the G1 sync.** In 1 of the 20 G1 syncs (2 at 8 KB, 100 MB) a file grew (a GIN pending-list
 or free-space-map page) and that sync wrote one table block. No sync that changed no file wrote a
@@ -229,9 +269,9 @@ initdb session still owns most of the blocks. One `deriveKey` is 0.010 ms (Chrom
 
 ## 4. Unit size
 
-**64 KB.** It is the only unit that passes G2 at 100 MB in Chromium, and it passes in Firefox
-(where 32 KB passes too). 8 KB fails G2 at 100 MB on both and G4 in Firefox. Nothing passes the
-10 MB open budget.
+**64 KB.** It is the only unit that passes G2 at 100 MB in Chromium and WebKit, and it passes in
+Firefox (where 32 KB passes too). 8 KB fails G2 at 100 MB on all three and G4 in Firefox and
+WebKit. Nothing passes the 10 MB open budget.
 
 ## 5. What only the owner can measure
 
