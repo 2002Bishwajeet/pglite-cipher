@@ -63,6 +63,27 @@ describe('IndexedDbBackend only', () => {
     }
   });
 
+  it('writes only the bytes of a view into `kv`, not the rest of its buffer', async () => {
+    const name = freshName();
+    const b = make(name);
+    const big = new Uint8Array(64).fill(0xa5);
+    big.set(testValue(1), 8);
+    await b.commit({ puts: [[2, big.subarray(8, 24)], [testBlockId(1), big.subarray(8, 24)]], deletes: [], durability: 'strict' });
+
+    const db = await rawOpen(name);
+    try {
+      const raw = await request(db.transaction('kv', 'readonly').objectStore('kv').getAll());
+      expect(raw).toHaveLength(2);
+      for (const value of raw as Uint8Array[]) {
+        expect(value).toEqual(testValue(1));
+        expect(value.buffer.byteLength).toBe(16);
+        expect(new Uint8Array(value.buffer)).not.toContain(0xa5);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
   it('a commit of 5,000 puts and 2,000 deletes lands in one transaction', async () => {
     const b = make();
     await b.commit({ puts: puts(0, 2000), deletes: [], durability: 'relaxed' });

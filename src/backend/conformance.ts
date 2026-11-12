@@ -84,6 +84,21 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
       expect(await b.getMany([testBlockId(1)])).toEqual([testValue(1)]);
     });
 
+    it('stores only the bytes of a view, not the rest of its buffer', async () => {
+      const b = await fresh();
+      const big = new Uint8Array(64).fill(0xa5);
+      big.set(testValue(1), 8);
+      const view = big.subarray(8, 24);
+      await b.commit(batch([[2, view], [testBlockId(1), view]]));
+      const got = [await b.get(2), ...(await b.getMany([testBlockId(1)])), ...(await b.readRange(null, 10)).map(([, v]) => v)];
+      expect(got).toHaveLength(3);
+      for (const value of got) {
+        expect(value).toEqual(testValue(1));
+        expect(value?.buffer.byteLength).toBe(16);
+        expect(new Uint8Array(value?.buffer ?? new ArrayBuffer(0))).not.toContain(0xa5);
+      }
+    });
+
     it('getMany returns values in the order asked, undefined for a missing id (1 id)', async () => {
       const b = await fresh();
       expect(await b.getMany([testBlockId(9)])).toEqual([undefined]);

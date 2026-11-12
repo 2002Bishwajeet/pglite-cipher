@@ -95,7 +95,11 @@ export class IndexedDbBackend implements StorageBackend {
           }
           for (const [key, value] of batch.puts) {
             if (!isRecordKey(key)) throw invalidKey();
-            store.put(value, key);
+            // A put clones the whole buffer behind a view, so a partial view is copied to its own
+            // bytes first; a SharedArrayBuffer cannot be cloned at all. `SharedArrayBuffer` itself
+            // is undefined where the page is not cross-origin isolated, hence `instanceof ArrayBuffer`.
+            const whole = value.byteOffset === 0 && value.byteLength === value.buffer.byteLength && value.buffer instanceof ArrayBuffer;
+            store.put(whole ? value : value.slice(), key);
           }
         } catch (error) {
           // invalidKey(), or the DOMException a put throws for a value it cannot clone.
