@@ -14,12 +14,17 @@ at every unit in Firefox and WebKit. G2 at 100 MB passes at 64 KB in Chromium an
 and 64 KB in Firefox. G3 fails as measured, for plain `idb://` too. Every other gate passes at 32
 and 64 KB on all three engines.
 
-**Can the open go under plain's 746 ms?** Not without changing the design. At 64 KB the encrypted
-open is 771 ms against plain's 746 ms in Chromium (3 % slower, well inside the 2× run-to-run
-noise), and it is already faster than plain in Firefox (602 vs 673 ms) and WebKit (669 vs
-1,193 ms). Both opens load the whole 68 MB data directory into MEMFS before Postgres starts, so
-plain's time is PGlite's own floor for this design. Going lower means reading less at open: lazy
-loading of cold files (a design change) or upstream PGlite work. The owner put both out of scope
+**Can the open go under 746 ms?** Sometimes it already does, but not far under plain, and that
+limitation is accepted. 746 ms is plain `idb://`'s Chromium p50 at 10 MB from one noisy run. In
+that run encrypted 64 KB opened in 771 ms; in the quieter Chromium run it opened in 449 ms; in
+Firefox (602 vs 673 ms) and WebKit (669 vs 1,193 ms) it opened faster than plain. In Chromium,
+within one run (where relative numbers are stable, see "Noise"), 64 KB is 3-24 % slower than plain
+(771 vs 746 ms, 449 vs 361 ms). Plain's own Chromium open hardly changes with size (746 ms at 10 MB
+vs 776 ms at 100 MB; 361 vs 542 ms in the quieter run, for a data directory of 68 vs 267 MB), so it
+is mostly PGlite startup, and no filesystem change, lazy loading included, can take the open far
+below it. What the encrypted design adds on top grows with the data (64 KB at 100 MB: 1,432 vs
+776 ms, 871 vs 542 ms). Lazy loading of cold files would narrow that encrypted-vs-plain gap, not
+get under plain; it is a design change, and the owner put it and upstream PGlite work out of scope
 for now, to revisit if the device runs (#11) show phone open times that hurt the app. The prototype
 was not tuned further.
 
