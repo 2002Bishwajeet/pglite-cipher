@@ -5,11 +5,23 @@ Throwaway measurements for the owner's decision in #3. PGlite 0.5.10. Nothing un
 `spike/results/<browser>.json` (the benchmark page, headless Playwright on the Linux host, a 16 GB
 ROG G14 that other harness jobs share: timings are noisy, see "Noise" below).
 
-**Verdict: STOP condition 4 applies.** G2 at 10 MB (≤ 400 ms) fails in Chromium at every unit
-size: plain `idb://` itself takes 361-746 ms to open the same data directory, so the 400 ms
-budget is below what PGlite needs to start on its smallest store. G2 at 100 MB passes at 64 KB in
-Chromium and WebKit and at 32 and 64 KB in Firefox. G3 fails as measured, for plain `idb://` too.
-Every other gate passes at 32 and 64 KB on all three engines.
+**Verdict: no STOP condition applies; recommended unit 64 KB.** The first run stopped at STOP 4:
+G2 at 10 MB (≤ 400 ms) failed in Chromium at every unit size, because plain `idb://` itself takes
+361-746 ms to open the same data directory. The owner accepted that limitation and restated G2 for
+the 10 MB store as **≤ 2× plain `idb://` only** (the 100 MB budgets are unchanged). Against the
+restated gate, G2 at 10 MB passes at 32 and 64 KB in Chromium (8 KB fails: 1,523 vs 1,493 ms) and
+at every unit in Firefox and WebKit. G2 at 100 MB passes at 64 KB in Chromium and WebKit and at 32
+and 64 KB in Firefox. G3 fails as measured, for plain `idb://` too. Every other gate passes at 32
+and 64 KB on all three engines.
+
+**Can the open go under plain's 746 ms?** Not without changing the design. At 64 KB the encrypted
+open is 771 ms against plain's 746 ms in Chromium (3 % slower, well inside the 2× run-to-run
+noise), and it is already faster than plain in Firefox (602 vs 673 ms) and WebKit (669 vs
+1,193 ms). Both opens load the whole 68 MB data directory into MEMFS before Postgres starts, so
+plain's time is PGlite's own floor for this design. Going lower means reading less at open: lazy
+loading of cold files (a design change) or upstream PGlite work. The owner put both out of scope
+for now, to revisit if the device runs (#11) show phone open times that hurt the app. The prototype
+was not tuned further.
 
 ## 1. Filesystem-operation trace (steps 1-3)
 
@@ -156,7 +168,10 @@ payload added to a fresh database; the data directory is then **67.8 MB** (8,347
 and **266.6 MB** (26,501 records at 8 KB), because a fresh directory is 40 MB and the build leaves
 WAL segments that the checkpoint recycles but keeps. Every open reads all of it. G4 is a
 `SELECT pg_switch_wal()` plus a 4 KB insert in one `exec`, after an untimed `CHECKPOINT`; all 20
-runs switched segment. Gates are judged on p50.
+runs switched segment. Gates are judged on p50. The page now judges G2 at 10 MB as ≤ 2× plain only
+(owner decision); the committed `spike/results/*.json` predate that change, so their
+`gates10.gates.*.G2` and `G5` fields still apply the dropped 400 ms budget. The tables below apply
+the restated gate to the same measured numbers.
 
 ### Chromium 158 (headless, Linux)
 
@@ -166,7 +181,7 @@ runs switched segment. Gates are judged on p50.
 | G1b sync, one 4 KB insert, 10 MB | 136 / 277 | 1.23 / 1.95 ✅ | 1.53 / 2.23 ✅ | 2.72 / 3.62 ✅ |
 | G1b sync, one 4 KB insert, 100 MB | 516 / 687 | 0.96 / 2.16 ✅ | 1.86 / 2.47 ✅ | 10.1 / 19.7 ✅ |
 | G1b table blocks per sync (p50 / p95), both sizes | | 1 / 1 ✅ | 1 / 1 ✅ | 1 / 1 ✅ |
-| G2 open, 10 MB (≤ 400 ms, ≤ 2× plain) | 746 / 1,091 | 1,523 / 2,044 ❌ | 1,110 / 1,492 ❌ | 771 / 1,133 ❌ |
+| G2 open, 10 MB (≤ 2× plain) | 746 / 1,091 | 1,523 / 2,044 ❌ | 1,110 / 1,492 ✅ | 771 / 1,133 ✅ |
 | G2 open, 100 MB (≤ 1,500 ms, ≤ 2× plain) | 776 / 1,187 | 3,424 / 11,866 ❌ | 2,553 / 4,046 ❌ | 1,432 / 2,738 ✅ |
 | G4 segment switch, 10 MB (≤ 500 ms) | 212 / 350 | 289 / 472 ✅ | 148 / 285 ✅ | 136 / 275 ✅ |
 | G4 segment switch, 100 MB (≤ 500 ms) | 546 / 671 | 192 / 216 ✅ | 147 / 267 ✅ | 280 / 522 ✅ |
@@ -177,7 +192,8 @@ runs switched segment. Gates are judged on p50.
 
 An earlier run on a quieter machine (same build, before the G9 counters were added) measured G2
 at 10 MB: plain 361, 8 KB 1,034, 32 KB 732, 64 KB 449; at 100 MB: plain 542, 8 KB 2,896,
-32 KB 1,516, 64 KB 871. Same verdicts: 10 MB fails everywhere, 100 MB passes at 64 KB.
+32 KB 1,516, 64 KB 871. Same verdict at 100 MB (64 KB passes). Against the restated 10 MB gate (≤ 722 ms there), 64 KB
+passes and 8 and 32 KB fail (1,034 and 732 ms).
 
 ### Firefox (Playwright build, headless, Linux)
 
@@ -187,7 +203,7 @@ at 10 MB: plain 361, 8 KB 1,034, 32 KB 732, 64 KB 449; at 100 MB: plain 542, 8 K
 | G1b sync, one 4 KB insert, 10 MB | 233 / 331 | 1.98 / 2.84 ✅ | 2.66 / 3.54 ✅ | 3.26 / 5.14 ✅ |
 | G1b sync, one 4 KB insert, 100 MB | 1,064 / 1,377 | 2.72 / 3.98 ✅ | 2.88 / 10.7 ✅ | 4.52 / 6.12 ✅ |
 | G1b table blocks per sync (p50 / p95), both sizes | | 1 / 1 ✅ | 1 / 1 ✅ | 1 / 1 ✅ |
-| G2 open, 10 MB (≤ 400 ms, ≤ 2× plain) | 673 / 939 | 776 / 983 ❌ | 560 / 610 ❌ | 602 / 809 ❌ |
+| G2 open, 10 MB (≤ 2× plain) | 673 / 939 | 776 / 983 ✅ | 560 / 610 ✅ | 602 / 809 ✅ |
 | G2 open, 100 MB (≤ 1,500 ms, ≤ 2× plain) | 1,829 / 2,337 | 2,139 / 3,154 ❌ | 1,221 / 1,652 ✅ | 1,332 / 1,622 ✅ |
 | G4 segment switch, 10 MB (≤ 500 ms) | 289 / 508 | 638 / 834 ❌ | 322 / 352 ✅ | 293 / 520 ✅ |
 | G4 segment switch, 100 MB (≤ 500 ms) | 1,073 / 1,202 | 920 / 1,091 ❌ | 355 / 645 ✅ | 330 / 458 ✅ |
@@ -206,7 +222,7 @@ Not Safari and not WKWebView.
 | G1b sync, one 4 KB insert, 10 MB | 494 / 694 | 8.86 / 24.5 ✅ | 5.04 / 13.7 ✅ | 2.40 / 3.64 ✅ |
 | G1b sync, one 4 KB insert, 100 MB | 2,082 / 2,748 | 1.84 / 4.10 ✅ | 8.52 / 18.4 ✅ | 6.72 / 16.2 ✅ |
 | G1b table blocks per sync (p50 / p95), both sizes | | 1 / 1 ✅ | 1 / 1 ✅ | 1 / 1 ✅ |
-| G2 open, 10 MB (≤ 400 ms, ≤ 2× plain) | 1,193 / 1,625 | 1,478 / 1,923 ❌ | 609 / 941 ❌ | 669 / 921 ❌ |
+| G2 open, 10 MB (≤ 2× plain) | 1,193 / 1,625 | 1,478 / 1,923 ✅ | 609 / 941 ✅ | 669 / 921 ✅ |
 | G2 open, 100 MB (≤ 1,500 ms, ≤ 2× plain) | 2,764 / 3,532 | 2,088 / 2,671 ❌ | 1,712 / 2,964 ❌ | 1,207 / 1,834 ✅ |
 | G4 segment switch, 10 MB (≤ 500 ms) | 513 / 943 | 901 / 1,126 ❌ | 141 / 247 ✅ | 111 / 214 ✅ |
 | G4 segment switch, 100 MB (≤ 500 ms) | 2,051 / 2,915 | 448 / 559 ✅ | 356 / 546 ✅ | 146 / 195 ✅ |
@@ -215,7 +231,7 @@ Not Safari and not WKWebView.
 | G9 table blocks in the G1 sync (p50 / max) | | 0 / 1 (2 at 100 MB) | 0 / 1 | 0 / 1 |
 | G9 table blocks in the open | | 25 / 64 | 4 / 7 | 2 / 3 |
 
-Plain `idb://` misses the absolute G2 budgets on its own here (1.2 s at 10 MB, 2.8 s at 100 MB).
+Plain `idb://` misses the 100 MB budget on its own here (2.8 s) and takes 1.2 s at 10 MB.
 
 ### Gates across targets
 
@@ -224,7 +240,7 @@ Plain `idb://` misses the absolute G2 budgets on its own here (1.2 s at 10 MB, 2
 | G1 sync (≤ 2× plain, 100 MB) | ✅ all units (0.75-6.8 ms vs 75 ms) | ✅ all units | ✅ all units (1.1-5.9 ms vs 932 ms) |
 | G1b sync (≤ 1 table block p50, ≤ 2× plain) | ✅ all units, 10 and 100 MB | ✅ all units | ✅ all units |
 | G2 open, 100 MB (≤ 1.5 s, ≤ 2× plain) | ✅ 64 KB only | ✅ 32 and 64 KB | ✅ 64 KB only (plain: 2,764 ms) |
-| G2 open, 10 MB (≤ 400 ms) | ❌ every unit (plain: 746 ms) | ❌ every unit (plain: 673 ms) | ❌ every unit (plain: 1,193 ms) |
+| G2 open, 10 MB (≤ 2× plain, restated) | ✅ 32 and 64 KB; ❌ 8 KB (plain: 746 ms) | ✅ all units (plain: 673 ms) | ✅ all units (plain: 1,193 ms) |
 | G3 memory (≤ data + 64 MB) | ❌ as measured, plain too (see below) | not available | not available |
 | G4 segment switch (≤ 500 ms) | ✅ all units | ✅ 32 and 64 KB; ❌ 8 KB | ✅ 32 and 64 KB; ❌ 8 KB at 10 MB |
 | G5 unit size | 64 KB | 32 KB | 64 KB |
@@ -271,7 +287,7 @@ initdb session still owns most of the blocks. One `deriveKey` is 0.010 ms (Chrom
 
 **64 KB.** It is the only unit that passes G2 at 100 MB in Chromium and WebKit, and it passes in
 Firefox (where 32 KB passes too). 8 KB fails G2 at 100 MB on all three and G4 in Firefox and
-WebKit. Nothing passes the 10 MB open budget.
+WebKit. At 10 MB, 32 and 64 KB pass the restated gate (≤ 2× plain) everywhere.
 
 ## 5. What only the owner can measure
 

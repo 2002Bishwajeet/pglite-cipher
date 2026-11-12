@@ -252,13 +252,16 @@ async function runVariant(kind: Kind, mb: number, runs: number, key: CryptoKey):
 
 function judge(mb: number, v: Record<string, VariantResult>): Json {
   const plain = v.plain;
+  // Owner decision on #2: at 10 MB, G2 is ≤ 2× plain only (plain idb:// alone misses 400 ms). The
+  // 400 ms figure still sets the G9 file-map budget (5 % of it, 20 ms), which the decision left as it was.
   const budget = mb >= 100 ? 1500 : 400;
-  const out: Json = { g2BudgetMs: budget, note: 'p50 throughout; p95 is beside it in the variant numbers' };
+  const g2Budget = mb >= 100 ? 1500 : Infinity;
+  const out: Json = { g2BudgetMs: mb >= 100 ? 1500 : '2× plain only', note: 'p50 throughout; p95 is beside it in the variant numbers' };
   const passG2: number[] = [];
   for (const bs of BLOCK_SIZES) {
     const r = v[label(bs)];
     if (!r || !plain) continue;
-    const g2 = r.g2.ms.p50 <= 2 * plain.g2.ms.p50 && r.g2.ms.p50 <= budget;
+    const g2 = r.g2.ms.p50 <= 2 * plain.g2.ms.p50 && r.g2.ms.p50 <= g2Budget;
     if (g2) passG2.push(bs);
     const mem = r.g3.bytes;
     out[label(bs)] = {
