@@ -51,7 +51,7 @@ Options: `blockSize` (8192, 32768 or 65536, default 65536; used when the store i
 - **Give the database a name that says nothing:** `data`, not `notes-encrypted`. `new IndexedDbBackend(name)` opens one IndexedDB database with exactly `name` and one object store, `kv`, holding nothing but the encrypted records. A random name works too, but then you have to remember it somewhere, and that place is as visible as the name was. No name hides that a database exists.
 - **Keep temp storage inside the data directory.** Everything under PGDATA is encrypted, Postgres's temp files included. Do not point `temp_tablespaces`, a tablespace or another mount outside it.
 - **Exports are plaintext.** Encrypt or delete them yourself.
-- **One writer per store.** A second instance that opened the same store loses at its next sync (`StaleWriterError`). During a rotation either one can lose (see Keys).
+- **One writer per store.** A second instance that opened the same store loses at its next sync, `changeKey` or `rotateDataKey` (`StaleWriterError`). During a rotation either one can lose (see Keys).
 
 ### Open modes
 | Mode | Empty storage | A store that opens |

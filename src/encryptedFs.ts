@@ -207,7 +207,9 @@ function blockOf(node: MemNode | undefined, index: number, blockSize: number): B
 
 /**
  * Seals `items` and commits them strict, at most PAGE records per commit, so that one batch of
- * ciphertext is held at a time. `deletes` go with the first commit.
+ * ciphertext is held at a time. `deletes` go with the first commit. The store being written has no
+ * root yet, and each commit requires that: once another instance switched to a store in that slot,
+ * the commit gets StaleWriterError instead of adding records to it.
  */
 async function putInBatches<T>(
   backend: StorageBackend,
@@ -222,7 +224,7 @@ async function putInBatches<T>(
     await pool(batch, async (item) => {
       puts.push(await seal(item));
     });
-    await backend.commit({ puts, deletes: at === 0 ? [...deletes] : [], durability: 'strict' });
+    await backend.commit({ expectRoot: null, puts, deletes: at === 0 ? [...deletes] : [], durability: 'strict' });
     onBatch(at + batch.length);
   }
 }
@@ -752,10 +754,23 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /** The other slot of a pair holds a store only when a rotation could not delete the store it left. */
+  /**
+   * The other slot of a pair holds a store only when a rotation or an open could not delete the one
+   * it left: a root marked "rotating", or none. That one is deleted once a read of this store's root
+   * shows it is still the one this instance wrote. A root that moved, or a ready root in the other
+   * slot, is another writer's: StaleWriterError, and nothing is deleted.
+   */
   async #dropLeftover(): Promise<void> {
     const other = this.#slots.find((backend) => backend !== this.#backend);
-    if (other && !(await other.isEmpty())) await deleteStore(other);
+    if (!other || (await other.isEmpty())) return;
+    const current = rootMatches(await this.#backend.get(2), this.#lastRoot);
+    const left = current ? await openRootOf(other, this.#key) : null;
+    if (!current || (left !== null && left.root.state !== 'rotating')) {
+      const error = new StaleWriterError('another writer committed to this store');
+      this.#setFatal(error);
+      throw error;
+    }
+    await deleteStore(other);
   }
 
   /**
@@ -954,26 +969,29 @@ export class EncryptedFs extends MemoryFS {
   }
 
   /**
-   * A rotation failed before the switch: deletes the new store, then sets the old one back to ready
-   * if the mark went in. Should that fail too, the old store stays marked, the next open resolves
-   * it, and this instance stops syncing.
+   * A rotation failed before the switch. It writes into the new store only once its mark is in the
+   * old one, and an instance that moved the root off the mark owns both stores from then on. So the
+   * new store is deleted, and the old one set back to ready in a commit guarded by the mark, only
+   * while the old store still holds the mark. Without the mark, or with the old store's root as it
+   * was, nothing of this rotation is anywhere. Any other root is another writer's: nothing is
+   * deleted, and this instance stops. Should the undo fail, the old store stays marked, the next
+   * open resolves it, and this instance stops syncing.
    */
   async #undoRotation(from: StorageBackend, to: StorageBackend, before: Bytes | null, mark: Bytes | null, single: boolean): Promise<void> {
     try {
-      await deleteStore(to);
-      if (single) await to.close();
       if (mark === null) return;
       const stored = await from.get(2);
-      if (stored === undefined || !equalBytes(stored, mark)) {
-        if (rootMatches(stored, before)) return;
-        throw new StaleWriterError('another writer committed to this store');
-      }
+      if (rootMatches(stored, before)) return;
+      if (!rootMatches(stored, mark)) throw new StaleWriterError('another writer committed to this store');
+      await deleteStore(to);
       const ready = await this.#sealRootAs(this.#gen + 2, 'ready', this.#origin);
       await commitSettled(from, { expectRoot: mark, puts: [[2, ready]], deletes: [], durability: 'strict' }, 2, ready);
       this.#lastRoot = ready;
       this.#gen += 2;
     } catch (error) {
       this.#setFatal(error instanceof Error ? error : new Error('EncryptedFs: a failed rotation could not be undone'));
+    } finally {
+      if (single) await to.close().catch(() => undefined);
     }
   }
 

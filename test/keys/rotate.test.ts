@@ -511,6 +511,79 @@ describe('rotateDataKey', () => {
     for (let at = 1; at <= total; at++) await run(at);
   }, 900_000);
 
+  it('an instance idle while another rotated the pair: its changeKey and its rotateDataKey reject with StaleWriterError and delete nothing', async () => {
+    const { key, recs } = await baseStore(65536);
+    for (const operation of ['changeKey', 'rotateDataKey'] as const) {
+      const a = await restore(recs);
+      const b = new MemoryBackend();
+      const idle = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      const first = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      await first.pg.exec(`INSERT INTO t VALUES (-1, 'rotated')`);
+      await first.fs.rotateDataKey();
+      await first.pg.close();
+      const rotated = await records(b);
+      await rejection(operation === 'changeKey' ? idle.fs.changeKey(await newKey()) : idle.fs.rotateDataKey(), StaleWriterError);
+      expect(await a.isEmpty(), operation).toBe(true);
+      expect(sameRecords(await records(b), rotated), operation).toBe(true);
+      await idle.pg.close();
+      const re = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      expect(await rowCount(re.pg, 't'), operation).toBe(2001);
+      await expectOneStore([a, b], re);
+      await re.pg.close();
+    }
+  }, 240_000);
+
+  it('a rotation undone by a second instance, which then rotates the pair itself: the first fails and deletes nothing, the second’s store stays whole', async () => {
+    const { key, recs } = await baseStore(65536);
+    /** The first instance's rotation, with a second one opening the pair and rotating it before the first's write `at`; the first's writes. */
+    const run = async (at: number): Promise<number> => {
+      const a = await restore(recs);
+      const b = new MemoryBackend();
+      const writes = { n: 0, on: false };
+      const second: { opened: Opened | null } = { opened: null };
+      const before = async (n: number) => {
+        if (n !== at) return;
+        const opened = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+        second.opened = opened;
+        await opened.pg.exec(`INSERT INTO t VALUES (-3, 'second')`);
+        await opened.fs.rotateDataKey();
+      };
+      const first = await openPair([new Before(shared(a), writes, before), new Before(shared(b), writes, before)], key);
+      await first.pg.exec(`INSERT INTO t VALUES (-1, 'before')`);
+      await first.fs.syncToFs(false);
+      writes.on = true;
+      const rotation = await first.fs.rotateDataKey().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      writes.on = false;
+      const up = second.opened;
+      if (up === null) {
+        await first.pg.close();
+        return writes.n;
+      }
+      const label = `write ${String(at)}`;
+      expect(rotation, label).toBeInstanceOf(StaleWriterError);
+      await first.pg.exec(`INSERT INTO t VALUES (-2, 'lost')`);
+      await rejection(first.fs.syncToFs(false), StaleWriterError);
+      await up.pg.exec(`INSERT INTO t VALUES (-4, 'second, after')`);
+      await up.fs.syncToFs(false);
+      await first.pg.close();
+      await up.pg.close();
+
+      const re = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      const ids = (await re.pg.query<{ id: number }>('SELECT id FROM t WHERE id < 0 ORDER BY id')).rows.map((r) => r.id);
+      expect(ids, label).toEqual([-4, -3, -1]);
+      await expectOneStore([a, b], re);
+      await re.pg.close();
+      return writes.n;
+    };
+    const total = await run(Infinity);
+    // Every write up to the switch, which is followed by the retiring and the clear of the old store.
+    expect(total).toBeGreaterThanOrEqual(7);
+    for (let at = 1; at <= total - 2; at++) await run(at);
+  }, 900_000);
+
   it('an open beside a store with no root or no header, which an undone rotation can leave, deletes that one', async () => {
     const { key, recs } = await baseStore(65536);
     for (const [cut, leftFirst] of [

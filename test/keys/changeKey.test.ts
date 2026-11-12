@@ -3,11 +3,12 @@
 // documented, a copy of the old header still opens later copies of the store with the old key.
 import { describe, expect, it } from 'vitest';
 import { InjectedFault } from '../../src/backend/faulty.ts';
+import { MemoryBackend } from '../../src/backend/memory.ts';
 import { concat, type Bytes } from '../../src/format/bytes.ts';
-import { CorruptStoreError, WrongKeyError } from '../../src/format/errors.ts';
+import { CorruptStoreError, StaleWriterError, WrongKeyError } from '../../src/format/errors.ts';
 import { openHeader } from '../../src/format/keys.ts';
-import { newKey, openStore, records, rejection, restore, shared } from '../fs/helpers.ts';
-import { baseStore, Faults, tablesOf, type Base, type FaultCounter } from './helpers.ts';
+import { newKey, openStore, records, rejection, resealRoot, restore, sameRecords, shared } from '../fs/helpers.ts';
+import { baseStore, Faults, openPair, tablesOf, type Base, type FaultCounter } from './helpers.ts';
 
 let stored: Promise<Base> | null = null;
 /** One store for every test of this file, made on first use. */
@@ -111,6 +112,38 @@ describe('changeKey', () => {
     const thief = await openStore({ backend: shared(await restore(later)), key, mode: 'open' });
     expect((await thief.pg.query(`SELECT v FROM t WHERE id = -1`)).rows).toEqual([{ v: 'written after the key change' }]);
     await thief.pg.close();
+  }, 120_000);
+
+  it('on a pair, deletes what a rotation left in the other slot (a root marked "rotating", or none), and never a ready store', async () => {
+    const { key, recs } = await base();
+    const marked = await restore(recs);
+    await resealRoot(marked, key, (root) => ({ ...root, state: 'rotating', origin: 'b' }));
+    const rootless = new Map(recs);
+    rootless.delete(2);
+    for (const [kind, left] of [
+      ['rotating', await records(marked)],
+      ['no root', rootless],
+      ['ready', recs],
+    ] as const) {
+      const a = await restore(recs);
+      const b = new MemoryBackend();
+      const { pg, fs } = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      await b.commit({ puts: [...left].map(([k, v]) => [k, v.slice()]), deletes: [], durability: 'strict' });
+      const next = await newKey();
+      if (kind === 'ready') {
+        await rejection(fs.changeKey(next), StaleWriterError);
+        expect(sameRecords(await records(b), left)).toBe(true);
+        expect(await a.get(0)).toEqual(recs.get(0));
+        await pg.close();
+        continue;
+      }
+      await fs.changeKey(next);
+      expect(await b.isEmpty(), kind).toBe(true);
+      await pg.close();
+      const re = await openPair([shared(a), shared(b)], next, { mode: 'open' });
+      expect(await rowsOf(re.pg), kind).toBe(500);
+      await re.pg.close();
+    }
   }, 120_000);
 
   it('the old header’s meta beside the new header’s wrap does not open, on a real store', async () => {
