@@ -24,6 +24,8 @@ printed in the `<pre>`). Parts:
 
 URL parameters run it without clicking: `?auto=1&parts=gates10,extras&runs=20` (and `&sessions=365`
 for the year). The page sets `window.__benchResult` when it finishes; `node spike/run.mjs` uses that.
+`&post=<target>` also sends the progress and the result to the device collector
+(`spike/device/serve.mjs`, issue #11), which saves `spike/results/<target>.json`.
 
 ## Inside the Tauri shells (G7, WKWebView, WebView2, Android WebView, iOS)
 

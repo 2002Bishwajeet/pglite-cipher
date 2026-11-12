@@ -26,7 +26,8 @@ below it. What the encrypted design adds on top grows with the data (64 KB at 10
 776 ms, 871 vs 542 ms). Lazy loading of cold files would narrow that encrypted-vs-plain gap, not
 get under plain; it is a design change, and the owner put it and upstream PGlite work out of scope
 for now, to revisit if the device runs (#11) show phone open times that hurt the app. The prototype
-was not tuned further.
+was not tuned further. On the Mac's WebKit and WKWebView (section 6) the 64 KB store opens in
+340-583 ms at 10 and 100 MB, under 746 ms; the phones are still owner-pending.
 
 ## 1. Filesystem-operation trace (steps 1-3)
 
@@ -303,6 +304,86 @@ WebKit. At 10 MB, 32 and 64 KB pass the restated gate (≤ 2× plain) everywhere
 - **G7** (Rust store throughput and whether Tauri used its fetch IPC): only inside a shell built
   with `encfs-bench`.
 - **G3** with `measureUserAgentSpecificMemory` (headed Chrome, cross-origin isolated).
+
+## 6. Devices (issue #11)
+
+Run by the harness on the owner's machines with `spike/device/` (collector `serve.mjs`, Apple
+targets `mac.sh` through `scripts/harness/remote.sh mac`, Android `redmi.sh` on the G14). Each
+target ran the same page at 10 MB and 100 MB with **3 runs, the median (p50) recorded**, plus
+G6 and the G8 `deriveKey` timing. Raw numbers: `spike/results/<target>.json`. The Mac is a
+MacBook Pro M1 Pro, macOS 27.0.1, not loaded by other jobs during the runs. No device showed a
+functional failure: every WebCrypto and IndexedDB check passed, every run switched WAL segment
+and every variant reopened its database. 3 runs are few: p95 is the 3rd value, the single slowest.
+
+| Target | Engine | Status |
+| --- | --- | --- |
+| `mac-webkit` | Playwright WebKit 27.2, macOS 27.0.1, headless | measured |
+| `mac-wkwebview` | WKWebView of macOS 27.0.1 (Safari 27.0.1's WebKit), `spike/device/wkhost.swift` | measured |
+| `ios-sim` | Mobile Safari 27.0, iOS 27.0 simulator (iPhone 17e) | measured; **timings not representative** (the Mac's CPU) |
+| `iphone-15` | Safari, iOS 27 | **owner-pending**: `devicectl` lists it "unavailable" |
+| `ipad-air-m3` | Safari, iPadOS 27 | **owner-pending**: `devicectl` lists it "unavailable" |
+| `redmi` | Chrome, Android | **owner-pending**: `adb devices` lists nothing (not paired) |
+
+### Gates at 64 KB (the recommended unit), p50 in ms, encrypted vs plain
+
+| Gate (target) | `mac-webkit` | `mac-wkwebview` | `ios-sim` (not representative) |
+| --- | --- | --- | --- |
+| G1 sync, one-row UPDATE, 100 MB (≤ 2× plain) | 4.6 vs 330 ✅ | 12.6 vs 475 ✅ | 6.6 vs 692 ✅ |
+| G1b sync, 4 KB insert, 10 / 100 MB (≤ 2× plain, 1 table block) | 4.5 / 2.3 vs 180 / 1,495, 1 block ✅ | 1.8 / 5.8 vs 416 / 4,055, 1 block ✅ | 18.6 / 3.8 vs 2,212 / 3,555, 1 block ✅ |
+| G2 open, 10 MB (≤ 2× plain) | 506 vs 635 ✅ | 340 vs 510 ✅ | 393 vs 1,097 ✅ |
+| G2 open, 100 MB (≤ 1,500 ms, ≤ 2× plain) | 449 vs 963 ✅ | 583 vs 1,945 ✅ | 1,324 vs 1,581 ✅ |
+| G3 memory (≤ data + 64 MB) | not available | not available | not available |
+| G4 segment switch, 10 / 100 MB (≤ 500 ms) | 74 / 103 ✅ | 166 / 305 ✅ | 433 / 387 ✅ |
+| G6 support | ✅ all present | ✅ all present | ✅ all present |
+| G8 subkeys (366 salts × one `deriveKey`, ≤ 150 ms) | 366 × 0.02 = 7.3 ✅ | 366 × 0.04 = 14.6 ✅ | 366 × 0.04 = 14.6 ✅ |
+| G9 file-map phase, 10 / 100 MB (≤ 20 / 75 ms) | 20.3 ❌ / 15.9 ✅ | 3.2 / 6.7 ✅ | 4.5 / 9.7 ✅ |
+| G9 table blocks in the G1 sync (p50 / max) | 0 / 1 | 0 / 1 | 0 / 1 |
+| G7 Rust store | owner (Tauri only) | owner (Tauri only) | owner (Tauri only) |
+
+G8 takes the 366 live salts of the Linux simulated year (section 3; the count does not depend on
+the engine) times each engine's `deriveKey` p50. G9 strictly read fails everywhere for the same
+reason as on Linux: in 1 of the 3 G1 syncs a file grew and wrote one table block. `mac-webkit`'s
+10 MB file-map phase is 20.3 ms against 20 ms (3 runs; 8 and 32 KB: 22.0 and 30.3 ms); at 100 MB
+it passes, and WKWebView, the engine the macOS app uses, passes both by a wide margin.
+
+### G2 open at every unit, p50 in ms
+
+| Target, size | plain | 8 KB | 32 KB | 64 KB |
+| --- | --- | --- | --- | --- |
+| `mac-webkit`, 10 MB | 635 | 388 | 306 | 506 |
+| `mac-webkit`, 100 MB | 963 | 1,516 ❌ | 1,015 | 449 |
+| `mac-wkwebview`, 10 MB | 510 | 357 | 347 | 340 |
+| `mac-wkwebview`, 100 MB | 1,945 | 5,443 ❌ | 667 | 583 |
+| `ios-sim`, 10 MB | 1,097 | 776 | 327 | 393 |
+| `ios-sim`, 100 MB | 1,581 | 1,029 | 628 | 1,324 |
+
+8 KB also fails G4 (≤ 500 ms) at 100 MB on all three (939, 690 and 570 ms) and at 10 MB on the
+simulator (992 ms). The unit choice stands: 64 KB passes every gate on all three except the strict
+G9 and `mac-webkit`'s 10 MB file-map phase (20.3 vs 20 ms). 32 KB misses that phase by more there
+(30.3 ms) and G4 at 100 MB on the simulator (557 ms, under the 1 s budget of the slowest target).
+
+**Open time on Apple engines.** On the Mac the encrypted 64 KB store opens in 340-506 ms at 10 MB
+and 449-583 ms at 100 MB: under the 746 ms that plain `idb://` took in Chromium on Linux, and
+faster than plain `idb://` in the same engine (510-635 ms at 10 MB, 963-1,945 ms at 100 MB).
+Phones are still unmeasured.
+
+### What the owner must do for the pending targets
+
+- **`iphone-15`, `ipad-air-m3`:** unlock the device, keep it near the Mac with Wi-Fi on and the
+  Tailscale app connected, and check that `xcrun devicectl list devices` on the Mac shows it
+  "available (paired)". Then the harness runs `scripts/harness/remote.sh mac bash spike/device/mac.sh
+  iphone-15` (or `ipad-air-m3`). It serves the page over HTTPS with
+  `tailscale serve --bg --https=47901 http://127.0.0.1:47901` (port 47901 only; the existing serve
+  on 443 is left alone; turned off again on exit) and launches Safari with
+  `devicectl device process launch --payload-url`. If Safari does not open by itself, open this URL
+  on the device while the script waits:
+  `https://bishwajeets-macbook-pro.tailc8a53d.ts.net:47901/?auto=1&parts=gates10,gates100,extras&runs=3&post=iphone-15`
+  (`post=ipad-air-m3` on the iPad), and keep the screen on until the page says `done`.
+- **`redmi`:** on the phone, Settings → Developer options → Wireless debugging → Pair device with
+  pairing code; on the G14, `~/.local/bin/adb pair <ip>:<port>` with that code, then
+  `~/.local/bin/adb connect <ip>:<port>` (the port Wireless debugging shows). Then the harness runs
+  `npm run bench:build` and `~/.claude/bin/heavy bash spike/device/redmi.sh`
+  (`adb reverse tcp:47901 tcp:47901`, Chrome opens `http://localhost:47901/?…&post=redmi`).
 
 ## Noise
 
