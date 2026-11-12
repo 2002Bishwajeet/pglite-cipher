@@ -11,9 +11,28 @@ export class CorruptStoreError extends Error {
   override name = 'CorruptStoreError';
 }
 
-/** The store has records but no header. */
+/**
+ * The store was never completely written: records without a header, a header without a root, or a
+ * root still `populating`. `rotation` is true when a data-key rotation was interrupted.
+ */
 export class IncompleteStoreError extends Error {
   override name = 'IncompleteStoreError';
+  readonly rotation: boolean;
+
+  constructor(message: string, { rotation = false }: { rotation?: boolean } = {}) {
+    super(message);
+    this.rotation = rotation;
+  }
+}
+
+/** Mode `open`, and the backend holds no record at all. */
+export class StoreMissingError extends Error {
+  override name = 'StoreMissingError';
+}
+
+/** Mode `create`, and the backend already holds a store. */
+export class StoreExistsError extends Error {
+  override name = 'StoreExistsError';
 }
 
 /** Another writer committed since this one last read the root. */
