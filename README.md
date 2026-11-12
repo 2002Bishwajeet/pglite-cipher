@@ -71,7 +71,7 @@ Whatever the mode, storage that holds something other than a complete store is n
 | `UnsupportedFormatError` | A newer version of this package wrote the store | Update the app. **Never reset**: the data is fine |
 | `StoreMissingError` | `open` found empty storage | Create it (`create` or `open-or-create`), or report the missing data |
 | `StoreExistsError` | `create` found storage that is not empty | Open it instead, or choose another name |
-| `StaleWriterError` | Another instance wrote the store after this one opened it | Close this instance and reopen; its unsynced changes are lost |
+| `StaleWriterError` | Another instance wrote the store after this one opened it, or kept writing while it opened | Close this instance and reopen; its unsynced changes are lost |
 | `StoreFullError` | A sync would pass the format's limits (file table size, ids in a run) | Nothing was written; the store is as it was before that sync. Report it |
 | `CryptoSelfTestError` | WebCrypto on this platform gives wrong answers | Do not use encryption on this platform |
 

@@ -2,7 +2,7 @@
 // changes nothing in the backend, creates nothing in MEMFS, and so never lets PGlite run initdb.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it, vi } from 'vitest';
-import type { RecordKey, StorageBackend } from '../../src/backend/backend.ts';
+import type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from '../../src/backend/backend.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import type { OpenMode } from '../../src/encryptedFs.ts';
 import type { Bytes } from '../../src/format/bytes.ts';
@@ -11,6 +11,7 @@ import {
   CryptoSelfTestError,
   IncompleteStoreError,
   StoreExistsError,
+  StaleWriterError,
   StoreMissingError,
   UnsupportedFormatError,
   WrongKeyError,
@@ -44,6 +45,39 @@ async function baseStore(): Promise<{ key: CryptoKey; recs: Map<RecordKey, Uint8
   await pg.exec(`CREATE TABLE t (id int PRIMARY KEY, v text); INSERT INTO t VALUES (1, 'one'), (2, 'two');`);
   await pg.close();
   return { key, recs: await records(memory) };
+}
+
+/** Passes everything to `inner`; before the second readRange page of a load, runs `between` (at most `times` loads). */
+class MidLoad implements StorageBackend {
+  fired = 0;
+  readonly #inner: StorageBackend;
+  readonly #between: () => Promise<unknown>;
+  readonly #times: number;
+  #armed = false;
+
+  constructor(inner: StorageBackend, between: () => Promise<unknown>, times: number) {
+    this.#inner = inner;
+    this.#between = between;
+    this.#times = times;
+  }
+
+  async readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>> {
+    if (after === null) this.#armed = true;
+    else if (this.#armed && this.fired < this.#times) {
+      this.#armed = false;
+      this.fired++;
+      await this.#between();
+    }
+    return this.#inner.readRange(after, limit);
+  }
+
+  get = (slot: Slot) => this.#inner.get(slot);
+  isEmpty = () => this.#inner.isEmpty();
+  count = () => this.#inner.count();
+  getMany = (ids: BlockId[]) => this.#inner.getMany(ids);
+  commit = (batch: CommitBatch) => this.#inner.commit(batch);
+  clear = () => this.#inner.clear();
+  close = () => this.#inner.close();
 }
 
 /** Opens in `mode` and expects `type`; the backend must be byte-identical and MEMFS untouched. */
@@ -211,4 +245,50 @@ describe('the open state machine', () => {
     expect((await rolledBack.pg.query('SELECT count(*)::int AS n FROM t')).rows).toEqual([{ n: 2 }]);
     await rolledBack.pg.close();
   }, 60_000);
+});
+
+describe('another writer commits while a store loads', () => {
+  /** A second instance, open on a store that spans several readRange pages (8 KiB blocks). */
+  async function writer(): Promise<{ memory: MemoryBackend; key: CryptoKey; pg: PGlite }> {
+    const memory = new MemoryBackend();
+    const key = await newKey();
+    const { pg } = await openStore({ backend: shared(memory), key, blockSize: 8192 });
+    await pg.exec('CREATE TABLE t (id int PRIMARY KEY, v text)');
+    return { memory, key, pg };
+  }
+
+  /** Enough rows to rewrite blocks all over the store, so the load cannot miss the commit. */
+  const insert = (pg: PGlite, from: number) =>
+    pg.exec(`INSERT INTO t SELECT g, 'from b' FROM generate_series(${String(from)}, ${String(from + 1999)}) g`);
+
+  const rowCount = async (pg: PGlite) => ((await pg.query('SELECT count(*)::int AS n FROM t')).rows[0] as { n: number }).n;
+
+  it('a commit between two pages of a load: the open reads the store again and loads the newer one', async () => {
+    const b = await writer();
+    const backend = new MidLoad(shared(b.memory), () => insert(b.pg, 1), 1);
+    const a = await openStore({ backend, key: b.key, mode: 'open' });
+    expect(backend.fired).toBe(1);
+    expect(await rowCount(a.pg)).toBe(2000);
+    await a.pg.exec(`INSERT INTO t VALUES (0, 'from a')`);
+    await rejection(b.pg.exec(`INSERT INTO t VALUES (-1, 'from b')`), StaleWriterError);
+    await b.pg.close();
+    await a.pg.close();
+    const c = await openStore({ backend: shared(b.memory), key: b.key, mode: 'open' });
+    expect(await rowCount(c.pg)).toBe(2001);
+    await c.pg.close();
+  }, 120_000);
+
+  it('a writer that commits during every load: the open gives up after three with StaleWriterError', async () => {
+    const b = await writer();
+    let commits = 0;
+    const backend = new MidLoad(shared(b.memory), () => insert(b.pg, 1 + 2000 * commits++), Infinity);
+    const fs = new WatchedFs({ backend, key: b.key, mode: 'open' });
+    await rejection(PGlite.create({ fs }), StaleWriterError);
+    expect(backend.fired).toBe(3);
+    expect(fs.moduleFs?.analyzePath(`${PGDATA}/PG_VERSION`).exists).toBe(false);
+    await b.pg.close();
+    const c = await openStore({ backend: shared(b.memory), key: b.key, mode: 'open' });
+    expect(await rowCount(c.pg)).toBe(6000);
+    await c.pg.close();
+  }, 120_000);
 });

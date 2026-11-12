@@ -2,7 +2,7 @@
 // database runs; the tracker knows which blocks changed; each sync seals them, with the file-table
 // blocks and a new root, into one atomic commit of the packed block space (FORMAT.md).
 import { MemoryFS, type PGlite } from '@electric-sql/pglite';
-import type { RecordKey, StorageBackend } from './backend/backend.ts';
+import { rootMatches, type RecordKey, type StorageBackend } from './backend/backend.ts';
 import { equalBytes, toHex, type Bytes } from './format/bytes.ts';
 import { DEFAULT_BLOCK_SIZE, decodeRoot, decodeTable, encodeRoot, type BlockSize, type TableEntry } from './format/codec.ts';
 import {
@@ -28,6 +28,8 @@ const PAGE = 512;
 const CONCURRENCY = 64;
 /** The key id of a new store's first data key. */
 const FIRST_KEY_ID = 1;
+/** Loads begun while another writer keeps committing, before the open gives up. */
+const LOAD_ATTEMPTS = 3;
 
 export type OpenMode = 'open' | 'create' | 'open-or-create';
 
@@ -172,7 +174,7 @@ export class EncryptedFs extends MemoryFS {
     await selfTest();
     const { emscriptenOpts } = await super.init(pg, emscriptenOptions);
     // The tracker needs the block size, which an existing store keeps in its header: it is
-    // installed by initialSyncFs, before anything exists under PGDATA.
+    // installed by initialSyncFs.
     const keepFs = (mod: { FS: unknown }) => {
       this.#FS = mod.FS as ModuleFS;
     };
@@ -208,9 +210,29 @@ export class EncryptedFs extends MemoryFS {
     this.#tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
   }
 
+  /**
+   * Slots, table and blocks are separate backend reads, so a writer that commits during a load makes
+   * a healthy store look corrupt. A root that moved meanwhile says so, and the load starts over.
+   */
   async #load(FS: ModuleFS): Promise<void> {
     const backend = this.#backend;
-    const [copy0, copy1, sealedRoot] = await Promise.all([backend.get(0), backend.get(1), backend.get(2)]);
+    for (let attempt = 1; ; attempt++) {
+      const slots = await Promise.all([backend.get(0), backend.get(1), backend.get(2)]);
+      try {
+        await this.#loadFrom(FS, slots);
+        return;
+      } catch (error) {
+        if (!(error instanceof CorruptStoreError) || rootMatches(await backend.get(2), slots[2] ?? null)) throw error;
+        if (attempt === LOAD_ATTEMPTS) throw new StaleWriterError('another writer kept committing while the store loaded');
+        if (FS.analyzePath(PGDATA).exists) clearDir(FS, PGDATA);
+      }
+    }
+  }
+
+  /** Loads the store the slots name. The tracker is installed only once the load is complete. */
+  async #loadFrom(FS: ModuleFS, slots: Array<Uint8Array | undefined>): Promise<void> {
+    const backend = this.#backend;
+    const [copy0, copy1, sealedRoot] = slots;
 
     // 1. Header and root.
     if (copy0 === undefined && copy1 === undefined) throw new IncompleteStoreError('the store has records but no header');
@@ -259,7 +281,6 @@ export class EncryptedFs extends MemoryFS {
     const tableMs = now() - t0;
 
     // The tree, every file at its final size.
-    const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
     if (!FS.analyzePath(PGDATA).exists) FS.mkdirTree(PGDATA);
     FS.chmod(PGDATA, 0o700);
     const depth = (f: MapFile) => f.path.split('/').length;
@@ -312,6 +333,7 @@ export class EncryptedFs extends MemoryFS {
       [...map.files.values()].filter((f) => f.type === 'file').map((f) => ({ fileId: f.fileId, blockTags: concatTags(f) })),
     );
     if (!equalBytes(manifest, root.manifest)) throw new CorruptStoreError('the blocks differ from the manifest');
+    const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
     tracker.loadState([...map.files.values()].map((f) => ({ path: f.path, fileId: f.fileId, blocks: f.ids.length })));
 
     this.#lastOpen = { tableMs, blocksMs: now() - t1 };
