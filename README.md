@@ -12,6 +12,9 @@ SQLCipher-style encryption at rest for [PGlite](https://pglite.dev) (Postgres co
 
 Built first for [Journal](https://github.com/2002Bishwajeet/journal)'s native apps, where it's used as a git submodule, and meant to be usable by any PGlite app.
 
+## Storage names
+`new IndexedDbBackend(name)` opens one IndexedDB database with exactly `name` (no prefix, suffix or version) and one object store, `kv`, holding nothing but the encrypted records. Pass a name that says nothing: `data`, not `notes-encrypted`. A random name works too, but then you have to remember it somewhere, and that place is as visible as the name was. No name hides that a database exists, or whose browser profile it is in.
+
 ## Docs
 - `docs/research/2026-11-10-spec-v1.md`: SQLCipher's design adapted to PGlite (v1)
 - `docs/research/2026-11-10-review-fable-5.2.md`: independent review ("sound with fixes")
