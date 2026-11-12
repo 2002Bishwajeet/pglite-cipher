@@ -135,3 +135,25 @@ Accurate, and safe to publish once J-16 is closed for the platform:
 Do not say: "military grade", "audited", "FIPS", "zero knowledge" (that is Homebase's property, not this feature's), "the same as SQLCipher", or "protects against malware".
 
 Fair comparison to SQLCipher, if asked: "The same idea, encryption underneath the database engine with a fresh random nonce and an integrity check on every block, adapted to Postgres. Like a SQLCipher file, the stored data shows how big it is and when it changes, and nothing about what is inside. It covers more of the database's files and detects more kinds of tampering. It is newer, keeps the open database in memory, and takes longer to open a large database."
+
+## 5. Native PostgreSQL encryption, compared
+
+Date: 2026-11-12. Sources: Percona pg_tde release notes 2.1.2 and 2.2.0 (https://docs.percona.com/pg-tde/), the pgconf.de 2026 talk "Status update on TDE in PG", the pg_vault_tde 1.7.1 announcement on postgresql.org. **[unverified]** marks vendor claims I did not test.
+
+Community PostgreSQL has **no built-in transparent data encryption** (TDE). Patches have been discussed for years and none is in core. What exists:
+
+| Option | What it is | Covers | Fits PGlite? |
+|---|---|---|---|
+| `pgcrypto` | SQL functions (`pgp_sym_encrypt`, `encrypt`, `digest`) | Only the values the application encrypts in queries. Catalogs, indexes, WAL and everything else stay plaintext | Runs, but it is not encryption at rest, and encrypted columns can't be indexed or searched |
+| Percona `pg_tde` | Extension, open source, 1.0 GA, 2.2.0 on 2026-05-20 (AES-256) | Table data and WAL. Temp-file encryption is on its 2026 roadmap. No column-level encryption **[unverified]** | No. It needs Percona's patched server (hooks community Postgres lacks), and a key provider (file, Vault or KMIP). Caveats in its own notes: no `pg_upgrade`, possible corruption with `pg_rewind` |
+| `pg_vault_tde` (Miriade) | Extension inside the public extension API, PostgreSQL 17 and 18 | Per its announcement, table data **[unverified]** | Not tried. It expects a Vault key server and a server build, not WASM |
+| EDB, Fujitsu Enterprise Postgres | TDE in commercial builds | Cluster-wide **[unverified]** | No: proprietary server builds |
+| Disk encryption (LUKS, BitLocker, FileVault) | Below the filesystem | Everything, while the machine is off | Not in a browser or webview. It is what the OS offers anyway, and it doesn't protect a running, unlocked machine |
+
+Where ours differs from server TDE:
+
+- **No Postgres patches.** The cipher sits under Postgres in the PGlite filesystem, so PGlite and Postgres upgrade independently of it, as long as the filesystem contract holds (the conformance suite pins it).
+- **Wider coverage than pg_tde today:** catalogs, temp files, `pg_control`, `pg_xact`, and the file names, sizes and count are all inside the cipher.
+- **Key handling:** the key comes from the OS keychain through the app (`00-overview.md` 2.2), not from a key server. That suits one-user apps on a device; server TDE suits many users and key rotation by operators.
+- **Same threat model as server TDE:** both protect data at rest (a copied disk or store, a lost device) and neither protects against code running inside the process while the database is open.
+- **Weaker in maturity.** pg_tde has a company, users and public review behind it. Ours has none of that yet (section 2, "Maturity").
