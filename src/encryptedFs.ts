@@ -163,21 +163,22 @@ async function commitSettled(backend: StorageBackend, batch: CommitBatch, slot: 
   }
 }
 
-/** A store's header and root, opened; null for a store without a root. */
-async function openRootOf(backend: StorageBackend, kek: CryptoKey): Promise<{ ctx: RecordContext; root: RootBody; sealed: Bytes } | null> {
+/** A store's header and root, opened. */
+interface OpenedRoot {
+  ctx: RecordContext;
+  root: RootBody;
+  sealed: Bytes;
+}
+
+/** A store's header and root, opened; null for a store without a root or without a header, which nothing opens. */
+async function openRootOf(backend: StorageBackend, kek: CryptoKey): Promise<OpenedRoot | null> {
   const [copy0, copy1, sealed] = (await Promise.all([backend.get(0), backend.get(1), backend.get(2)])) as Array<Bytes | undefined>;
-  if (sealed === undefined) return null;
+  if (sealed === undefined || (copy0 === undefined && copy1 === undefined)) return null;
   const { dek, meta } = await openHeader(kek, copy0, copy1);
   const ctx: RecordContext = { subkeys: new SubkeyCache(dek), meta, encryptions: 0 };
   const root = decodeRoot(await openRoot(ctx, sealed));
   ctx.encryptions = root.encryptions;
   return { ctx, root, sealed };
-}
-
-/** The new store's name, from the root of a store that a rotation marked; null for any other store. */
-async function rotatingOrigin(backend: StorageBackend, kek: CryptoKey): Promise<string | null> {
-  const opened = await openRootOf(backend, kek);
-  return opened?.root.state === 'rotating' ? opened.root.origin : null;
 }
 
 /** The root body for the map as `draft` leaves it. The root's own encryption is the next one. */
@@ -333,48 +334,72 @@ export class EncryptedFs extends MemoryFS {
     if (other === undefined) {
       // A root marked "rotating": a rotation from this store was interrupted. Anything else, and
       // anything that does not open here, is for the load to report.
-      const origin = this.#mode === 'create' ? null : await rotatingOrigin(store, this.#key).catch(() => null);
-      const next = origin === null ? undefined : slots.length === 2 ? slots[slots.indexOf(store) ^ 1] : this.#openOrigin?.(origin);
-      if (next === undefined) {
+      const opened = this.#mode === 'create' ? null : await openRootOf(store, this.#key).catch(() => null);
+      const mark = opened?.root.state === 'rotating' ? opened : null;
+      const next = mark === null ? undefined : slots.length === 2 ? slots[slots.indexOf(store) ^ 1] : this.#openOrigin?.(mark.root.origin);
+      if (mark === null || next === undefined) {
         await this.#load(FS, store);
         return store;
       }
-      return this.#resume(FS, store, next);
+      return this.#resume(FS, store, next, mark);
     }
-    // Two stores: a rotation from the one marked "rotating" into the other.
+    // Two stores: a rotation from the one marked "rotating" into the other. Without a mark, a store
+    // with no root or no header is what an undone rotation left, and is deleted.
     if (this.#mode === 'create') throw new StoreExistsError('a store exists');
-    const origins = await Promise.all(used.map((backend) => rotatingOrigin(backend, this.#key)));
-    const from = origins.findIndex((origin) => origin !== null);
-    if (from === -1 || origins[1 - from] !== null) throw new CorruptStoreError('the two stores of the pair are not a rotation');
-    return this.#resume(FS, used[from] as StorageBackend, used[1 - from] as StorageBackend);
+    const opened = await Promise.all(used.map((backend) => openRootOf(backend, this.#key)));
+    const marked = opened.map((o) => o?.root.state === 'rotating');
+    const from = marked.indexOf(true);
+    if (from !== -1 && !marked[1 - from]) {
+      return this.#resume(FS, used[from] as StorageBackend, used[1 - from] as StorageBackend, opened[from] as OpenedRoot);
+    }
+    const left = opened.indexOf(null);
+    if (from === -1 && left !== -1 && opened[1 - left] !== null) {
+      const kept = used[1 - left] as StorageBackend;
+      await deleteStore(used[left] as StorageBackend);
+      await this.#load(FS, kept);
+      return kept;
+    }
+    throw new CorruptStoreError('the two stores of the pair are not a rotation');
   }
 
   /**
-   * Resumes a rotation a crash interrupted, from `from` into `to`. A new store that loads (so its
+   * Resumes a rotation from `from`, whose root is `mark`, into `to`. A new store that loads (so its
    * root is ready and every record checks) is the store, and the old one is deleted. Otherwise the
-   * new store is deleted, and the old one is set back to ready and loaded.
+   * old one is set back to ready and loaded, and the new store is deleted. An open cannot tell a
+   * crashed rotation from one that still runs, so before either store is deleted the old root moves
+   * off the mark, in a commit guarded by it, as the rotation's own step 8 does: only one of them
+   * wins, and the others get StaleWriterError and delete nothing.
    */
-  async #resume(FS: ModuleFS, from: StorageBackend, to: StorageBackend): Promise<StorageBackend> {
+  async #resume(FS: ModuleFS, from: StorageBackend, to: StorageBackend, mark: OpenedRoot): Promise<StorageBackend> {
+    const { ctx, root, sealed } = mark;
     // A pair keeps both backends; one backend keeps only the store it ends on.
     const drop = async (backend: StorageBackend) => {
       await deleteStore(backend);
       if (this.#slots.length === 1) await backend.close();
     };
+    const move = async (state: RootState, origin: string) => {
+      const body: RootBody = { ...root, gen: root.gen + 1, encryptions: ctx.encryptions + 1, state, origin };
+      const next = await sealRoot(ctx, encodeRoot(body, ctx.meta.blockSize));
+      await commitSettled(from, { expectRoot: sealed, puts: [[2, next]], deletes: [], durability: 'strict' }, 2, next);
+    };
+    let loaded = false;
     if (!(await to.isEmpty())) {
       try {
         await this.#load(FS, to);
-        await drop(from);
-        return to;
+        loaded = true;
       } catch (error) {
         if (!(error instanceof CorruptStoreError) && !(error instanceof IncompleteStoreError)) throw error;
         if (FS.analyzePath(PGDATA).exists) clearDir(FS, PGDATA);
       }
     }
+    if (loaded) {
+      // Still "rotating" until it is deleted, so that a crash in between finishes the rotation again.
+      await move('rotating', root.origin);
+      await drop(from);
+      return to;
+    }
+    await move('ready', '');
     await drop(to);
-    const { ctx, root, sealed } = (await openRootOf(from, this.#key)) as NonNullable<Awaited<ReturnType<typeof openRootOf>>>;
-    const body: RootBody = { ...root, gen: root.gen + 1, encryptions: ctx.encryptions + 1, state: 'ready', origin: '' };
-    const ready = await sealRoot(ctx, encodeRoot(body, ctx.meta.blockSize));
-    await commitSettled(from, { expectRoot: sealed, puts: [[2, ready]], deletes: [], durability: 'strict' }, 2, ready);
     await this.#load(FS, from);
     return from;
   }
@@ -727,7 +752,7 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /** The other slot of a pair holds a store only when deleting the old store of a rotation failed. */
+  /** The other slot of a pair holds a store only when a rotation could not delete the store it left. */
   async #dropLeftover(): Promise<void> {
     const other = this.#slots.find((backend) => backend !== this.#backend);
     if (other && !(await other.isEmpty())) await deleteStore(other);
@@ -795,7 +820,7 @@ export class EncryptedFs extends MemoryFS {
     let before = this.#lastRoot;
     let mark: Bytes | null = null;
     let snap: Snapshot | null = null;
-    let next: { ctx: RecordContext; map: FileMap; header: Bytes; root: Bytes; snap: Snapshot };
+    let next: { ctx: RecordContext; map: FileMap; header: Bytes; root: Bytes; snap: Snapshot; retired: Bytes };
     try {
       // 1. Flush. Syncs stay held back from here to the end; the tracker collects what queries change.
       await this.#syncOnce('strict');
@@ -871,8 +896,10 @@ export class EncryptedFs extends MemoryFS {
 
       // 6. The switch: the new store's root. Until it is in, the old store is the store.
       const root = await sealRoot(ctx, encodeRoot(body, blockSize));
+      // Step 8's old root, sealed while the old data key and map are the filesystem's.
+      const retired = await this.#sealRootAs(this.#gen + 2, 'rotating', name);
       await commitSettled(to, { expectRoot: null, puts: [[2, root]], deletes: [], durability: 'strict' }, 2, root);
-      next = { ctx, map, header: created.header, root, snap };
+      next = { ctx, map, header: created.header, root, snap, retired };
     } catch (error) {
       if (snap) tracker.requeue(snap);
       await this.#undoRotation(from, to, before, mark, single);
@@ -891,13 +918,35 @@ export class EncryptedFs extends MemoryFS {
     this.#gen += 2;
     tracker.commit(next.snap);
 
-    // 8. Delete the old store. Should that fail, it stays marked, and the next open of the pair, or
-    // its next rotation or key change, deletes it.
-    await deleteStore(from).catch(() => undefined);
-    if (single) await from.close().catch(() => undefined);
+    // 8. Retire the old store, then delete it. The retiring commit keeps the old root "rotating", so
+    // that a crash before the deletion finishes the rotation at the next open, and it is guarded by
+    // the mark: an instance that opened the pair since step 2 took this rotation for an interrupted
+    // one and finished or undid it, or this one retires the old store, never both. On
+    // StaleWriterError the old store is not touched, the new one is deleted if the other instance
+    // kept the old one, and this instance stops. Should anything else fail, the old store stays
+    // marked, and the next open of the pair, or its next rotation or key change, deletes it.
+    try {
+      const retired = next.retired;
+      await commitSettled(from, { expectRoot: mark, puts: [[2, retired]], deletes: [], durability: 'strict' }, 2, retired);
+      await deleteStore(from);
+    } catch (error) {
+      if (!(error instanceof StaleWriterError)) return;
+      const kept = await openRootOf(from, this.#key).catch(() => null);
+      if (kept !== null && kept.root.state !== 'rotating') {
+        // Guarded by this rotation's root, so that nothing written into the slot since is deleted.
+        await to
+          .commit({ expectRoot: next.root, puts: [], deletes: [0, 1, 2], durability: 'strict' })
+          .then(() => deleteStore(to))
+          .catch(() => undefined);
+      }
+      this.#setFatal(error);
+      throw error;
+    } finally {
+      if (single) await from.close().catch(() => undefined);
+    }
   }
 
-  /** The current map's root, sealed with another state or origin: to mark a rotation, and to undo the mark. */
+  /** The current map's root, sealed with another state or origin: to mark a rotation, to retire the old store, and to undo the mark. */
   async #sealRootAs(gen: number, state: RootState, origin: string): Promise<Bytes> {
     const ctx = this.#ctx as RecordContext;
     const body = await rootBody(new Draft(this.#map as FileMap), ctx, { gen, state, origin });

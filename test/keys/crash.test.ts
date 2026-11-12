@@ -45,11 +45,15 @@ describe('rotation crash matrix', () => {
     const end = journal.length;
     await pg.close();
 
-    // The switch: the root put into the new store. Then step 8 clears the old one, and the sync follows.
-    const switchAt = journal.findIndex((e, i) => i >= start && e.slot === 1 && 'batch' in e && e.batch.puts.some(([k]) => k === 2)) + 1;
+    // The switch: the root put into the new store. Then step 8 retires the old one (a root put guarded
+    // by step 2's mark) and clears it, and the sync follows.
+    const rootOf = (e: Event | undefined) => (e !== undefined && 'batch' in e ? e.batch.puts.find(([k]) => k === 2)?.[1] : undefined);
+    const switchAt = journal.findIndex((e, i) => i >= start && e.slot === 1 && rootOf(e) !== undefined) + 1;
     expect(switchAt).toBeGreaterThan(start);
-    expect(journal[switchAt]).toEqual({ slot: 0, clear: true });
-    expect(end).toBe(switchAt + 2);
+    expect(journal[switchAt]).toMatchObject({ slot: 0, batch: { expectRoot: rootOf(journal[start]), deletes: [] } });
+    expect(rootOf(journal[switchAt])).toBeDefined();
+    expect(journal[switchAt + 1]).toEqual({ slot: 0, clear: true });
+    expect(end).toBe(switchAt + 3);
     // Step 2's mark on the old store, then the header copies and the copy's batches on the new one,
     // then at least the catch-up's table, the switch, step 8's clear and the sync.
     expect(journal[start]).toMatchObject({ slot: 0 });

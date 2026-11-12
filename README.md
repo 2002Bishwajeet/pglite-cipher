@@ -51,7 +51,7 @@ Options: `blockSize` (8192, 32768 or 65536, default 65536; used when the store i
 - **Give the database a name that says nothing:** `data`, not `notes-encrypted`. `new IndexedDbBackend(name)` opens one IndexedDB database with exactly `name` and one object store, `kv`, holding nothing but the encrypted records. A random name works too, but then you have to remember it somewhere, and that place is as visible as the name was. No name hides that a database exists.
 - **Keep temp storage inside the data directory.** Everything under PGDATA is encrypted, Postgres's temp files included. Do not point `temp_tablespaces`, a tablespace or another mount outside it.
 - **Exports are plaintext.** Encrypt or delete them yourself.
-- **One writer per store.** A second instance that opened the same store loses at its next sync (`StaleWriterError`).
+- **One writer per store.** A second instance that opened the same store loses at its next sync (`StaleWriterError`). During a rotation either one can lose (see Keys).
 
 ### Open modes
 | Mode | Empty storage | A store that opens |
@@ -91,6 +91,7 @@ await fs.rotateDataKey({ onProgress: ({ phase, done, total }) => {} });
 ```
 
 - **An interrupted rotation needs nothing from the app.** The next open finds both stores and either finishes the switch or goes back to the old store, and deletes the other.
+- **An instance that opens the pair while another rotates** cannot tell the rotation from an interrupted one, and finishes or undoes it too. Only one of the two wins; the other gets `StaleWriterError` (from its open, its `rotateDataKey` or through `onFatal`), and what it had not synced is lost.
 - **Writes made while a rotation runs become durable when it completes.** Syncs wait for it (with `relaxedDurability: true` queries do not). A crash during a rotation returns to the state when it started.
 - **With a single backend**, pass `backendFactory: () => ({ name, backend })` (an empty backend for the new store) to `rotateDataKey`, and `openOrigin: (name) => backend` to the constructor so that an open can resume an interrupted rotation.
 

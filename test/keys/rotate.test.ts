@@ -10,11 +10,24 @@ import { IndexedDbBackend } from '../../src/backend/indexeddb.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import type { RotateProgress } from '../../src/encryptedFs.ts';
 import { toHex, type Bytes } from '../../src/format/bytes.ts';
-import { CorruptStoreError, IncompleteStoreError, StoreExistsError } from '../../src/format/errors.ts';
+import { CorruptStoreError, IncompleteStoreError, StaleWriterError, StoreExistsError } from '../../src/format/errors.ts';
 import { openBlock, openRoot, openTable, type RecordContext } from '../../src/format/records.ts';
 import { packEntries } from '../../src/format/table.ts';
 import { freshName } from '../backend/names.ts';
-import { expectStoreEquals, fsOf, inBrowser, inspect, newKey, openStore, records, rejection, restore, sameRecords, shared } from '../fs/helpers.ts';
+import {
+  expectStoreEquals,
+  fsOf,
+  inBrowser,
+  inspect,
+  newKey,
+  openStore,
+  records,
+  rejection,
+  restore,
+  sameRecords,
+  shared,
+  type Opened,
+} from '../fs/helpers.ts';
 import { baseStore, databaseExists, expectOneStore, Faults, openPair, tablesOf, type FaultCounter } from './helpers.ts';
 
 const rowCount = async (pg: PGlite, table: string) =>
@@ -138,6 +151,36 @@ class Zeroing implements StorageBackend {
   isEmpty = () => this.#inner.isEmpty();
   count = () => this.#inner.count();
   clear = () => this.#inner.clear();
+  close = () => this.#inner.close();
+}
+
+/** While `writes.on`, runs `before(n)` ahead of the n-th commit or clear across the backends that share `writes`; the write waits for it. */
+class Before implements StorageBackend {
+  readonly #inner: StorageBackend;
+  readonly #writes: { n: number; on: boolean };
+  readonly #before: (n: number) => Promise<void>;
+
+  constructor(inner: StorageBackend, writes: { n: number; on: boolean }, before: (n: number) => Promise<void>) {
+    this.#inner = inner;
+    this.#writes = writes;
+    this.#before = before;
+  }
+
+  async commit(batch: CommitBatch): Promise<void> {
+    if (this.#writes.on) await this.#before(++this.#writes.n);
+    await this.#inner.commit(batch);
+  }
+
+  async clear(): Promise<void> {
+    if (this.#writes.on) await this.#before(++this.#writes.n);
+    await this.#inner.clear();
+  }
+
+  get = (slot: Slot) => this.#inner.get(slot);
+  isEmpty = () => this.#inner.isEmpty();
+  count = () => this.#inner.count();
+  getMany = (ids: BlockId[]) => this.#inner.getMany(ids);
+  readRange = (after: BlockId | null, limit: number) => this.#inner.readRange(after, limit);
   close = () => this.#inner.close();
 }
 
@@ -384,17 +427,106 @@ describe('rotateDataKey', () => {
       };
       const { rejected, commits: total } = await run(Infinity);
       expect(rejected).toBe(false);
-      // The mark, the header copies, at least one batch of the copy, the table, the switch.
-      expect(total).toBeGreaterThanOrEqual(5);
+      // The mark, the header copies, at least one batch of the copy, the table, the switch, and the
+      // retiring of the old store.
+      expect(total).toBeGreaterThanOrEqual(6);
       const every = inBrowser ? 10 : 1;
       for (let at = 1; at <= total; at += every) {
         const outcome = await run(at);
-        // A commit that failed before writing fails the rotation. One that applied fails it too,
-        // except the mark and the switch, which a read of the root settles as applied.
-        if (mode === 'before') expect(outcome.rejected, `commit ${String(at)}`).toBe(true);
-        else expect(outcome.rejected, `commit ${String(at)}`).toBe(at !== 1 && at !== total);
+        // A commit before the switch that failed before writing fails the rotation. One that applied
+        // fails it too, except the mark and the switch, which a read of the root settles as applied.
+        // The last, the retiring after the switch, fails nothing: the old store stays marked, and the
+        // reopen finishes the rotation.
+        if (mode === 'before') expect(outcome.rejected, `commit ${String(at)}`).toBe(at !== total);
+        else expect(outcome.rejected, `commit ${String(at)}`).toBe(at !== 1 && at < total - 1);
       }
     }, 900_000);
   }
+
+  it('a second instance that opens the pair before any write of a rotation: one of the two keeps a store, the other stops, nothing is lost', async () => {
+    const { key, recs } = await baseStore(65536);
+    /** One rotation, with a second instance opening the pair before its write `at`; the rotation's writes. */
+    const run = async (at: number): Promise<number> => {
+      const a = await restore(recs);
+      const b = new MemoryBackend();
+      const writes = { n: 0, on: false };
+      const second: { opening: Promise<Opened> | null } = { opening: null };
+      const before = async (n: number) => {
+        if (n !== at) return;
+        second.opening = openPair([shared(a), shared(b)], key, { mode: 'open' });
+        await second.opening.catch(() => undefined);
+      };
+      const first = await openPair([new Before(shared(a), writes, before), new Before(shared(b), writes, before)], key);
+      await first.pg.exec(`INSERT INTO t VALUES (-1, 'before')`);
+      await first.fs.syncToFs(false);
+      writes.on = true;
+      const rotation = await first.fs.rotateDataKey().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      writes.on = false;
+      const label = `write ${String(at)}`;
+      // The rotation fails at its read-back when the other instance deleted the new store, and at the
+      // switch or step 8 when it lost the old store's root.
+      if (rotation !== null) expect([StaleWriterError, CorruptStoreError].some((type) => rotation instanceof type), label).toBe(true);
+      const up: Array<{ opened: Opened; id: number }> = [{ opened: first, id: -2 }];
+      if (second.opening) {
+        const opened = await second.opening.then(
+          (o) => o,
+          (e: unknown) => {
+            expect(e, label).toBeInstanceOf(StaleWriterError);
+            return null;
+          },
+        );
+        if (opened) up.push({ opened, id: -3 });
+      }
+      // Each instance still up writes a row and syncs it: exactly one of them can.
+      const synced: number[] = [];
+      for (const { opened, id } of up) {
+        await opened.pg.exec(`INSERT INTO t VALUES (${String(id)}, 'after')`);
+        const ok = await opened.fs.syncToFs(false).then(
+          () => true,
+          (e: unknown) => {
+            expect(e, label).toBeInstanceOf(StaleWriterError);
+            return false;
+          },
+        );
+        if (ok) synced.push(id);
+      }
+      expect(synced, label).toHaveLength(1);
+      for (const { opened } of up) await opened.pg.close();
+
+      const re = await openPair([shared(a), shared(b)], key, { mode: 'open' });
+      const ids = (await re.pg.query<{ id: number }>('SELECT id FROM t WHERE id < 0 ORDER BY id')).rows.map((r) => r.id);
+      expect(ids, label).toEqual([synced[0], -1]);
+      expect(await rowCount(re.pg, 't'), label).toBe(2002);
+      await expectOneStore([a, b], re);
+      await re.pg.close();
+      return writes.n;
+    };
+    const total = await run(Infinity);
+    // The mark, the header copies, at least one batch of the copy, the table, the switch, and the
+    // retiring and the clear of the old store.
+    expect(total).toBeGreaterThanOrEqual(7);
+    for (let at = 1; at <= total; at++) await run(at);
+  }, 900_000);
+
+  it('an open beside a store with no root or no header, which an undone rotation can leave, deletes that one', async () => {
+    const { key, recs } = await baseStore(65536);
+    for (const [cut, leftFirst] of [
+      [[2], true],
+      [[0, 1], false],
+    ] as const) {
+      const store = await restore(recs);
+      const left = await restore(recs);
+      await left.commit({ puts: [], deletes: [...cut], durability: 'strict' });
+      const pair = leftFirst ? ([left, store] as const) : ([store, left] as const);
+      const re = await openPair([shared(pair[0]), shared(pair[1])], key, { mode: 'open' });
+      expect(await rowCount(re.pg, 't')).toBe(2000);
+      expect(await left.isEmpty()).toBe(true);
+      await expectOneStore(pair, re);
+      await re.pg.close();
+    }
+  }, 240_000);
 });
 
