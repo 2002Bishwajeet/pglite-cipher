@@ -94,7 +94,6 @@ interface ModuleFS extends EmscriptenFS {
 interface Prepared {
   draft: Draft;
   root: Bytes;
-  tableDigest: Bytes;
   puts: Array<[RecordKey, Bytes]>;
   deletes: string[];
   stats: SyncStats;
@@ -145,7 +144,6 @@ export class EncryptedFs extends MemoryFS {
   #lastRoot: Bytes | null = null;
   #gen = 0;
   #origin = '';
-  #tableDigest: Bytes = new Uint8Array(32);
 
   /** Syncs are enabled once the open succeeded. */
   #ready = false;
@@ -326,7 +324,6 @@ export class EncryptedFs extends MemoryFS {
     this.#lastRoot = sealedRoot as Bytes;
     this.#gen = root.gen;
     this.#origin = root.origin;
-    this.#tableDigest = root.tableDigest;
   }
 
   // ---- sync --------------------------------------------------------------------------------
@@ -458,7 +455,7 @@ export class EncryptedFs extends MemoryFS {
       encryptMs: now() - t0,
       commitMs: 0,
     };
-    return { draft, root, tableDigest, puts, deletes: draft.deletes, stats };
+    return { draft, root, puts, deletes: draft.deletes, stats };
   }
 
   /**
@@ -494,7 +491,6 @@ export class EncryptedFs extends MemoryFS {
     (this.#tracker as Tracker).commit(snap);
     this.#lastRoot = prepared.root;
     this.#gen++;
-    this.#tableDigest = prepared.tableDigest;
     this.#headerRepair = false;
     this.#lastSync = prepared.stats;
   }

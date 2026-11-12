@@ -28,7 +28,7 @@
         "doc_search": 5,
         "kv": 2
       },
-      "blobChecksum": "5739542b64c4923fd9336575e0396c71"
+      "blobChecksum": "2083c094b2919024641265f1b0066a07"
     },
     "afterReopen": {
       "counts": {
@@ -36,7 +36,7 @@
         "doc_search": 5,
         "kv": 2
       },
-      "blobChecksum": "5739542b64c4923fd9336575e0396c71"
+      "blobChecksum": "2083c094b2919024641265f1b0066a07"
     },
     "walFiles": [
       "000000010000000000000002",
@@ -45,22 +45,22 @@
     ]
   },
   "ops": {
-    "lookup": 4279,
+    "lookup": 4282,
     "mknod": 2544,
     "setattr": 6213,
-    "write": 16627,
+    "write": 16633,
     "symlink": 4,
     "readlink": 4,
     "getattr": 100,
     "read": 6254,
     "readdir": 33,
-    "llseek": 7098,
+    "llseek": 7101,
     "mmap": 4,
     "unlink": 9,
     "rename": 12
   },
   "otherOps": {
-    "lookup": 4279,
+    "lookup": 4282,
     "readlink": 4,
     "getattr": 100,
     "read": 6254,
@@ -10302,18 +10302,18 @@
       }
     },
     "base/N/N": {
-      "count": 12077,
-      "bytes": 112107520,
+      "count": 12083,
+      "bytes": 112156672,
       "viaMsync": 0,
       "unalignedOffset": 0,
       "unalignedLength": 0,
       "pastEof": 0,
       "unlinkedNode": 0,
       "offsetMod": {
-        "0": 12077
+        "0": 12083
       },
       "lengthMod": {
-        "0": 12077
+        "0": 12083
       }
     },
     "base/N/N_fsm": {
@@ -16293,7 +16293,7 @@
       "grow": 0,
       "shrink": 0,
       "same": 0,
-      "growByWrite": 5803
+      "growByWrite": 5806
     },
     "base/N/N_fsm": {
       "setattrWithSize": 0,
@@ -17287,7 +17287,7 @@
   "syncSummary": {
     "total": 2930,
     "writeCommits": 2342,
-    "withTableChange": 1479,
+    "withTableChange": 1476,
     "byPhase": {
       "initdb": {
         "syncs": 2,
@@ -17340,7 +17340,7 @@
       "insert": {
         "syncs": 2300,
         "writeCommits": 2200,
-        "withTableChange": 1367,
+        "withTableChange": 1365,
         "creates": 3,
         "sizeChanges": 1417,
         "renames": 1,
@@ -17416,13 +17416,13 @@
       "wal-switch": {
         "syncs": 194,
         "writeCommits": 94,
-        "withTableChange": 92,
+        "withTableChange": 91,
         "creates": 1,
-        "sizeChanges": 244,
+        "sizeChanges": 247,
         "renames": 1,
         "removes": 0,
         "sizeChangedFiles": {
-          "base/N/N": 242,
+          "base/N/N": 245,
           "base/N/N_fsm": 1,
           "pg_wal/xlogtemp.N": 1
         }
