@@ -10,3 +10,7 @@ export {
   UnsupportedFormatError,
   WrongKeyError,
 } from './format/errors.ts';
+
+export type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from './backend/backend.ts';
+export { IndexedDbBackend } from './backend/indexeddb.ts';
+export { MemoryBackend } from './backend/memory.ts';

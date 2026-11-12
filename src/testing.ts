@@ -3,3 +3,4 @@
 export { setRandomSource } from './format/bytes.ts';
 export { setSubkeyMaxEncryptions } from './format/keys.ts';
 export { resetSelfTest } from './format/selfTest.ts';
+export { FaultyBackend, InjectedFault, type FaultPlan } from './backend/faulty.ts';
