@@ -343,26 +343,33 @@ export class EncryptedFs extends MemoryFS {
     if (!this.#ready) return Promise.reject(new Error('EncryptedFs: the store is not open'));
     this.#requested = true;
     if (relaxedDurability === false) this.#strict = true;
-    this.#drain ??= this.#runAll().finally(() => {
-      this.#drain = null;
-    });
+    this.#drain ??= this.#runAll();
     return relaxedDurability === true ? this.#drain.catch(() => undefined) : this.#drain;
   }
 
+  /**
+   * Runs syncs while one is requested. `#drain` is cleared in the same step that leaves the loop,
+   * so a call after that step starts a new run instead of getting this finished one back. The
+   * loop always awaits first, so `syncToFs` has assigned `#drain` before it is cleared.
+   */
   async #runAll(): Promise<void> {
     let failure: { error: unknown } | null = null;
-    while (this.#requested) {
-      this.#requested = false;
-      const strict = this.#strict;
-      this.#strict = false;
-      try {
-        await this.#syncOnce(strict ? 'strict' : 'relaxed');
-        failure = null;
-      } catch (error) {
-        if (strict) this.#strict = true;
-        failure = { error };
-        if (this.#fatal) break;
+    try {
+      while (this.#requested) {
+        this.#requested = false;
+        const strict = this.#strict;
+        this.#strict = false;
+        try {
+          await this.#syncOnce(strict ? 'strict' : 'relaxed');
+          failure = null;
+        } catch (error) {
+          if (strict) this.#strict = true;
+          failure = { error };
+          if (this.#fatal) break;
+        }
       }
+    } finally {
+      this.#drain = null;
     }
     if (failure) throw failure.error;
   }

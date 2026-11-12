@@ -37,6 +37,9 @@ const browserProject = (browser: 'chromium' | 'firefox' | 'webkit') => ({
 
 export default defineConfig({
   test: {
+    // Most test files start PGlite, at about 1 GB each (a worker, or a browser page): the default
+    // of one per core runs a 16 GB machine out of memory.
+    maxWorkers: 4,
     projects: [
       {
         extends: true,

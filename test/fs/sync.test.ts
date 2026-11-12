@@ -174,6 +174,25 @@ describe('sync', () => {
     await pg.close();
   }, 60_000);
 
+  it('#1191: a sync called in any tick while the running one finishes still commits its changes', async () => {
+    const { pg, fs } = await openStore({ backend: shared(new MemoryBackend()), key: await newKey() });
+    const FS = fsOf(pg);
+    await fs.syncToFs();
+    for (let k = 0; k <= 20; k++) {
+      // Nothing is dirty: this sync is microtasks only, and the late call lands k ticks into it.
+      const first = fs.syncToFs();
+      let tick = Promise.resolve();
+      for (let i = 0; i < k; i++) tick = tick.then(() => undefined);
+      const late = tick.then(() => {
+        FS.writeFile(`${PGDATA}/late-${String(k)}`, new Uint8Array(10).fill(k));
+        return fs.syncToFs();
+      });
+      await Promise.all([first, late]);
+      expect(fs.hasDirty(), `k = ${String(k)}`).toBe(false);
+    }
+    await pg.close();
+  }, 60_000);
+
   it('#1065: a transaction left unsynced is visible through hasDirty() and persisted by syncToFs()', async () => {
     const memory = new MemoryBackend();
     const key = await newKey();

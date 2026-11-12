@@ -7,7 +7,7 @@ import type { StorageBackend } from '../../src/backend/backend.ts';
 import { FaultyBackend } from '../../src/backend/faulty.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import { EncryptedFs } from '../../src/encryptedFs.ts';
-import { toHex } from '../../src/format/bytes.ts';
+import { toHex, type Bytes } from '../../src/format/bytes.ts';
 import { packEntries } from '../../src/format/table.ts';
 import {
   expectStoreEquals,
@@ -47,12 +47,19 @@ function prng(seed: number) {
 /** Every node under `dir`, by absolute path. */
 const entries = (FS: TestFS, dir: string) => [...listTree(FS, dir)].map(([p, s]) => ({ path: `${dir}/${p}`, ...s }));
 
-/** The tree under PGDATA: each node's mode, and its bytes or symlink target. */
-function treeOf(FS: TestFS): Map<string, string> {
+/**
+ * The tree under PGDATA: each node's mode, and the SHA-256 of its bytes or its symlink target.
+ * A digest, not the bytes in hex: hex strings of the whole data directory take gigabytes of heap.
+ */
+async function treeOf(FS: TestFS): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (const [path, { mode }] of listTree(FS)) {
     const full = `${PGDATA}/${path}`;
-    const body = FS.isDir(mode) ? 'dir' : FS.isLink(mode) ? FS.readlink(full) : toHex(FS.readFile(full));
+    const body = FS.isDir(mode)
+      ? 'dir'
+      : FS.isLink(mode)
+        ? FS.readlink(full)
+        : toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', FS.readFile(full) as Bytes)));
     out.set(path, `${String(mode)}:${body}`);
   }
   return out;
@@ -73,7 +80,7 @@ class LoadSnapshotFs extends EncryptedFs {
 
   override async initialSyncFs(): Promise<void> {
     await super.initialSyncFs();
-    this.loaded = treeOf(this.#moduleFs as TestFS);
+    this.loaded = await treeOf(this.#moduleFs as TestFS);
   }
 }
 
@@ -168,7 +175,7 @@ describe('file-table packing', () => {
     const { table } = await inspect(memory, key);
     expect(fs.stats().table.blocks).toBeLessThanOrEqual(2 * packEntries(table.files.values(), B).length + 4);
 
-    const live = treeOf(FS);
+    const live = await treeOf(FS);
     const reopen = new LoadSnapshotFs({ backend: shared(await restore(await records(memory))), key, mode: 'open' });
     const pg2 = await PGlite.create({ fs: reopen });
     expect(reopen.loaded).toEqual(live);
