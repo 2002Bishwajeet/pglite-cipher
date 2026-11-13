@@ -238,7 +238,7 @@ const dirBytes = (pg: Pg): Record<string, number> => {
   }
   return out;
 };
-export const wasmBytes = (pg: Pg): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+export const wasmBytes = (pg: PGlite): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
 
 /** The data directory as a file map: path to mode and size. */
 const tree = (pg: Pg): Map<string, string> => new Map(nodes(pg).map((n) => [n.path, `${String(n.mode)} ${String(n.size)}`]));
@@ -484,15 +484,16 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
   const id = crypto.randomUUID();
   const names = { plain: `bench-plain-${String(mb)}-${id}`, encrypted: `bench-encrypted-${String(mb)}-${id}` };
   const n = opts.opens ?? runs;
+  const pgOptions = opts.pgOptions ?? {};
   const built: Built[] = [];
   try {
     let p: Built | undefined;
     if (!opts.onlyEncrypted) {
-      p = await buildVariant('plain', names.plain, mb, runs, log, opts.pgOptions ?? {});
+      p = await buildVariant('plain', names.plain, mb, runs, log, pgOptions);
       built.push(p);
       await shut(p);
     }
-    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log, opts.pgOptions ?? {});
+    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log, pgOptions);
     built.push(e);
     await shut(e);
 
