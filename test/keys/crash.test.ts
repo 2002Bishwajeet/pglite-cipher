@@ -56,7 +56,7 @@ describe('rotation crash matrix', () => {
     expect(journal[switchAt]).toMatchObject({ slot: 0, batch: { expectRoot: rootOf(journal[start]), deletes: [] } });
     expect(rootOf(journal[switchAt])).toBeDefined();
     expect(journal[switchAt + 1]).toEqual({ slot: 0, clear: true });
-    expect(end).toBe(switchAt + 3);
+    expect(end).toBe(switchAt + 4);
     // Step 2's mark on the old store, then the header copies and the copy's batches on the new one,
     // then at least the catch-up's table, the switch, step 8's clear and the sync.
     expect(journal[start]).toMatchObject({ slot: 0 });
