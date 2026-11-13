@@ -6,6 +6,7 @@ import { EncryptedFs, IndexedDbBackend } from '../src/index.ts';
 import type { BlockSize } from '../src/format/codec.ts';
 import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
+import { runHandles, runOnDemand } from '../spike/on-demand/part.ts';
 import { runG7 } from './g7.ts';
 import { judgeGates, judgeYear } from './judge.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
@@ -342,6 +343,8 @@ async function runOps(runs: number): Promise<Json> {
 
 // ---- page ------------------------------------------------------------------------------------
 
+const odMb = () => Number(new URLSearchParams(location.search).get('odmb') ?? 100);
+
 const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   gates10: (runs) => runGates(10, runs),
   gates100: (runs) => runGates(100, runs),
@@ -353,6 +356,11 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   year: () => runYear(Number(new URLSearchParams(location.search).get('sessions') ?? 365)),
   ops: (runs) => runOps(runs),
   g7: () => runG7(log),
+  // Spike #47 (spike/on-demand/): `&odmb=` sets the database size, 100 MB by default.
+  ondemand: () => runOnDemand('plain', odMb(), log),
+  'ondemand-aes': () => runOnDemand('aes', odMb(), log),
+  'ondemand-idb': () => runOnDemand('idb', odMb(), log),
+  'ondemand-handles': () => runHandles(1100),
 };
 
 async function run(parts: string[], runs: number, onPart: (result: Json) => Promise<void>): Promise<Json> {
