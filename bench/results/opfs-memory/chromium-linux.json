@@ -1,0 +1,152 @@
+{
+  "browser": "chromium",
+  "mb": 100,
+  "measuredAt": "2026-11-13T11:23:41.888Z",
+  "fs": {
+    "idb": {
+      "build": {
+        "rows": 100000,
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "ms": 9269
+      },
+      "baselineRssKb": 571488,
+      "open": {
+        "openMs": 1020,
+        "sharedBuffers": "128MB",
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121,
+          "jsHeapBytes": null
+        }
+      },
+      "openRssDeltaKb": 535852,
+      "point": {
+        "ms": 36,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121,
+          "jsHeapBytes": null
+        }
+      },
+      "scan": {
+        "ms": 968,
+        "rows": [
+          {
+            "rows": 100000,
+            "bytes": "96000000"
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121,
+          "jsHeapBytes": null
+        }
+      },
+      "scanRssDeltaKb": 535676
+    },
+    "opfs-ahp": {
+      "build": {
+        "rows": 100000,
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "ms": 5723
+      },
+      "baselineRssKb": 584492,
+      "open": {
+        "openMs": 430,
+        "sharedBuffers": "128MB",
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214,
+          "jsHeapBytes": null
+        }
+      },
+      "openRssDeltaKb": 312308,
+      "point": {
+        "ms": 2,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214,
+          "jsHeapBytes": null
+        }
+      },
+      "scan": {
+        "ms": 578,
+        "rows": [
+          {
+            "rows": 100000,
+            "bytes": "96000000"
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214,
+          "jsHeapBytes": null
+        }
+      },
+      "scanRssDeltaKb": 313000
+    }
+  },
+  "features": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36",
+    "crossOriginIsolated": true,
+    "sharedArrayBuffer": true,
+    "atomicsWaitAsync": true,
+    "opfs": true,
+    "createSyncAccessHandle": true,
+    "jspi": true
+  },
+  "bridge": {
+    "pages": 1024,
+    "reads": 2000,
+    "run": {
+      "roundTripMs": {
+        "n": 2000,
+        "mean": 0.066,
+        "p50": 0.055,
+        "p95": 0.095,
+        "max": 2.1,
+        "meanFromTotal": 0.067
+      },
+      "plainReadMs": {
+        "n": 2000,
+        "mean": 0.003,
+        "p50": 0,
+        "p95": 0.005,
+        "max": 0.05,
+        "meanFromTotal": 0.003
+      },
+      "mismatches": 0
+    },
+    "crypto": {
+      "readAndDecryptMs": {
+        "n": 2000,
+        "mean": 0.028,
+        "p50": 0.025,
+        "p95": 0.04,
+        "max": 0.545
+      }
+    }
+  },
+  "handles": {
+    "requested": 1100,
+    "opened": 1100,
+    "error": null,
+    "cleanupError": null
+  }
+}
