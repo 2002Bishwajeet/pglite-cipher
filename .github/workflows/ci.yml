@@ -15,12 +15,15 @@ concurrency:
 permissions:
   contents: read
 
-# Every job runs on the owner's self-hosted runner (Debian 13 mini PC, Node 24, Playwright system
-# dependencies installed once). Browsers stay in ~/.cache/ms-playwright between runs, so
-# `playwright install` is a no-op after the first run: no apt-get, no --with-deps.
+# Jobs run on whichever of the owner's self-hosted runners labelled `pc-ci` is free: the yantra-box
+# mini PC (Debian 13), the Mac (macOS, native WebKit) and the G14 laptop (only while it has spare
+# memory; its jobs hold the machine's heavy lock). Playwright system dependencies are installed once
+# per machine and browsers stay in ~/.cache/ms-playwright (macOS: ~/Library/Caches/ms-playwright),
+# so `playwright install` is a no-op after the first run: no apt-get, no --with-deps.
+# The repo is private; when it goes public, switch to GitHub-hosted runners.
 jobs:
   lint:
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,7 +35,7 @@ jobs:
       - run: npm run typecheck
 
   build:
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +46,7 @@ jobs:
       - run: npm run build
 
   test:
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +62,7 @@ jobs:
       - run: npm run harness:test
 
   test-browser:
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +80,7 @@ jobs:
   # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
   # every engine opens both. Two engines that each read only their own stores is what this catches.
   compat-write:
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     strategy:
       fail-fast: false
       matrix:
@@ -102,7 +105,7 @@ jobs:
 
   compat-read:
     needs: compat-write
-    runs-on: [self-hosted, yantra-box]
+    runs-on: [self-hosted, pc-ci]
     strategy:
       fail-fast: false
       matrix:
