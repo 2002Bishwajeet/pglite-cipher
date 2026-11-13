@@ -1062,6 +1062,9 @@ export class EncryptedFs extends MemoryFS {
    * FS, the tracker and the file map, then closes the backends. PGlite drops its module on close;
    * through these, a host that keeps the closed instance kept the wasm memory and the data
    * directory too (#42). They go first, so a backend that fails to close keeps none of them.
+   * A failed close-time sync rejects with its error, but drops them all the same, with an
+   * unsettled commit and the PGlite instance (#49): PGlite takes no second close, so nothing
+   * could retry it. PGlite then keeps its own module until the host drops the instance.
    */
   override async closeFs(): Promise<void> {
     try {
@@ -1073,8 +1076,10 @@ export class EncryptedFs extends MemoryFS {
       this.#FS = null;
       this.#tracker = null;
       this.#map = null;
+      this.#unsettled = null;
       await Promise.all(this.#slots.map((backend) => backend.close()));
       await super.closeFs();
+      delete this.pg;
     }
   }
 
