@@ -1,149 +1,72 @@
-# Benchmark results, 2026-11-13 (re-run)
+# Benchmark results, 2026-11-13 (final, on `main` at `ae2b2f6`)
 
-Final benchmark on `main` at `78e5851`, run as documented in `bench/README.md`: the benchmark page (`bench/`) in headless Playwright through `spike/run.mjs`, parts `gates10,extras,gates100,year`, 20 runs per measure, p50 / p95. Raw JSON beside this file: `chromium.json`, `firefox.json`, `webkit.json`. This replaces the earlier 2026-11-13 run (commit 5dccf50, on `2efe68f`) in the same directory.
+Run as `bench/README.md` documents: the benchmark page (`bench/`) built with `npm run bench:build` and driven headless by `node bench/run.mjs <browser> --parts ...`, 20 runs per measure, p50 / p95. Parts: `gates10`, `gates100`, `extras`, `year`, `ops`. Raw JSON beside this file: `chromium.json`, `firefox.json`, `webkit.json`. This replaces the earlier 2026-11-13 run (commit `95fb8b8`, on `78e5851`) in the same directory. The code under test changed since then (#10: the next page is read while one decrypts; #36: `changeKey`).
 
-**What was measured.** The page benchmarks the issue #2 prototype filesystem (`spike/protoFs.ts`) against plain `idb://`, at 8, 32 and 64 KB units. It does not exercise the shipped `src/` (`EncryptedFs`); `bench/README.md` documents no benchmark of `src/`. These numbers re-check the spike verdict on current dependencies and browsers; they are not a measurement of the released code.
+**What was measured.** The page benchmarks the shipped `src/` (`EncryptedFs` over `IndexedDbBackend.pair`, 64 KB blocks, the format default) against plain `idb://` (`IdbFs`) on the same data: 10 MB and 100 MB blob payloads, 67.8 MB and 266.6 MB data directories, about 1,020 files. Gates are judged by `bench/judge.ts` (`node bench/gates.ts --factor 1`, absolute budgets not relaxed).
 
-**Node.** The page needs IndexedDB and a DOM, so it cannot run in Node. Node (v26.13.0) is only the host that drives Playwright and Vite; no Node row exists.
+**Node.** The page needs IndexedDB and a DOM, so it cannot run in Node. Node (v26.13.0) is only the host that drives Playwright and Vite; no Node benchmark row exists. Node behaviour is covered by the test suite, not by this benchmark.
 
 ## Environment
 
 | | Chromium, Firefox | WebKit |
 | --- | --- | --- |
-| Machine | ROG G14 (host `CachyOs-G14`), shared with other harness jobs, heavy lock held | MacBook Pro, through `scripts/harness/webkit.sh` (the Mac path; the podman fallback was not used) |
-| CPU | AMD Ryzen 5 4600HS (12 threads) | Apple M1 Pro |
+| Machine | ROG G14, shared with other harness sessions (heavy lock held for each run) | MacBook Pro, through `scripts/harness/webkit.sh` (the Mac path) |
+| CPU | AMD Ryzen 5 4600HS, 12 threads | Apple M1 Pro |
 | RAM | 15 GiB | 16 GiB |
 | OS | CachyOS Linux, kernel 7.3.0-4-cachyos | macOS 27.0.1 |
 | Browser | Chromium 158.0.8127.18 (headless), Firefox 159.0 (Playwright build, headless) | Playwright WebKit, `Version/27.2 Safari/605.1.15`, headless. Not Safari, not WKWebView |
 | Playwright | 1.65.0 | 1.65.0 |
 | PGlite | 0.5.10 | 0.5.10 |
 
-WebKit ran on different, faster hardware than the other two. Compare plain against encrypted within one engine, never absolute times across engines. Chromium and Firefox ran on a machine other sessions share, so timings are noisy (see "Noise" in `spike/RESULTS.md`). Chromium's G3 reads `performance.memory` (launched with `--enable-precise-memory-info`); `measureUserAgentSpecificMemory` does not exist headless. Firefox and WebKit have no memory API the page can use, so G3 is n/a there.
+WebKit ran on different, faster hardware. Compare plain against encrypted within one engine, never absolute times across engines. Chromium and Firefox ran on a machine other sessions share, so absolute timings are noisy. `/tmp` on this host is a 7.6 GB tmpfs, which is where the browsers' profiles live (see `ops` below).
 
-## Gates
+## Gate table G1 to G9
 
-Targets are `docs/plan/03-spike-prototype-benchmarks.md`, as restated by the owner on #3: G2 at 10 MB is "no worse than 2x plain `idb://`" only. "10 MB" and "100 MB" are the blob payload. Gates are judged on p50, by the flags the page computes. G9 passes when both `G9_fileMap` and `G9_g1p50` are true (file-map phase within 5 % of the G2 budget, and the G1 sync p50 writes no table block). The page's stricter `G9` flag, which also requires that no G1 sync ever wrote a table block, is false at every unit in every engine (as in the earlier run). Cells list 8 / 32 / 64 KB.
-
-Verdict by engine (recommended unit = G5 at 100 MB): Chromium passes G1, G1b, G2 (64 KB at 100 MB; 32 and 64 KB at 10 MB), G4, G6, G8, G9 and fails G3 at every unit. Firefox passes G1, G1b, G2 (32 and 64 KB at 100 MB; every unit at 10 MB), G6, G8, G9, and G4 at 32 and 64 KB (8 KB fails). WebKit passes every gate it can measure at every unit; G3 is not measurable there. G7 is owner-only. The verdict matches the earlier run on `2efe68f`.
+Target = `docs/plan/01-sqlcipher-comparison.md` 3.3 with the desktop budgets of #3. "Ratio" is encrypted p50 divided by plain p50 in the same run.
 
 | Gate | Target | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- | --- |
-| G1 sync, one-row UPDATE | enc p50 <= 2x plain | 100 MB: plain 83.0 ms; 0.70 pass, 0.83 pass, 0.80 pass | 100 MB: plain 159 ms; 1.70 pass, 1.62 pass, 1.64 pass | 100 MB: plain 160 ms; 0.38 pass, 0.44 pass, 0.44 pass |
-| G1b sync, one 4 KB insert | <= 2x plain, <= 1 table block | 100 MB: plain 589 ms; 1.08 pass, 1.18 pass, 1.56 pass | 100 MB: plain 746 ms; 2.30 pass, 2.40 pass, 3.86 pass | 100 MB: plain 273 ms; 0.66 pass, 0.92 pass, 1.02 pass |
-| G2 open, 10 MB (p50 ms) | <= 2x plain | plain 370; 970 FAIL, 648 pass, 429 pass | plain 640; 741 pass, 576 pass, 598 pass | plain 284; 145 pass, 117 pass, 137 pass |
-| G2 open, 100 MB (p50 ms) | <= 2x plain and <= 1,500 ms | plain 715; 2,918 FAIL, 1,661 FAIL, 853 pass | plain 1,286; 2,044 FAIL, 1,285 pass, 1,187 pass | plain 418; 367 pass, 257 pass, 244 pass |
-| G3 memory | open <= database + 64 MB | 100 MB: 737 MB FAIL, 721 MB FAIL, 672 MB FAIL (plain idb 721 MB); 10 MB: 510 MB FAIL, 374 MB FAIL, 375 MB FAIL (plain idb 398 MB) | not available (no memory API) | not available (no memory API) |
-| G4 segment switch | <= 500 ms | 100 MB: 191 pass, 106 pass, 81.7 pass; 10 MB: 178 pass, 108 pass, 82.3 pass | 100 MB: 618 FAIL, 328 pass, 273 pass; 10 MB: 560 FAIL, 317 pass, 272 pass | 100 MB: 114 pass, 58.2 pass, 31.7 pass; 10 MB: 116 pass, 47.6 pass, 29.2 pass |
-| G5 unit size | smallest unit passing G2 | 10 MB: 32 KB; 100 MB: 64 KB | 10 MB: 8 KB; 100 MB: 32 KB | 10 MB: 8 KB; 100 MB: 8 KB |
+| G1 sync, one-row UPDATE, 10 MB | ratio <= 2 | 0.05 (4.36 vs 79.8 ms): pass | 0.04 (6.26 vs 146 ms): pass | 0.05 (6.38 vs 133 ms): pass |
+| G1 sync, one-row UPDATE, 100 MB | ratio <= 2 | 0.06 (4.85 vs 82.3 ms): pass | 0.05 (7.00 vs 144 ms): pass | 0.03 (5.40 vs 206 ms): pass |
+| G1b sync, one 4 KB insert, 10 MB | ratio <= 2; <= 1 table block | 0.05 (5.73 vs 110 ms); table blocks p50 1, max 1: pass | 0.04 (7.70 vs 185 ms); 1 / 1: pass | 0.04 (5.78 vs 135 ms); 1 / 1: pass |
+| G1b sync, one 4 KB insert, 100 MB | ratio <= 2; <= 1 table block | 0.01 (7.06 vs 595 ms); table blocks p50 1, max 2: pass on p50 | 0.01 (10.4 vs 724 ms); 1 / 2: pass on p50 | 0.01 (5.78 vs 479 ms); 1 / 2: pass on p50 |
+| G2 open, 10 MB | ratio <= 2 | 1.07 (460 vs 431 ms): pass | 1.10 (676 vs 615 ms): pass | 0.65 (233 vs 357 ms): pass |
+| G2 open, 100 MB | ratio <= 2 and <= 1,500 ms | 1.34 (860 ms): pass | 0.96 (1,269 ms): pass | 0.92 (696 ms): pass |
+| G3 memory after the open | database + 64 MB | not measurable: 632 MB (10 MB db), 1,000 MB (100 MB db), the whole renderer heap including baseline; plain idb 479 / 1,183 MB | not measurable (no memory API) | not measurable (no memory API) |
+| G4 segment switch, 10 MB | <= 500 ms; <= 10x a normal plain sync | 92.2 ms (1.16x): pass | 258 ms (1.76x): pass | 63.2 ms (0.48x): pass |
+| G4 segment switch, 100 MB | <= 500 ms; <= 10x a normal plain sync | 87.3 ms (1.06x): pass | 278 ms (1.93x): pass | 58.8 ms (0.28x): pass |
+| G5 unit size | smallest of 8/32/64 KB passing G2 | n/a: `src/` has one default unit, 64 KB; G2 passes at it | n/a: same | n/a: same |
 | G6 support | all present | all present: pass | all present: pass | all present: pass |
 | G7 Rust store throughput | recorded only | owner (Tauri only) | owner (Tauri only) | owner (Tauri only) |
-| G8 subkeys | live salts x deriveKey <= 150 ms | 366 live salts x 0.01 ms = 3.66 ms: pass | 366 live salts x 0.1 ms = 36.6 ms: pass | 366 live salts x 0.06 ms = 21.96 ms: pass |
-| G9 file table | file-map <= 5 % of G2 budget; G1 sync p50 writes no table block | file-map 100 MB 28.7 / 7.69 / 16.9 ms (budget 75), 10 MB 17.9 / 9.44 / 6.12 ms (budget 20); pass, pass, pass at 100 MB, pass, pass, pass at 10 MB | file-map 100 MB 42.3 / 13.7 / 10.4 ms (budget 75), 10 MB 15.3 / 7.96 / 6.84 ms (budget 20); pass, pass, pass at 100 MB, pass, pass, pass at 10 MB | file-map 100 MB 24.5 / 12.5 / 9.92 ms (budget 75), 10 MB 15.5 / 9.96 / 10.2 ms (budget 20); pass, pass, pass at 100 MB, pass, pass, pass at 10 MB |
+| G8 subkeys after a year (365 sessions) | live salts x deriveKey <= 150 ms | 263 salts, 1,507 records, 1.3 ms: pass | 21.0 ms: pass | 21.0 ms: pass |
+| G9 file-table phase of the open, 10 MB | <= 5 % of the G2 budget (about 20 ms) | 9.88 ms: pass | 11.0 ms: pass | 4.62 ms: pass |
+| G9 file-table phase of the open, 100 MB | <= 75 ms | 12.9 ms: pass | 19.0 ms: pass | 8.22 ms: pass |
+| G9 the G1 sync writes no table block | p50 0; none on a sync that changed no file | p50 0, no table block on a sync without a file change, at most 1 per changed file: pass | same: pass | same: pass |
 
-## Per engine, every unit
+`node bench/gates.ts --factor 1` on the three JSON files lists every judged row above as pass (G3 "not measurable") and exits 1 only because of the `ops` part (next section). The judge does not cover G1b; that row is computed from the JSON. The Chromium G8 figure is 263 salts x 0.005 ms; Firefox and WebKit derive in 0.08 ms.
 
-### chromium
+Verdict: no gate fails in any engine. G3 cannot be measured headless (Chromium has no `measureUserAgentSpecificMemory` there; Firefox and WebKit have no API), so it stays open for the devices. G2 at 100 MB in Firefox has the least headroom (1,269 of 1,500 ms).
 
-User agent: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36`
+## Other measurements
 
-| Measure (p50 / p95 ms unless noted) | plain | 8 KB | 32 KB | 64 KB |
-|---|---|---|---|---|
-| data directory at 10 MB | | 64.7 MiB | | |
-| G1 sync, one-row UPDATE, 10 MB | 86.2 / 111 | 0.68 / 1.16 pass | 0.69 / 1.92 pass | 0.80 / 2.51 pass |
-| G1b sync, one 4 KB insert, 10 MB | 115 / 130 | 0.92 / 1.38 pass | 1.42 / 1.98 pass | 2.01 / 2.95 pass |
-| G2 open, 10 MB | 370 / 431 | 970 / 1,031 FAIL | 648 / 768 pass | 429 / 469 pass |
-| G4 segment switch, 10 MB | 125 / 139 | 178 / 192 pass | 108 / 120 pass | 82.3 / 93.0 pass |
-| G9 file-map phase of the open p50, 10 MB (budget 20 ms) | | 17.9 pass | 9.44 pass | 6.12 pass |
-| G9 table blocks written by the G1 sync, 10 MB (p50 / max; p50 must be 0) | | 0 / 1 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 10 MB (budget: data + 64 MB) | 398 MB | 510 MB FAIL | 374 MB FAIL | 375 MB FAIL |
-| data directory at 100 MB | | 254.2 MiB | | |
-| G1 sync, one-row UPDATE, 100 MB | 83.0 / 92.2 | 0.70 / 2.25 pass | 0.83 / 2.99 pass | 0.80 / 11.8 pass |
-| G1b sync, one 4 KB insert, 100 MB | 589 / 613 | 1.08 / 2.30 pass | 1.18 / 1.94 pass | 1.56 / 2.12 pass |
-| G2 open, 100 MB | 715 / 831 | 2,918 / 3,113 FAIL | 1,661 / 1,816 FAIL | 853 / 907 pass |
-| G4 segment switch, 100 MB | 566 / 671 | 191 / 322 pass | 106 / 124 pass | 81.7 / 96.0 pass |
-| G9 file-map phase of the open p50, 100 MB (budget 75 ms) | | 28.7 pass | 7.69 pass | 16.9 pass |
-| G9 table blocks written by the G1 sync, 100 MB (p50 / max; p50 must be 0) | | 0 / 2 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 100 MB (budget: data + 64 MB) | 721 MB | 737 MB FAIL | 721 MB FAIL | 672 MB FAIL |
+| Measure | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| `changeKey`, 10 MB / 100 MB | 3.5 / 6.9 ms | 6.8 / 25.0 ms | 7.3 / 8.0 ms |
+| `verify()`, 10 MB / 100 MB | 361 / 865 ms | 580 / 1,519 ms | 301 / 427 ms |
+| `rotateDataKey`, 10 MB / 100 MB | 1,150 / 2,282 ms | 2,176 / 5,122 ms | 1,036 / 932 ms |
+| Open after the rotation, 100 MB (p50) | 867 ms | 1,260 ms | 376 ms |
+| Open at 100 MB: wall time with a page read in flight / with a decrypt in flight (p50) | 683 / 223 ms | 971 / 435 ms | 281 / 90 ms |
+| AES-GCM over 100 MB, MB/s encrypt / decrypt at 8 / 32 / 64 KB | 596/650, 970/952, 1144/791 | 201/210, 641/598, 1206/1097 | 243/1174, 537/2716, 739/2107 |
+| `deriveKey` median of 1,000 | 0.01 ms | 0.06 ms | 0.04 ms |
+| Year simulation duration | 182 s | 259 s | 74 s |
 
-G5 unit size (smallest passing G2): 10 MB run 32768, 100 MB run 65536.
+**`ops` part (startup and operations, plain vs encrypted): errored in Chromium and Firefox.** Both engines threw `QuotaExceededError` during the operations step (Chromium: empty message; Firefox: "The current transaction exceeded its quota limitations"); it reproduced on a second Chromium run. WebKit, on the Mac, completed it (numbers in `webkit.json`). A likely cause is the headless profile quota on this host's shared 7.6 GB tmpfs `/tmp`, but that is not verified. `ops` is not a gate and is not in the default parts of `bench/run.mjs`; treat it as unmeasured on Linux until rerun with the profile on a disk. No other part errored.
 
-G6: aesGcm:true, hkdfDeriveKeyToAesGcm:true, unwrapKeyRawIntoHkdf:true, idbDurability_strict:strict, idbDurability_relaxed:relaxed, idbNumberKeysOrderedFirst:true, idbStringKeyRangeGetAll:true, idb2048PutsThen2048DeletesMs:puts:150.47,deletes:111.75.
+## Not measured here: what only the owner can measure
 
-G8: 366 live salts after 365 sessions x deriveKey p50 0.01 ms = 3.66 ms (budget 150 ms): pass. The year run took 324 s; 7252 live records. deriveKey x1000 p50 0.02 ms.
-
-AES-GCM over 100 MB, MB/s encrypt / decrypt: 8k: 604 / 673, 32k: 937 / 909, 64k: 1144 / 854.
-
-### firefox
-
-User agent: `Mozilla/5.0 (X11; Linux x86_64; rv:159.0) Gecko/20100101 Firefox/159.0`
-
-| Measure (p50 / p95 ms unless noted) | plain | 8 KB | 32 KB | 64 KB |
-|---|---|---|---|---|
-| data directory at 10 MB | | 64.7 MiB | | |
-| G1 sync, one-row UPDATE, 10 MB | 156 / 178 | 0.98 / 2.16 pass | 1.54 / 3.60 pass | 1.62 / 3.40 pass |
-| G1b sync, one 4 KB insert, 10 MB | 207 / 248 | 1.76 / 2.50 pass | 3.28 / 4.12 pass | 3.64 / 4.96 pass |
-| G2 open, 10 MB | 640 / 699 | 741 / 790 pass | 576 / 607 pass | 598 / 635 pass |
-| G4 segment switch, 10 MB | 273 / 328 | 560 / 599 FAIL | 317 / 347 pass | 272 / 302 pass |
-| G9 file-map phase of the open p50, 10 MB (budget 20 ms) | | 15.3 pass | 7.96 pass | 6.84 pass |
-| G9 table blocks written by the G1 sync, 10 MB (p50 / max; p50 must be 0) | | 0 / 1 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 10 MB (budget: data + 64 MB) |  | n/a not available | n/a not available | n/a not available |
-| data directory at 100 MB | | 254.2 MiB | | |
-| G1 sync, one-row UPDATE, 100 MB | 159 / 177 | 1.70 / 5.00 pass | 1.62 / 3.82 pass | 1.64 / 9.80 pass |
-| G1b sync, one 4 KB insert, 100 MB | 746 / 790 | 2.30 / 3.18 pass | 2.40 / 3.52 pass | 3.86 / 5.36 pass |
-| G2 open, 100 MB | 1,286 / 1,366 | 2,044 / 2,107 FAIL | 1,285 / 1,348 pass | 1,187 / 1,250 pass |
-| G4 segment switch, 100 MB | 809 / 850 | 618 / 645 FAIL | 328 / 369 pass | 273 / 312 pass |
-| G9 file-map phase of the open p50, 100 MB (budget 75 ms) | | 42.3 pass | 13.7 pass | 10.4 pass |
-| G9 table blocks written by the G1 sync, 100 MB (p50 / max; p50 must be 0) | | 0 / 2 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 100 MB (budget: data + 64 MB) |  | n/a not available | n/a not available | n/a not available |
-
-G5 unit size (smallest passing G2): 10 MB run 8192, 100 MB run 32768.
-
-G6: aesGcm:true, hkdfDeriveKeyToAesGcm:true, unwrapKeyRawIntoHkdf:true, idbDurability_strict:strict, idbDurability_relaxed:relaxed, idbNumberKeysOrderedFirst:true, idbStringKeyRangeGetAll:true, idb2048PutsThen2048DeletesMs:puts:330.16,deletes:153.98.
-
-G8: 366 live salts after 365 sessions x deriveKey p50 0.1 ms = 36.6 ms (budget 150 ms): pass. The year run took 268 s; 7252 live records. deriveKey x1000 p50 0.06 ms.
-
-AES-GCM over 100 MB, MB/s encrypt / decrypt: 8k: 202 / 274, 32k: 642 / 720, 64k: 1189 / 1348.
-
-### webkit
-
-User agent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15`
-
-| Measure (p50 / p95 ms unless noted) | plain | 8 KB | 32 KB | 64 KB |
-|---|---|---|---|---|
-| data directory at 10 MB | | 64.7 MiB | | |
-| G1 sync, one-row UPDATE, 10 MB | 109 / 123 | 0.40 / 0.98 pass | 0.40 / 1.62 pass | 0.58 / 1.48 pass |
-| G1b sync, one 4 KB insert, 10 MB | 108 / 122 | 0.66 / 0.78 pass | 0.86 / 1.04 pass | 1.26 / 1.40 pass |
-| G2 open, 10 MB | 284 / 309 | 145 / 172 pass | 117 / 147 pass | 137 / 163 pass |
-| G4 segment switch, 10 MB | 119 / 129 | 116 / 129 pass | 47.6 / 68.3 pass | 29.2 / 32.5 pass |
-| G9 file-map phase of the open p50, 10 MB (budget 20 ms) | | 15.5 pass | 9.96 pass | 10.2 pass |
-| G9 table blocks written by the G1 sync, 10 MB (p50 / max; p50 must be 0) | | 0 / 1 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 10 MB (budget: data + 64 MB) |  | n/a not available | n/a not available | n/a not available |
-| data directory at 100 MB | | 254.2 MiB | | |
-| G1 sync, one-row UPDATE, 100 MB | 160 / 173 | 0.38 / 1.70 pass | 0.44 / 1.70 pass | 0.44 / 4.70 pass |
-| G1b sync, one 4 KB insert, 100 MB | 273 / 412 | 0.66 / 1.00 pass | 0.92 / 1.22 pass | 1.02 / 1.28 pass |
-| G2 open, 100 MB | 418 / 575 | 367 / 415 pass | 257 / 382 pass | 244 / 327 pass |
-| G4 segment switch, 100 MB | 276 / 331 | 114 / 132 pass | 58.2 / 66.7 pass | 31.7 / 47.3 pass |
-| G9 file-map phase of the open p50, 100 MB (budget 75 ms) | | 24.5 pass | 12.5 pass | 9.92 pass |
-| G9 table blocks written by the G1 sync, 100 MB (p50 / max; p50 must be 0) | | 0 / 2 pass | 0 / 1 pass | 0 / 1 pass |
-| G3 peak memory, 100 MB (budget: data + 64 MB) |  | n/a not available | n/a not available | n/a not available |
-
-G5 unit size (smallest passing G2): 10 MB run 8192, 100 MB run 8192.
-
-G6: aesGcm:true, hkdfDeriveKeyToAesGcm:true, unwrapKeyRawIntoHkdf:true, idbDurability_strict:strict, idbDurability_relaxed:relaxed, idbNumberKeysOrderedFirst:true, idbStringKeyRangeGetAll:true, idb2048PutsThen2048DeletesMs:puts:61.56,deletes:43.9.
-
-G8: 366 live salts after 365 sessions x deriveKey p50 0.06 ms = 21.96 ms (budget 150 ms): pass. The year run took 62 s; 7252 live records. deriveKey x1000 p50 0.04 ms.
-
-AES-GCM over 100 MB, MB/s encrypt / decrypt: 8k: 476 / 2366, 32k: 963 / 4248, 64k: 1453 / 4726.
-
-## Year simulation (G8)
-
-365 open/edit/checkpoint/close sessions on the prototype at 8 KB: 366 live salts and 7,252 records in chromium (324 s); 366 live salts and 7,252 records in firefox (268 s); 366 live salts and 7,252 records in webkit (62 s).
-
-## What only the owner can measure
-
-- **G7, Rust store throughput.** Only inside a Tauri shell built with `encfs-bench` (needs the `journal/02` bench endpoints). Not measured on any target.
-- **Tauri webviews.** WKWebView (macOS), WebView2 (Windows), WebKitGTK (Linux), each with the page as the shell frontend. Earlier Mac WebKit and WKWebView host runs from issue #11 are in `spike/results/` but are not part of this run.
-- **iPhone and iPad** (Safari and the Tauri iOS shell): memory limits and IndexedDB behaviour on a device, G2 and G4 on the slowest phone.
+- **G7, Rust store throughput.** Only inside a Tauri shell built with `encfs-bench` (needs the `journal/02` bench endpoints).
+- **Tauri webviews.** WKWebView (macOS), WebView2 (Windows), WebKitGTK (Linux), each with the page as the shell frontend (`bench/README.md`, "Inside the Tauri shells").
+- **iPhone and iPad** (Safari and the Tauri iOS shell): memory limits and IndexedDB behaviour on a device, G2 and G4 on the slowest phone, and G3.
 - **Android** (Chrome and Android System WebView on the Redmi and other phones): G2 at 100 MB against the 3 s slowest-target budget, G3.
-- **Real Safari** (not Playwright's build) and Windows.
-- The shipped `src/` filesystem: no benchmark of it exists yet (see "What was measured").
+- **Real Safari** (not Playwright's WebKit build) and Windows.
+- **G3** in every engine: needs a device or a headed run with a memory API.
