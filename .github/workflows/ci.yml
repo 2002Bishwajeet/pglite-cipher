@@ -20,6 +20,8 @@ permissions:
 # memory; its jobs hold the machine's heavy lock). Playwright system dependencies are installed once
 # per machine and browsers stay in ~/.cache/ms-playwright (macOS: ~/Library/Caches/ms-playwright),
 # so `playwright install` is a no-op after the first run: no apt-get, no --with-deps.
+# WebKit jobs stay on yantra-box: Playwright's WebKit is unsupported on the G14 (Arch) and its
+# browser connection closed mid-run on the Mac (2026-11-13), so it is only proven on the box.
 # The repo is private; when it goes public, switch to GitHub-hosted runners.
 jobs:
   lint:
@@ -62,7 +64,7 @@ jobs:
       - run: npm run harness:test
 
   test-browser:
-    runs-on: [self-hosted, pc-ci]
+    runs-on: ${{ matrix.browser == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci"]') }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +82,7 @@ jobs:
   # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
   # every engine opens both. Two engines that each read only their own stores is what this catches.
   compat-write:
-    runs-on: [self-hosted, pc-ci]
+    runs-on: ${{ matrix.browser == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci"]') }}
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +107,7 @@ jobs:
 
   compat-read:
     needs: compat-write
-    runs-on: [self-hosted, pc-ci]
+    runs-on: ${{ matrix.project == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci"]') }}
     strategy:
       fail-fast: false
       matrix:
