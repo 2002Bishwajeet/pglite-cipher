@@ -160,10 +160,11 @@ export class IndexedDbBackend implements StorageBackend {
       // first); a connection that stays open delays the deletion past the grace period, and the
       // database follows when it closes.
       request.onblocked = () => {
+        clearTimeout(grace);
         grace = setTimeout(resolve, BLOCKED_GRACE_MS);
       };
       request.onerror = () => {
-        this.#db = null; // a failed open is not cached: the next call tries again
+        clearTimeout(grace);
         reject(request.error ?? new Error('IndexedDbBackend: the database was not deleted'));
       };
     });
