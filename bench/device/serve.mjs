@@ -69,13 +69,8 @@ function serve({ port, dir, until, onDone }) {
         }
         if (typeof body?.target !== 'string' || !/^[a-z0-9-]{1,40}$/.test(body.target)) return send(400, 'bad target');
         const bad = save(dir, body);
-        if (body.partial === true) {
-          failed ||= bad;
-          console.log(`${stamp()} ${body.target}: part saved${bad ? ' (with an error)' : ''}`);
-          return send(204, '');
-        }
         failed ||= bad;
-        console.log(`${stamp()} ${body.target}: saved to ${join(dir, `${body.target}.json`)}${bad ? ' (with an error)' : ''}`);
+        console.log(`${stamp()} ${body.target}: ${body.partial === true ? 'part saved' : `saved to ${join(dir, `${body.target}.json`)}`}${bad ? ' (with an error)' : ''}`);
         send(204, '');
         pending.delete(body.target);
         if (until.length > 0 && pending.size === 0) onDone(failed ? 1 : 0);

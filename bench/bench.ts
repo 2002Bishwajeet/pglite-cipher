@@ -321,7 +321,7 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   g7: () => runG7(log),
 };
 
-async function run(parts: string[], runs: number, onPart: (part: string, result: Json) => Promise<void>): Promise<Json> {
+async function run(parts: string[], runs: number, onPart: (result: Json) => Promise<void>): Promise<Json> {
   const nav = navigator as Navigator & { deviceMemory?: number };
   const result: Json = {
     userAgent: navigator.userAgent,
@@ -340,7 +340,7 @@ async function run(parts: string[], runs: number, onPart: (part: string, result:
       result[part] = { error: errorText(e) };
     }
     // A later part may crash the tab: send this one now (serve.mjs merges per part).
-    await onPart(part, { partial: true, userAgent: result.userAgent, runs, finishedAt: new Date().toISOString(), [part]: result[part] });
+    await onPart({ partial: true, userAgent: result.userAgent, runs, finishedAt: new Date().toISOString(), [part]: result[part] });
   }
   result.finishedAt = new Date().toISOString();
   return result;
@@ -365,7 +365,7 @@ const post = async (body: Json, final = true) => {
 };
 
 const start = (parts: string[], runs: number) => {
-  void run(parts, runs, (_part, body) => post(body, false)).then(
+  void run(parts, runs, (body) => post(body, false)).then(
     (result) => {
       show(result);
       return post(result);
