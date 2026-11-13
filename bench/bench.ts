@@ -8,6 +8,7 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
 import { runHandles, runOnDemand } from '../spike/on-demand/part.ts';
 import { runG7 } from './g7.ts';
+import { runIdbRead } from './idbread.ts';
 import { judgeGates, judgeYear } from './judge.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
@@ -366,6 +367,8 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   'ondemand-aes': () => runOnDemand('aes', odMb(), log),
   'ondemand-idb': () => runOnDemand('idb', odMb(), log),
   'ondemand-handles': () => runHandles(1100),
+  // Spike #58 (bench/idbread.ts): `&idbmb=` sets the store size, 100 MB by default.
+  idbread: (runs) => runIdbRead(Number(new URLSearchParams(location.search).get('idbmb') ?? 100), runs, log),
 };
 
 async function run(parts: string[], runs: number, onPart: (result: Json) => Promise<void>): Promise<Json> {
