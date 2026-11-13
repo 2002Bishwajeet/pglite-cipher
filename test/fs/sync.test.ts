@@ -249,4 +249,76 @@ describe('sync', () => {
     expect(recorder.attempts.length).toBeGreaterThan(n);
     expect(last()).toBe('strict');
   }, 60_000);
+
+  /** Durability and outcome of each commit attempt from `from` on. */
+  const commitsOf = (recorder: Recorder, from: number) => recorder.attempts.slice(from).map((a) => [a.batch.durability, a.ok]);
+
+  it('a strict sync during a relaxed one waits for it, then commits strict before it resolves', async () => {
+    const recorder = new Recorder(shared(new MemoryBackend()));
+    const { pg, fs } = await openStore({ backend: recorder, key: await newKey() });
+    const FS = fsOf(pg);
+    const from = recorder.attempts.length;
+    const gate = released();
+    const entered = recorder.holdNext(gate.promise);
+    FS.writeFile(`${PGDATA}/relaxed`, new Uint8Array(10).fill(1));
+    const relaxed = fs.syncToFs(true);
+    await entered;
+    const strict = fs.syncToFs(false).then(() => commitsOf(recorder, from));
+    gate.release();
+    // The relaxed commit carried the write; a strict one after it makes it durable.
+    expect(await strict).toEqual([
+      ['relaxed', true],
+      ['strict', true],
+    ]);
+    await relaxed;
+    await pg.close();
+  }, 60_000);
+
+  it('closeFs during a relaxed sync waits for it, then commits strict', async () => {
+    const recorder = new Recorder(shared(new MemoryBackend()));
+    const { pg, fs } = await openStore({ backend: recorder, key: await newKey(), pglite: { relaxedDurability: true } });
+    const FS = fsOf(pg);
+    await fs.syncToFs(false);
+    const from = recorder.attempts.length;
+    const gate = released();
+    const entered = recorder.holdNext(gate.promise);
+    FS.writeFile(`${PGDATA}/relaxed`, new Uint8Array(10).fill(1));
+    void fs.syncToFs(true);
+    await entered;
+    const closeFs = fs.closeFs.bind(fs);
+    const closing = released();
+    fs.closeFs = () => {
+      closing.release();
+      return closeFs();
+    };
+    const closed = pg.close();
+    await closing.promise;
+    gate.release();
+    await closed;
+    const commits = commitsOf(recorder, from);
+    expect(commits[0]).toEqual(['relaxed', true]);
+    expect(commits.at(-1)).toEqual(['strict', true]);
+  }, 60_000);
+
+  it('strict syncs that one strict commit covers add no commit each', async () => {
+    const recorder = new Recorder(shared(new MemoryBackend()));
+    const { pg, fs } = await openStore({ backend: recorder, key: await newKey() });
+    const FS = fsOf(pg);
+    const from = recorder.attempts.length;
+    const gate = released();
+    const entered = recorder.holdNext(gate.promise);
+    FS.writeFile(`${PGDATA}/relaxed`, new Uint8Array(10).fill(1));
+    const relaxed = fs.syncToFs(true);
+    await entered;
+    const strict = [fs.syncToFs(false), fs.syncToFs(false), fs.syncToFs(false)];
+    gate.release();
+    await Promise.all([relaxed, ...strict]);
+    // Nothing new since that strict commit: no further commit.
+    await Promise.all([fs.syncToFs(false), fs.syncToFs(false)]);
+    expect(commitsOf(recorder, from)).toEqual([
+      ['relaxed', true],
+      ['strict', true],
+    ]);
+    await pg.close();
+  }, 60_000);
 });

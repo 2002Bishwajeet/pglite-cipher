@@ -58,8 +58,10 @@ const pg = await PGlite.create({ fs, relaxedDurability: true });
 await pg.exec('CREATE TABLE IF NOT EXISTS notes (id serial PRIMARY KEY, body text)');
 
 // PGlite does not always sync when it should (electric-sql/pglite#1191, #1065, #1063): sync
-// yourself when it matters, for example when the page is hidden.
-if (fs.hasDirty()) await fs.syncToFs(false);
+// yourself when it matters, for example when the page is hidden. A strict sync waits for a
+// running one and resolves once everything before it is committed strict, including what a
+// relaxed sync already committed (hasDirty() is false then, so do not skip on it).
+await fs.syncToFs(false);
 
 await pg.close(); // waits for a running sync, then commits everything strict
 ```

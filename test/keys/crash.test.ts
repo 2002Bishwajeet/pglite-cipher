@@ -56,7 +56,7 @@ describe('rotation crash matrix', () => {
     expect(journal[switchAt]).toMatchObject({ slot: 0, batch: { expectRoot: rootOf(journal[start]), deletes: [] } });
     expect(rootOf(journal[switchAt])).toBeDefined();
     expect(journal[switchAt + 1]).toEqual({ slot: 0, clear: true });
-    expect(end).toBe(switchAt + 3);
+    expect(end).toBe(switchAt + 4);
     // Step 2's mark on the old store, then the header copies and the copy's batches on the new one,
     // then at least the catch-up's table, the switch, step 8's clear and the sync.
     expect(journal[start]).toMatchObject({ slot: 0 });
@@ -71,7 +71,7 @@ describe('rotation crash matrix', () => {
       const reopened = await openPair([shared(stores[0]), shared(stores[1])], key, { mode: 'open' });
       const want = k < switchAt ? base : rotated;
       const tables = await tablesOf(reopened.pg);
-      if (k < end) expect(tables, `state ${String(k)}`).toEqual(want);
+      if (k < end - 1) expect(tables, `state ${String(k)}`).toEqual(want);
       else expect(await rowsOf(reopened.pg, 'r'), `state ${String(k)}`).toBe(written + 1);
       await expectOneStore(stores, reopened);
       await reopened.pg.close();
