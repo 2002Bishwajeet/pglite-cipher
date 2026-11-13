@@ -436,7 +436,10 @@ export class Draft {
     const out: Array<{ fileId: Bytes; blockTags: Bytes }> = [];
     for (const f of this.allFiles()) {
       if (f.type !== 'file') continue;
-      if (f.tags.some((t) => t === undefined)) throw new Error('pglite-cipher: a new block has no record to store');
+      // A plain loop: `tags` can be sparse (indexed assignment), and `some` skips holes.
+      for (let i = 0; i < f.ids.length; i++) {
+        if (f.tags[i] === undefined) throw new Error('pglite-cipher: a new block has no record to store');
+      }
       out.push({ fileId: f.fileId, blockTags: concat(f.tags as Bytes[]) });
     }
     return out;
