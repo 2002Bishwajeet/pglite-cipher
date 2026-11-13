@@ -7,7 +7,7 @@ export interface GateRow {
   gate: string;
   value: number | string;
   limit: string;
-  pass: boolean | 'n/a';
+  pass: boolean | 'not measurable';
 }
 
 /** Desktop budgets the owner approved on #3. */
@@ -32,7 +32,7 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   const big = r.sizeMB >= 100;
   const openBudget = OPEN_BUDGET_MS * factor;
   const rows: GateRow[] = [];
-  const row = (gate: string, value: number | string, limit: string, pass: boolean | 'n/a') => rows.push({ gate, value, limit, pass });
+  const row = (gate: string, value: number | string, limit: string, pass: GateRow['pass']) => rows.push({ gate, value, limit, pass });
   const ratio = (a: number, b: number) => Math.round((a / b) * 100) / 100;
 
   const g1 = ratio(e.g1.ms.p50, plain.g1.ms.p50);
@@ -40,13 +40,13 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   const g2 = ratio(e.g2.ms.p50, plain.g2.ms.p50);
   row('G2 open, p50 ÷ plain', g2, '≤ 2', g2 <= 2);
   if (big) row('G2 open, p50 ms', e.g2.ms.p50, `≤ ${String(openBudget)}`, e.g2.ms.p50 <= openBudget);
-  // G3 is judged only from measureUserAgentSpecificMemory (headed, cross-origin isolated). Headless,
-  // the page has only performance.memory plus the wasm heap, which fails for plain idb:// too
-  // (SPIKE-RESULTS.md, G3); the owner left G3 as recorded (#2, #3).
+  // G3 is recorded, never asserted in CI, and judged only from measureUserAgentSpecificMemory
+  // (headed, cross-origin isolated). Headless, the page has only performance.memory plus the wasm
+  // heap, which fails for plain idb:// too (SPIKE-RESULTS.md, G3): that is "not measurable".
   const bytes = e.g3.bytes;
   const db = e.dataDir.bytes;
   const measured = e.g3.source === 'measureUserAgentSpecificMemory' && typeof bytes === 'number';
-  row(`G3 memory after the open, bytes (${String(e.g3.source)})`, typeof bytes === 'number' ? bytes : 'not available', `≤ database (${String(db)}) + 64 MB`, measured ? bytes <= db + 64 * MB : 'n/a');
+  row(`G3 memory after the open, bytes (${String(e.g3.source)})`, typeof bytes === 'number' ? bytes : 'not available', `≤ database (${String(db)}) + 64 MB`, measured ? bytes <= db + 64 * MB : 'not measurable');
   row('G4 segment switch, p50 ms', e.g4.ms.p50, `≤ ${String(SWITCH_BUDGET_MS * factor)}`, e.g4.ms.p50 <= SWITCH_BUDGET_MS * factor);
   const g4 = ratio(e.g4.ms.p50, plain.g1.ms.p50);
   row('G4 segment switch, p50 ÷ plain normal sync', g4, '≤ 10', g4 <= 10);
@@ -56,6 +56,10 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   row('G9 file-table phase of the open, p50 ms', tableMs, `≤ ${String(Math.round(g9Limit * 10) / 10)}`, tableMs <= g9Limit);
   const unexplained = e.g1.tableBlocksWithoutFileChange ?? NaN;
   row('G9 G1 syncs that changed no file and wrote a table block', unexplained, '0', unexplained === 0);
+  const g1Table = e.g1.tableBlocks?.p50 ?? NaN;
+  row('G9 table blocks of a G1 sync, p50', g1Table, '0', g1Table === 0);
+  const perFile = e.g1.maxTableBlocksPerChangedFile ?? NaN;
+  row(`G9 table blocks per changed file, most of any G1 sync (${String(e.g1.fileChanges ?? 0)} changed a file)`, perFile, '≤ 1', perFile <= 1);
   return rows;
 }
 
@@ -66,4 +70,4 @@ export function judgeYear(r: YearResult, factor: number): GateRow[] {
 }
 
 export const table = (rows: readonly GateRow[]): string =>
-  ['| Gate | Value | Limit | Pass |', '| --- | --- | --- | --- |', ...rows.map((g) => `| ${g.gate} | ${String(g.value)} | ${g.limit} | ${g.pass === 'n/a' ? 'n/a' : g.pass ? 'pass' : '**FAIL**'} |`)].join('\n');
+  ['| Gate | Value | Limit | Pass |', '| --- | --- | --- | --- |', ...rows.map((g) => `| ${g.gate} | ${String(g.value)} | ${g.limit} | ${g.pass === 'not measurable' ? 'not measurable' : g.pass ? 'pass' : '**FAIL**'} |`)].join('\n');

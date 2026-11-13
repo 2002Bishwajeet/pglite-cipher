@@ -91,7 +91,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm install --no-save @electric-sql/pglite@latest @electric-sql/pglite-pgvector@latest
+      # pgvector is built for one exact PGlite: install the version whose peer dependency is the
+      # newest PGlite, and fail (allowed) when none is published yet.
+      - name: newest PGlite and the pgvector built for it
+        run: |
+          pglite=$(npm view @electric-sql/pglite@latest version)
+          pgvector=$(curl -fsS https://registry.npmjs.org/@electric-sql%2fpglite-pgvector | node -e '
+            const doc = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const match = Object.values(doc.versions).filter((v) => v.peerDependencies?.["@electric-sql/pglite"] === process.argv[1]);
+            if (match.length === 0) { console.error(`no pglite-pgvector for @electric-sql/pglite ${process.argv[1]}`); process.exit(1); }
+            console.log(match.at(-1).version);
+          ' "$pglite")
+          npm install --no-save "@electric-sql/pglite@$pglite" "@electric-sql/pglite-pgvector@$pgvector"
       - run: npm ls @electric-sql/pglite @electric-sql/pglite-pgvector || true
       - if: matrix.project != 'node'
         run: npx playwright install ${{ matrix.project }}

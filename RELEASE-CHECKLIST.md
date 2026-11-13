@@ -9,6 +9,9 @@ release issue, with a link where there is one.
 - [ ] **Bench JSON from the devices**, attached to #3 or to the Journal checklist issue (J-16):
       macOS (WKWebView), iOS, Windows (WebView2) and Android (WebView), from the bench page run
       inside the Tauri shells (`bench/README.md`), each with the device and OS version.
+- [ ] **G3 (peak memory at open ≤ database + 64 MB) on a device.** CI records G3 only: headless
+      browsers have no `measureUserAgentSpecificMemory`, and the bench prints "not measurable" there.
+      Read G3 from a headed, cross-origin-isolated run of the bench page on at least one device above.
 - [ ] **`FORMAT.md` vectors reproduced by the independent decoder**: `test/format/independent.node.test.ts`
       passes, and `test/format/vectors.json` is unchanged since the format was frozen.
 - [ ] **The frozen fixtures open**: `test/fs/reference.test.ts` (the v1 reference store) passes in

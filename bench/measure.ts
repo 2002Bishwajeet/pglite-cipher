@@ -163,6 +163,8 @@ interface Sample {
   fileChanges?: number;
   /** EncryptedFs: runs that wrote a table block although no file changed (G9; the owner's rule on #2). */
   tableBlocksWithoutFileChange?: number;
+  /** EncryptedFs: the most table blocks a run wrote per file it changed (G9: at most 1). */
+  maxTableBlocksPerChangedFile?: number;
   /** EncryptedFs: the `stats().lastSync` breakdown, summed per run. */
   lastSync?: { bytes: Stat; deletes: Stat; encryptMs: Stat; commitMs: Stat; repacked: number };
 }
@@ -191,12 +193,16 @@ function nodes(pg: Pg): Array<{ path: string; mode: number; size: number }> {
   return out;
 }
 
-/** The data directory as one string, sorted: two differ when a file changed. */
-const tree = (pg: Pg): string =>
-  nodes(pg)
-    .map((n) => `${n.path} ${String(n.mode)} ${String(n.size)}`)
-    .sort()
-    .join('\n');
+/** The data directory as a file map: path to mode and size. */
+const tree = (pg: Pg): Map<string, string> => new Map(nodes(pg).map((n) => [n.path, `${String(n.mode)} ${String(n.size)}`]));
+
+/** Files created, grown, shrunk, chmodded or removed between two file maps (a rename is two). */
+const changedFiles = (before: Map<string, string>, after: Map<string, string>): number => {
+  let n = 0;
+  for (const [path, v] of after) if (before.get(path) !== v) n++;
+  for (const path of before.keys()) if (!after.has(path)) n++;
+  return n;
+};
 
 /** Runs `op` n times; the syncs each run makes are summed (one per query or exec). */
 async function sample(fs: () => AnyFs, pg: () => Pg, n: number, op: (i: number) => Promise<unknown>, prep?: () => Promise<unknown>): Promise<Sample> {
@@ -205,21 +211,26 @@ async function sample(fs: () => AnyFs, pg: () => Pg, n: number, op: (i: number) 
   let repacked = 0;
   let fileChanges = 0;
   let unexplained = 0;
+  let perFile = 0;
   for (let i = 0; i < n; i++) {
     await prep?.();
     const f = fs();
     const from = f.syncs.length;
-    const before = f instanceof TimedFs ? tree(pg()) : '';
+    const before = f instanceof TimedFs ? tree(pg()) : null;
     await op(i);
     const syncs = f.syncs.slice(from);
     ms.push(syncs.reduce((a, s) => a + s.ms, 0));
-    if (f instanceof TimedFs) {
+    if (f instanceof TimedFs && before) {
       const st = syncs.flatMap((s) => (s.stats ? [s.stats] : []));
       for (const k of ['tableBlocks', 'dataBlocks', 'bytes', 'deletes', 'encryptMs', 'commitMs'] as const) sums[k].push(st.reduce((a, s) => a + s[k], 0));
       if (st.some((s) => s.repacked)) repacked++;
-      const changed = tree(pg()) !== before;
-      if (changed) fileChanges++;
-      else if (st.some((s) => s.tableBlocks > 0)) unexplained++;
+      // A file change comes from the file-map diff, not from the table write.
+      const changed = changedFiles(before, tree(pg()));
+      const written = st.reduce((a, s) => a + s.tableBlocks, 0);
+      if (changed > 0) {
+        fileChanges++;
+        perFile = Math.max(perFile, written / changed);
+      } else if (written > 0) unexplained++;
     }
   }
   if (sums.tableBlocks.length === 0) return { ms: stat(ms) };
@@ -229,6 +240,7 @@ async function sample(fs: () => AnyFs, pg: () => Pg, n: number, op: (i: number) 
     dataBlocks: stat(sums.dataBlocks),
     fileChanges,
     tableBlocksWithoutFileChange: unexplained,
+    maxTableBlocksPerChangedFile: round(perFile),
     lastSync: { bytes: stat(sums.bytes), deletes: stat(sums.deletes), encryptMs: stat(sums.encryptMs), commitMs: stat(sums.commitMs), repacked },
   };
 }
@@ -414,8 +426,10 @@ export const ratios = (plain: VariantResult, enc: VariantResult) => ({
   g2: round(enc.g2.ms.p50 / plain.g2.ms.p50),
   /** G4: encrypted segment-switch sync p50 ÷ plain normal (one-row-update) sync p50 (gate ≤ 10). */
   g4: round(enc.g4.ms.p50 / plain.g1.ms.p50),
-  /** For the record: the same switch ÷ the encrypted normal sync. */
+  /** For the record, not asserted: the same switch ÷ the encrypted normal sync. */
   g4ToEncryptedSync: round(enc.g4.ms.p50 / enc.g1.ms.p50),
+  /** For the record, not asserted: the encrypted switch ÷ the plain switch. */
+  g4ToPlainSwitch: round(enc.g4.ms.p50 / plain.g4.ms.p50),
   /** G9: file-table phase p50 ÷ encrypted open p50 (gate ≤ 0.05). */
   g9Open: Math.round(((enc.g2.tableMs?.p50 ?? NaN) / enc.g2.ms.p50) * 10_000) / 10_000,
 });
