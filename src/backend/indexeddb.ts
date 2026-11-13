@@ -156,6 +156,7 @@ export class IndexedDbBackend implements StorageBackend {
         resolve();
       };
       request.onerror = () => {
+        this.#db = null; // a failed open is not cached: the next call tries again
         reject(request.error ?? new Error('IndexedDbBackend: the database was not deleted'));
       };
     });
@@ -210,6 +211,7 @@ export class IndexedDbBackend implements StorageBackend {
         resolve(db);
       };
       request.onerror = () => {
+        this.#db = null; // a failed open is not cached: the next call tries again
         reject(request.error ?? new Error('IndexedDbBackend: the database did not open'));
       };
     });
