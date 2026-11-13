@@ -507,15 +507,22 @@ export class EncryptedFs extends MemoryFS {
       FS.chmod(path, f.mode & 0o7777);
     }
 
-    // 3. Blocks, one page at a time, in the order of their random ids.
+    // 3. Blocks, in the order of their random ids. The next page is read while this one decrypts,
+    // so a load holds at most two pages of ciphertext (review S5, as restated by the owner on #10).
     const t1 = now();
     const tableSet = new Set(tableIds);
     const total = tableIds.length + root.dataBlocks;
     let read = 0;
     let done = 0;
-    for (let after: string | null = null; ; ) {
-      const page = await backend.readRange(after, PAGE);
+    const readPage = (after: string | null) => {
+      const next = backend.readRange(after, PAGE);
+      next.catch(() => undefined); // awaited below; not unhandled if this page's decrypt throws first
+      return next;
+    };
+    for (let next: Promise<Array<[string, Uint8Array]>> | null = readPage(null); next; ) {
+      const page: Array<[string, Uint8Array]> = await next;
       if (page.length === 0) break;
+      next = page.length < PAGE ? null : readPage((page[page.length - 1] as [string, Uint8Array])[0]);
       await pool(page, async ([id, sealed]) => {
         if (tableSet.has(id)) return;
         const place = map.places.get(id);
@@ -529,8 +536,6 @@ export class EncryptedFs extends MemoryFS {
       });
       done += page.length;
       this.#onProgress?.({ phase: 'blocks', done, total });
-      after = (page[page.length - 1] as [string, Uint8Array])[0];
-      if (page.length < PAGE) break;
     }
     if (read !== root.dataBlocks) throw new CorruptStoreError('a data block is missing');
     const manifest = await computeManifest(

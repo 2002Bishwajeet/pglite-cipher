@@ -100,7 +100,7 @@ Reading: at 8 KB the per-call overhead dominates, not AES. Throughput is 390 MB/
 | **New WAL segment** | 16 MB written once | 2,048 block records at 8 KB (256 at 64 KB) and about 5 file-table blocks for their ids, in one sync: about 40–250 ms of crypto plus the IndexedDB write. A recycled segment (a rename) writes file-table blocks only | An occasional spike; measured as gate G4 |
 | **Query time** | – | **0 %** | Postgres reads plaintext memory. SQLCipher pays its 5–15 % here |
 | **RAM, steady** | 1× the database | 1× + 0.2 % (the tag table) + the block-id map: 16 bytes of id per block (0.2 % at 8 KB) plus the map's own overhead **[unverified]** | G3 measures it |
-| **RAM, peak at open** | 1× + the largest file | 1× + one read batch, if reads are batched by key range. A naive `getAll` would be 2× | Review S5; PC-08 mandates batches |
+| **RAM, peak at open** | 1× + the largest file | 1× + two read batches (the next is read while one decrypts: about 64 MB at 64 KB blocks and batches of 512; owner decision on #10). A naive `getAll` would be 2× | Review S5; PC-08 mandates batches |
 | **RAM, first population and rotation** | – | 1× + one batch, written in several transactions with the header last. A single transaction would be about 3× | Issues 08, 09 |
 | **App-lock unlock** | – | Equals open time, if locking closes the database (owner question 3) | |
 
