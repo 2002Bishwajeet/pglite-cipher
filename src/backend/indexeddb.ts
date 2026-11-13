@@ -16,6 +16,9 @@ import {
 /** The one object store. A constant, because it has to be known before anything can be read. */
 const STORE = 'kv';
 
+/** How long a blocked deletion is waited for before destroy() returns anyway. */
+const BLOCKED_GRACE_MS = 2000;
+
 const done = <T>(request: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     request.onsuccess = () => {
@@ -147,15 +150,21 @@ export class IndexedDbBackend implements StorageBackend {
     );
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(this.#name);
+      let grace: ReturnType<typeof setTimeout> | undefined;
       request.onsuccess = () => {
+        clearTimeout(grace);
         resolve();
       };
-      // The records are gone already (EncryptedFs clears first); the database follows when the
-      // other connection closes.
+      // WebKit reports a blocked deletion while the connection closed above is still closing, and
+      // deletes a moment later: wait for that. The records are gone already (EncryptedFs clears
+      // first); a connection that stays open delays the deletion past the grace period, and the
+      // database follows when it closes.
       request.onblocked = () => {
-        resolve();
+        clearTimeout(grace);
+        grace = setTimeout(resolve, BLOCKED_GRACE_MS);
       };
       request.onerror = () => {
+        clearTimeout(grace);
         reject(request.error ?? new Error('IndexedDbBackend: the database was not deleted'));
       };
     });
@@ -210,6 +219,7 @@ export class IndexedDbBackend implements StorageBackend {
         resolve(db);
       };
       request.onerror = () => {
+        this.#db = null; // a failed open is not cached: the next call tries again
         reject(request.error ?? new Error('IndexedDbBackend: the database did not open'));
       };
     });

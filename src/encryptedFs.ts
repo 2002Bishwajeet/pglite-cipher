@@ -3,7 +3,7 @@
 // blocks and a new root, into one atomic commit of the packed block space (FORMAT.md).
 import { MemoryFS, type PGlite } from '@electric-sql/pglite';
 import { rootMatches, type CommitBatch, type RecordKey, type Slot, type StorageBackend } from './backend/backend.ts';
-import { equalBytes, toHex, type Bytes } from './format/bytes.ts';
+import { concat, equalBytes, toHex, type Bytes } from './format/bytes.ts';
 import {
   DEFAULT_BLOCK_SIZE,
   decodeRoot,
@@ -534,7 +534,7 @@ export class EncryptedFs extends MemoryFS {
     }
     if (read !== root.dataBlocks) throw new CorruptStoreError('a data block is missing');
     const manifest = await computeManifest(
-      [...map.files.values()].filter((f) => f.type === 'file').map((f) => ({ fileId: f.fileId, blockTags: concatTags(f) })),
+      [...map.files.values()].filter((f) => f.type === 'file').map((f) => ({ fileId: f.fileId, blockTags: concat(f.tags as Bytes[]) })),
     );
     if (!equalBytes(manifest, root.manifest)) throw new CorruptStoreError('the blocks differ from the manifest');
     const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
@@ -1025,12 +1025,3 @@ export class EncryptedFs extends MemoryFS {
     };
   }
 }
-
-function concatTags(f: MapFile): Bytes {
-  const out = new Uint8Array(16 * f.tags.length);
-  f.tags.forEach((t, i) => {
-    out.set(t as Bytes, 16 * i);
-  });
-  return out;
-}
-
