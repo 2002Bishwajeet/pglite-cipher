@@ -1058,10 +1058,10 @@ export class EncryptedFs extends MemoryFS {
   // ---- close and stats ---------------------------------------------------------------------
 
   /**
-   * Waits for a running sync or key operation, commits what is dirty (strict), then closes the
-   * backends and drops the module's FS, the tracker and the file map. PGlite drops its module on
-   * close; through these, a host that keeps the closed instance kept the wasm memory and the data
-   * directory too (#42).
+   * Waits for a running sync or key operation, commits what is dirty (strict), drops the module's
+   * FS, the tracker and the file map, then closes the backends. PGlite drops its module on close;
+   * through these, a host that keeps the closed instance kept the wasm memory and the data
+   * directory too (#42). They go first, so a backend that fails to close keeps none of them.
    */
   override async closeFs(): Promise<void> {
     try {
@@ -1070,11 +1070,11 @@ export class EncryptedFs extends MemoryFS {
       if (this.#ready && !this.#fatal && (this.hasDirty() || this.#owesStrict)) await this.syncToFs(false);
     } finally {
       this.#ready = false;
-      await Promise.all(this.#slots.map((backend) => backend.close()));
-      await super.closeFs();
       this.#FS = null;
       this.#tracker = null;
       this.#map = null;
+      await Promise.all(this.#slots.map((backend) => backend.close()));
+      await super.closeFs();
     }
   }
 
