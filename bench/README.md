@@ -101,7 +101,8 @@ loses nothing already measured. When the plain 100 MB build crashes a phone firs
 scripts/harness/remote.sh mac bash bench/device/redmi.sh gates10,enc100 1
 ```
 
-`redmi.sh` takes `adb` from `$ADB`, else `~/.local/bin/adb`, else `PATH`; exit 5 means no device.
+`redmi.sh` rebuilds `bench/dist` on the Mac first (remote.sh does not sync `dist`), then takes `adb`
+from `$ADB`, else `~/.local/bin/adb`, else `PATH`; exit 5 means no device.
 
 ## Where the results go
 
