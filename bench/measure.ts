@@ -102,12 +102,47 @@ class PlainFs extends IdbFs {
   }
 }
 
+/** Wall time with at least one call in flight; overlapping calls count once. */
+class Busy {
+  #inFlight = 0;
+  #since = 0;
+  ms = 0;
+  async time<T>(call: () => Promise<T>): Promise<T> {
+    if (this.#inFlight++ === 0) this.#since = now();
+    try {
+      return await call();
+    } finally {
+      if (--this.#inFlight === 0) this.ms += now() - this.#since;
+    }
+  }
+}
+
+// The open's blocks phase, split (bench only): IndexedDB page reads and WebCrypto decrypts.
+const reading = new Busy();
+const decrypting = new Busy();
+const subtle = globalThis.crypto.subtle;
+const decrypt = subtle.decrypt.bind(subtle);
+subtle.decrypt = (...args: Parameters<SubtleCrypto['decrypt']>) => decrypting.time(() => decrypt(...args));
+const timedBackend = (name: string): [IndexedDbBackend, IndexedDbBackend] => {
+  const pair = IndexedDbBackend.pair(name);
+  for (const b of pair) {
+    const readRange = b.readRange.bind(b);
+    b.readRange = (after, limit) => reading.time(() => readRange(after, limit));
+  }
+  return pair;
+};
+
 class TimedFs extends EncryptedFs {
   readonly syncs: Sync[] = [];
   openStartedAt = 0;
+  /** IndexedDB read and decrypt time of the last open. */
+  openSplit = { readMs: 0, decryptMs: 0 };
   override async initialSyncFs(): Promise<void> {
     this.openStartedAt = now();
+    const r = reading.ms;
+    const d = decrypting.ms;
     await super.initialSyncFs();
+    this.openSplit = { readMs: reading.ms - r, decryptMs: decrypting.ms - d };
   }
   override async syncToFs(relaxed?: boolean): Promise<void> {
     const dirty = this.hasDirty();
@@ -269,6 +304,9 @@ export interface OpenResult {
   /** EncryptedFs: `stats().lastOpen` and the file table of the last open. */
   tableMs?: Stat;
   blocksMs?: Stat;
+  /** EncryptedFs, bench only: wall time of the open with an IndexedDB page read in flight, and with a decrypt in flight (they overlap). */
+  readMs?: Stat;
+  decryptMs?: Stat;
   tableBlocks?: number;
   tableFill?: number;
   dataBlocks?: number;
@@ -296,125 +334,185 @@ export interface VariantResult {
   keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openAfterRotation: OpenResult };
 }
 
-/** Opens `runs` times, closing the previous instance; returns the last PGlite and its filesystem. */
-async function opens(make: () => AnyFs, runs: number, first: Pg, log: (msg: string) => void, what: string): Promise<{ pg: Pg; fs: AnyFs; result: OpenResult }> {
-  let pg = first;
-  let fs: AnyFs | null = null;
-  const ms: number[] = [];
-  const tableMs: number[] = [];
-  const blocksMs: number[] = [];
-  for (let i = 0; i < runs; i++) {
-    await pg.close();
-    log(`${what} ${String(i + 1)} of ${String(runs)}`);
-    fs = make();
-    pg = await createPg(fs);
-    ms.push(now() - fs.openStartedAt);
-    if (fs instanceof TimedFs) {
-      const o = fs.stats().lastOpen;
-      if (o) {
-        tableMs.push(o.tableMs);
-        blocksMs.push(o.blocksMs);
-      }
+/** The opens of one variant, collected. */
+class Opens {
+  readonly ms: number[] = [];
+  readonly tableMs: number[] = [];
+  readonly blocksMs: number[] = [];
+  readonly readMs: number[] = [];
+  readonly decryptMs: number[] = [];
+  record(fs: AnyFs): void {
+    this.ms.push(now() - fs.openStartedAt);
+    if (!(fs instanceof TimedFs)) return;
+    const o = fs.stats().lastOpen;
+    if (o) {
+      this.tableMs.push(o.tableMs);
+      this.blocksMs.push(o.blocksMs);
     }
+    this.readMs.push(fs.openSplit.readMs);
+    this.decryptMs.push(fs.openSplit.decryptMs);
   }
-  const f = fs ?? make();
-  if (!(f instanceof TimedFs)) return { pg, fs: f, result: { ms: stat(ms) } };
-  const s = f.stats();
-  return {
-    pg,
-    fs: f,
-    result: { ms: stat(ms), tableMs: stat(tableMs), blocksMs: stat(blocksMs), tableBlocks: s.table.blocks, tableFill: round(s.table.fill), dataBlocks: s.dataBlocks, files: s.files, subkeys: s.subkeys },
+  result(fs: AnyFs): OpenResult {
+    if (!(fs instanceof TimedFs)) return { ms: stat(this.ms) };
+    const s = fs.stats();
+    return {
+      ms: stat(this.ms),
+      tableMs: stat(this.tableMs),
+      blocksMs: stat(this.blocksMs),
+      readMs: stat(this.readMs),
+      decryptMs: stat(this.decryptMs),
+      tableBlocks: s.table.blocks,
+      tableFill: round(s.table.fill),
+      dataBlocks: s.dataBlocks,
+      files: s.files,
+      subkeys: s.subkeys,
+    };
+  }
+}
+
+/** One variant's database after the build and the syncs; `pg` is usable while `open` is true. */
+interface Built {
+  kind: Kind;
+  label: string;
+  key: { kek: CryptoKey };
+  make: () => AnyFs;
+  fs: AnyFs;
+  pg: Pg;
+  open: boolean;
+  part: Omit<VariantResult, 'g2' | 'g3' | 'keys'>;
+}
+
+/** Builds an `mb` MB database on one filesystem and measures G1, G1b and G4 (and, encrypted, G9), `runs` times each. */
+async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void): Promise<Built> {
+  const label = `${kind} ${String(mb)} MB`;
+  const key = { kek: await newKek() };
+  const make = (): AnyFs => (kind === 'plain' ? new PlainFs(name) : new TimedFs({ backend: timedBackend(name), key: key.kek, mode: 'open-or-create' }));
+  const fs = make();
+  const cur = () => fs;
+  log(`${label}: build`);
+  const t0 = now();
+  const pg = await createPg(fs);
+  const docs = await build(pg, mb);
+  const buildMs = round(now() - t0);
+  const dir = nodes(pg);
+  const dataDir = { nodes: dir.length, bytes: dir.reduce((n, f) => n + f.size, 0) };
+
+  log(`${label}: G1, G1b`);
+  const g1 = await sample(cur, () => pg, runs, (i) => pg.query('UPDATE doc_search SET body = $2 WHERE doc_id = $1', [docs[1], `edit ${String(i)}`]));
+  const g1b = await sample(cur, () => pg, runs, () => pg.query('INSERT INTO doc_updates (doc_id, data) VALUES ($1, $2)', [docs[2], randomBytes(4096)]));
+
+  log(`${label}: G4`);
+  // Untimed before each run: a CHECKPOINT (so old segments are recycled and memory stays bounded)
+  // and the current segment's name, to count the runs that really switched.
+  let switched = 0;
+  let before = '';
+  const countSwitch = async () => {
+    if (before && (await walFile(pg)) !== before) switched++;
   };
+  const g4s = await sample(
+    cur,
+    () => pg,
+    runs,
+    () => pg.exec(`SELECT pg_switch_wal(); INSERT INTO doc_updates (doc_id, data) VALUES ('${docs[3] ?? ''}', bench_random_bytes(4096));`),
+    async () => {
+      await countSwitch();
+      await pg.exec('CHECKPOINT');
+      before = await walFile(pg);
+    },
+  );
+  await countSwitch();
+  const g4 = { ...g4s, switched };
+
+  let g9: VariantResult['g9'];
+  if (fs instanceof TimedFs) {
+    const all = fs.syncs.flatMap((s) => (s.stats ? [s.stats] : []));
+    g9 = {
+      syncs: all.length,
+      tableBlocks: stat(all.map((s) => s.tableBlocks)),
+      tableToDataBlocks: stat(all.filter((s) => s.dataBlocks > 0).map((s) => s.tableBlocks / s.dataBlocks)),
+      repacked: all.filter((s) => s.repacked).length,
+    };
+  }
+  return { kind, label, key, make, fs, pg, open: true, part: { buildMs, dataDir, g1, g1b, g4, ...(g9 ? { g9 } : {}) } };
+}
+
+/** Closes the variant's PGlite if it is open, opens the data again and records the open. */
+async function reopen(v: Built, into: Opens): Promise<void> {
+  await shut(v);
+  v.fs = v.make();
+  v.pg = await createPg(v.fs);
+  v.open = true;
+  into.record(v.fs);
+}
+
+async function shut(v: Built): Promise<void> {
+  if (v.open) await v.pg.close();
+  v.open = false;
 }
 
 /**
- * Builds an `mb` MB database on one filesystem and measures G1, G1b, G4, G2 and G3 (and, encrypted,
- * G9, and with `keys` the key operations), `runs` times each. Deletes the database at the end.
+ * Builds the same `mb` MB database on plain IdbFs and on EncryptedFs and measures G1, G1b and G4
+ * `runs` times each; then G2, `opens` opens per variant, plain and encrypted interleaved, so that a
+ * machine that speeds up or slows down meanwhile moves both alike; G3 after the last open of each,
+ * with the other closed; and with `keys` the key operations on the encrypted one, then its opens
+ * after the rotation. Deletes both databases at the end.
  */
-export async function runVariant(kind: Kind, mb: number, runs: number, log: (msg: string) => void, keys = false): Promise<VariantResult> {
-  const name = `bench-${kind}-${String(mb)}-${crypto.randomUUID()}`;
-  const label = `${kind} ${String(mb)} MB`;
-  let kek = await newKek();
-  const make = (): AnyFs => (kind === 'plain' ? new PlainFs(name) : new TimedFs({ backend: IndexedDbBackend.pair(name), key: kek, mode: 'open-or-create' }));
-  let fs = make();
-  const cur = () => fs;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean } = {}): Promise<{ plain: VariantResult; encrypted: VariantResult }> {
+  const id = crypto.randomUUID();
+  const names = { plain: `bench-plain-${String(mb)}-${id}`, encrypted: `bench-encrypted-${String(mb)}-${id}` };
+  const n = opts.opens ?? runs;
+  const built: Built[] = [];
   try {
-    log(`${label}: build`);
-    const t0 = now();
-    let pg = await createPg(fs);
-    const docs = await build(pg, mb);
-    const buildMs = round(now() - t0);
-    const dir = nodes(pg);
-    const dataDir = { nodes: dir.length, bytes: dir.reduce((n, f) => n + f.size, 0) };
+    const p = await buildVariant('plain', names.plain, mb, runs, log);
+    built.push(p);
+    await shut(p);
+    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log);
+    built.push(e);
+    await shut(e);
 
-    log(`${label}: G1, G1b`);
-    const g1 = await sample(cur, () => pg, runs, (i) => pg.query('UPDATE doc_search SET body = $2 WHERE doc_id = $1', [docs[1], `edit ${String(i)}`]));
-    const g1b = await sample(cur, () => pg, runs, () => pg.query('INSERT INTO doc_updates (doc_id, data) VALUES ($1, $2)', [docs[2], randomBytes(4096)]));
-
-    log(`${label}: G4`);
-    // Untimed before each run: a CHECKPOINT (so old segments are recycled and memory stays bounded)
-    // and the current segment's name, to count the runs that really switched.
-    let switched = 0;
-    let before = '';
-    const countSwitch = async () => {
-      if (before && (await walFile(pg)) !== before) switched++;
-    };
-    const g4s = await sample(
-      cur,
-      () => pg,
-      runs,
-      () => pg.exec(`SELECT pg_switch_wal(); INSERT INTO doc_updates (doc_id, data) VALUES ('${docs[3] ?? ''}', bench_random_bytes(4096));`),
-      async () => {
-        await countSwitch();
-        await pg.exec('CHECKPOINT');
-        before = await walFile(pg);
-      },
-    );
-    await countSwitch();
-    const g4 = { ...g4s, switched };
-
-    let g9: VariantResult['g9'];
-    if (fs instanceof TimedFs) {
-      const all = fs.syncs.flatMap((s) => (s.stats ? [s.stats] : []));
-      g9 = {
-        syncs: all.length,
-        tableBlocks: stat(all.map((s) => s.tableBlocks)),
-        tableToDataBlocks: stat(all.filter((s) => s.dataBlocks > 0).map((s) => s.tableBlocks / s.dataBlocks)),
-        repacked: all.filter((s) => s.repacked).length,
-      };
+    const g2 = { plain: new Opens(), encrypted: new Opens() };
+    const g3: Record<Kind, Json> = { plain: {}, encrypted: {} };
+    for (let i = 0; i < n; i++) {
+      for (const v of [p, e]) {
+        log(`${v.label}: G2 open ${String(i + 1)} of ${String(n)}`);
+        await reopen(v, g2[v.kind]);
+        if (i < n - 1) await shut(v);
+        else {
+          log(`${v.label}: G3 memory`);
+          g3[v.kind] = await memory(v.pg);
+          if (v === p) await shut(v);
+        }
+      }
     }
+    const plain: VariantResult = { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain };
+    const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted };
 
-    log(`${label}: G2`);
-    let opened = await opens(make, runs, pg, log, `${label}: G2 open`);
-    ({ pg, fs } = opened);
-    const g2 = opened.result;
-    log(`${label}: G3 memory`);
-    const g3 = await memory(pg);
-
-    let keyOps: VariantResult['keys'];
-    if (keys && fs instanceof TimedFs) {
-      log(`${label}: changeKey, verify, rotateDataKey`);
+    if (opts.keys && e.fs instanceof TimedFs) {
+      log(`${e.label}: changeKey, verify, rotateDataKey`);
       const next = await newKek();
       let t = now();
-      await fs.changeKey(next);
+      await e.fs.changeKey(next);
       const changeKeyMs = round(now() - t);
-      kek = next;
+      e.key.kek = next;
       t = now();
-      const verified = await fs.verify();
+      const verified = await e.fs.verify();
       const verifyMs = round(now() - t);
       t = now();
-      await fs.rotateDataKey();
+      await e.fs.rotateDataKey();
       const rotateDataKeyMs = round(now() - t);
-      opened = await opens(make, runs, pg, log, `${label}: open after the rotation`);
-      ({ pg, fs } = opened);
-      keyOps = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openAfterRotation: opened.result };
+      const after = new Opens();
+      for (let i = 0; i < n; i++) {
+        log(`${e.label}: open after the rotation ${String(i + 1)} of ${String(n)}`);
+        await reopen(e, after);
+      }
+      encrypted.keys = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openAfterRotation: after.result(e.fs) };
     }
-    await pg.close();
-    return { buildMs, dataDir, g1, g1b, g4, g2, g3, ...(g9 ? { g9 } : {}), ...(keyOps ? { keys: keyOps } : {}) };
+    return { plain, encrypted };
   } finally {
-    log(`${label}: delete the database`);
-    if (kind === 'plain') await dropIdb(`/pglite/${name}`);
-    else for (const db of [`${name}.a`, `${name}.b`]) await dropIdb(db);
+    for (const v of built) await shut(v);
+    log(`${String(mb)} MB: delete the databases`);
+    await dropIdb(`/pglite/${names.plain}`);
+    for (const db of [`${names.encrypted}.a`, `${names.encrypted}.b`]) await dropIdb(db);
   }
 }
 

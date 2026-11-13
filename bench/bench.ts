@@ -8,7 +8,7 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
 import { runG7 } from './g7.ts';
 import { judgeGates, judgeYear } from './judge.ts';
-import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runVariant, stat, type Json, type Pg, type Stat } from './measure.ts';
+import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, type Json, type Pg, type Stat } from './measure.ts';
 
 const BLOCK_SIZE = 65536;
 const MB = 1024 * 1024;
@@ -27,8 +27,7 @@ const log = (msg: string) => {
 // ---- gates at one database size ---------------------------------------------------------------
 
 async function runGates(mb: number, runs: number): Promise<Json> {
-  const plain = await runVariant('plain', mb, runs, log);
-  const encrypted = await runVariant('encrypted', mb, runs, log, true);
+  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true });
   const result = { sizeMB: mb, blockSize: BLOCK_SIZE, plain, encrypted };
   return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
 }

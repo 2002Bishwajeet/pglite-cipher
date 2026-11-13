@@ -32,8 +32,10 @@ What each gates part reports, per variant (`plain`, `encrypted`):
   breakdown summed per run (table and data blocks, bytes, deletes, encrypt and commit ms, repacks),
   and `fileChanges` / `tableBlocksWithoutFileChange` (G9: runs that changed no file must write no
   table block, the owner's rule on #2).
-- `g2`: the open from `initialSyncFs` to Postgres ready; encrypted also `lastOpen.tableMs` (G9) and
-  `lastOpen.blocksMs`, the table blocks and `table.fill`, data blocks, files and subkeys.
+- `g2`: the open from `initialSyncFs` to Postgres ready, plain and encrypted opens interleaved;
+  encrypted also `lastOpen.tableMs` (G9) and `lastOpen.blocksMs`, `readMs` and `decryptMs` (the
+  open's wall time with an IndexedDB page read in flight and with a decrypt in flight), the table
+  blocks and `table.fill`, data blocks, files and subkeys.
 - `g9` (encrypted): over every sync of the workload, p50/p95 of `lastSync.tableBlocks` and of
   `tableBlocks / dataBlocks`, and how many syncs repacked the table.
 - `keys` (encrypted): `changeKeyMs`, `verifyMs`, `rotateDataKeyMs`, and `openAfterRotation` (the

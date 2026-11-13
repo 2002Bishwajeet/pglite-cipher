@@ -9,19 +9,22 @@
 //
 // G4's denominator is the plain normal sync (every ratio is against plain idb://). `ratios` also
 // records, unasserted, the switch ÷ the encrypted sync and ÷ the plain switch.
+//
+// G2 is 20 opens per variant (plan 03), plain and encrypted interleaved, so that a machine that
+// speeds up or slows down during the run moves both medians alike.
 import { describe, expect, it } from 'vitest';
-import { ratios, runVariant } from '../../bench/measure.ts';
+import { ratios, runPair } from '../../bench/measure.ts';
 
 const MB = 10;
 const RUNS = 10;
+const OPENS = 20;
 
 describe('perf gates at 10 MB, against plain idb:// in the same run', () => {
   it('G1 ≤ 2×, G2 ≤ 2×, G4 ≤ 10× a plain normal sync, G9 open ≤ 5 % and no table block in a G1 sync that changed no file', async () => {
     const log = () => undefined;
-    const plain = await runVariant('plain', MB, RUNS, log);
-    const encrypted = await runVariant('encrypted', MB, RUNS, log);
+    const { plain, encrypted } = await runPair(MB, RUNS, log, { opens: OPENS });
     const r = ratios(plain, encrypted);
-    console.log(JSON.stringify({ sizeMB: MB, runs: RUNS, ratios: r, plain, encrypted }));
+    console.log(JSON.stringify({ sizeMB: MB, runs: RUNS, opens: OPENS, ratios: r, plain, encrypted }));
     expect.soft(r.g1, 'G1: encrypted ÷ plain one-row-update sync, p50').toBeLessThanOrEqual(2);
     expect.soft(r.g2, 'G2: encrypted ÷ plain open, p50').toBeLessThanOrEqual(2);
     expect.soft(r.g4, 'G4: encrypted segment-switch sync ÷ plain normal sync, p50').toBeLessThanOrEqual(10);
