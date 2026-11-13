@@ -26,6 +26,7 @@ const stamp = () => new Date().toISOString().slice(11, 19);
 /** Merges one posted body into <dir>/<target>.json; returns whether it carries an error. */
 function save(dir, body) {
   const { target, error, ...rest } = body;
+  delete rest.partial;
   const file = join(dir, `${target}.json`);
   const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { target, parts: {} };
   let failed = error !== undefined;
@@ -68,6 +69,11 @@ function serve({ port, dir, until, onDone }) {
         }
         if (typeof body?.target !== 'string' || !/^[a-z0-9-]{1,40}$/.test(body.target)) return send(400, 'bad target');
         const bad = save(dir, body);
+        if (body.partial === true) {
+          failed ||= bad;
+          console.log(`${stamp()} ${body.target}: part saved${bad ? ' (with an error)' : ''}`);
+          return send(204, '');
+        }
         failed ||= bad;
         console.log(`${stamp()} ${body.target}: saved to ${join(dir, `${body.target}.json`)}${bad ? ' (with an error)' : ''}`);
         send(204, '');
@@ -101,6 +107,9 @@ async function selfTest() {
       'COOP header': (await fetch(`${base}/missing`)).headers.get('cross-origin-opener-policy') === 'same-origin',
     };
     const saved = JSON.parse(readFileSync(join(dir, 'self-test.json'), 'utf8'));
+    checks['partial post 204'] = (await post({ target: 'self-test', partial: true, finishedAt: 'later', ops: { a: 1 } })).status === 204;
+    const saved2 = JSON.parse(readFileSync(join(dir, 'self-test.json'), 'utf8'));
+    checks['partial merged, no partial field'] = saved2.parts.ops?.a === 1 && !('partial' in saved2) && !('partial' in saved2.parts.ops);
     checks['file written'] = saved.target === 'self-test' && saved.parts.gates10?.runs === 3 && 'extras' in saved.parts;
     server.close();
     const failedChecks = Object.entries(checks).filter(([, ok]) => !ok);

@@ -18,7 +18,8 @@ const MB = 1024 * 1024;
 export interface GatesResult {
   sizeMB: number;
   blockSize: number;
-  plain: VariantResult;
+  /** Absent in an encrypted-only part (`enc10`, `enc100`): the ratio gates then report "no plain baseline". */
+  plain?: VariantResult;
   encrypted: VariantResult;
 }
 
@@ -35,10 +36,13 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   const row = (gate: string, value: number | string, limit: string, pass: GateRow['pass']) => rows.push({ gate, value, limit, pass });
   const ratio = (a: number, b: number) => Math.round((a / b) * 100) / 100;
 
-  const g1 = ratio(e.g1.ms.p50, plain.g1.ms.p50);
-  row('G1 sync after a one-row UPDATE, p50 ÷ plain', g1, '≤ 2', g1 <= 2);
-  const g2 = ratio(e.g2.ms.p50, plain.g2.ms.p50);
-  row('G2 open, p50 ÷ plain', g2, '≤ 2', g2 <= 2);
+  const NO_PLAIN = 'no plain baseline';
+  const vsPlain = (gate: string, num: number, den: number | undefined, limit: number) => {
+    const v = den === undefined ? undefined : ratio(num, den);
+    row(gate, v ?? NO_PLAIN, `≤ ${String(limit)}`, v === undefined ? 'not measurable' : v <= limit);
+  };
+  vsPlain('G1 sync after a one-row UPDATE, p50 ÷ plain', e.g1.ms.p50, plain?.g1.ms.p50, 2);
+  vsPlain('G2 open, p50 ÷ plain', e.g2.ms.p50, plain?.g2.ms.p50, 2);
   if (big) row('G2 open, p50 ms', e.g2.ms.p50, `≤ ${String(openBudget)}`, e.g2.ms.p50 <= openBudget);
   // G3 is recorded, never asserted in CI, and judged only from measureUserAgentSpecificMemory
   // (headed, cross-origin isolated). Headless, the page has only performance.memory plus the wasm
@@ -48,8 +52,7 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   const measured = e.g3.source === 'measureUserAgentSpecificMemory' && typeof bytes === 'number';
   row(`G3 memory after the open, bytes (${String(e.g3.source)})`, typeof bytes === 'number' ? bytes : 'not available', `≤ database (${String(db)}) + 64 MB`, measured ? bytes <= db + 64 * MB : 'not measurable');
   row('G4 segment switch, p50 ms', e.g4.ms.p50, `≤ ${String(SWITCH_BUDGET_MS * factor)}`, e.g4.ms.p50 <= SWITCH_BUDGET_MS * factor);
-  const g4 = ratio(e.g4.ms.p50, plain.g1.ms.p50);
-  row('G4 segment switch, p50 ÷ plain normal sync', g4, '≤ 10', g4 <= 10);
+  vsPlain('G4 segment switch, p50 ÷ plain normal sync', e.g4.ms.p50, plain?.g1.ms.p50, 10);
   const tableMs = e.g2.tableMs?.p50 ?? NaN;
   // At 10 MB the owner replaced the open budget with "≤ 2× plain": G9 is then 5 % of the open measured.
   const g9Limit = big ? 0.05 * openBudget : 0.05 * e.g2.ms.p50;

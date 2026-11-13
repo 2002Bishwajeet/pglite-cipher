@@ -32,6 +32,13 @@ async function runGates(mb: number, runs: number): Promise<Json> {
   return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
 }
 
+/** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
+async function runEncrypted(mb: number, runs: number): Promise<Json> {
+  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true });
+  const result = { sizeMB: mb, blockSize: BLOCK_SIZE, encrypted };
+  return { ...result, gates: judgeGates(result, 1) };
+}
+
 // ---- G6 support, G8 deriveKey, AES-GCM, crypto overhead ----------------------------------------
 
 const STORE = 'kv';
@@ -306,13 +313,15 @@ async function runOps(runs: number): Promise<Json> {
 const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   gates10: (runs) => runGates(10, runs),
   gates100: (runs) => runGates(100, runs),
+  enc10: (runs) => runEncrypted(10, runs),
+  enc100: (runs) => runEncrypted(100, runs),
   extras: (runs) => runExtras(runs),
   year: () => runYear(Number(new URLSearchParams(location.search).get('sessions') ?? 365)),
   ops: (runs) => runOps(runs),
   g7: () => runG7(log),
 };
 
-async function run(parts: string[], runs: number): Promise<Json> {
+async function run(parts: string[], runs: number, onPart: (part: string, result: Json) => Promise<void>): Promise<Json> {
   const nav = navigator as Navigator & { deviceMemory?: number };
   const result: Json = {
     userAgent: navigator.userAgent,
@@ -330,6 +339,8 @@ async function run(parts: string[], runs: number): Promise<Json> {
     } catch (e) {
       result[part] = { error: errorText(e) };
     }
+    // A later part may crash the tab: send this one now (serve.mjs merges per part).
+    await onPart(part, { partial: true, userAgent: result.userAgent, runs, finishedAt: new Date().toISOString(), [part]: result[part] });
   }
   result.finishedAt = new Date().toISOString();
   return result;
@@ -341,8 +352,8 @@ const show = (result: Json) => {
   log('done');
 };
 
-/** Sends the result to the collector, then sets `window.__benchPosted` (what the device drivers wait for). */
-const post = async (body: Json) => {
+/** Sends a result to the collector; the final one (not a `partial` per-part post) sets `window.__benchPosted` (what the device drivers wait for). */
+const post = async (body: Json, final = true) => {
   if (!postTarget) return;
   try {
     const r = await fetch('./result', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: postTarget, ...body }) });
@@ -350,11 +361,11 @@ const post = async (body: Json) => {
   } catch (e) {
     log(`post failed: ${errorText(e)}`);
   }
-  (window as unknown as { __benchPosted?: boolean }).__benchPosted = true;
+  if (final) (window as unknown as { __benchPosted?: boolean }).__benchPosted = true;
 };
 
 const start = (parts: string[], runs: number) => {
-  void run(parts, runs).then(
+  void run(parts, runs, (_part, body) => post(body, false)).then(
     (result) => {
       show(result);
       return post(result);

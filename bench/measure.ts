@@ -457,15 +457,21 @@ async function shut(v: Built): Promise<void> {
  * with the other closed; and with `keys` the key operations on the encrypted one, then its opens
  * after the rotation. Deletes both databases at the end.
  */
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean } = {}): Promise<{ plain: VariantResult; encrypted: VariantResult }> {
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
+/** With `onlyEncrypted` the plain database is neither built nor opened and there is no `plain`. */
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true }): Promise<{ plain: undefined; encrypted: VariantResult }>;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
   const id = crypto.randomUUID();
   const names = { plain: `bench-plain-${String(mb)}-${id}`, encrypted: `bench-encrypted-${String(mb)}-${id}` };
   const n = opts.opens ?? runs;
   const built: Built[] = [];
   try {
-    const p = await buildVariant('plain', names.plain, mb, runs, log);
-    built.push(p);
-    await shut(p);
+    let p: Built | undefined;
+    if (!opts.onlyEncrypted) {
+      p = await buildVariant('plain', names.plain, mb, runs, log);
+      built.push(p);
+      await shut(p);
+    }
     const e = await buildVariant('encrypted', names.encrypted, mb, runs, log);
     built.push(e);
     await shut(e);
@@ -473,7 +479,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     const g2 = { plain: new Opens(), encrypted: new Opens() };
     const g3: Record<Kind, Json> = { plain: {}, encrypted: {} };
     for (let i = 0; i < n; i++) {
-      for (const v of [p, e]) {
+      for (const v of p ? [p, e] : [e]) {
         log(`${v.label}: G2 open ${String(i + 1)} of ${String(n)}`);
         await reopen(v, g2[v.kind]);
         if (i < n - 1) await shut(v);
@@ -484,7 +490,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
         }
       }
     }
-    const plain: VariantResult = { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain };
+    const plain: VariantResult | undefined = p && { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain };
     const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted };
 
     if (opts.keys && e.fs instanceof TimedFs) {
@@ -511,7 +517,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
   } finally {
     for (const v of built) await shut(v);
     log(`${String(mb)} MB: delete the databases`);
-    await dropIdb(`/pglite/${names.plain}`);
+    if (!opts.onlyEncrypted) await dropIdb(`/pglite/${names.plain}`);
     for (const db of [`${names.encrypted}.a`, `${names.encrypted}.b`]) await dropIdb(db);
   }
 }

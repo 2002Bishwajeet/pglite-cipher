@@ -1,13 +1,16 @@
 #!/bin/bash
-# Throwaway spike code (issue #11): runs the bench page in Chrome on the Redmi from the G14, with the
-# collector here and `adb reverse` so the phone opens http://localhost (a secure context).
-# Usage: ~/.claude/bin/heavy bash bench/device/redmi.sh [parts] [runs]   (after npm run bench:build)
+# Throwaway spike code (issue #11): runs the bench page in Chrome on the Redmi, with the collector
+# here and `adb reverse` so the phone opens http://localhost (a secure context). The Redmi is attached
+# to the Mac: scripts/harness/remote.sh mac bash bench/device/redmi.sh [parts] [runs]
+# (after npm run bench:build; adb from $ADB, else ~/.local/bin/adb, else PATH).
 # Exit 5 = no device attached (record it owner-pending); otherwise serve.mjs's exit.
 set -u
-adb=${ADB:-$HOME/.local/bin/adb}
+if [ -n "${ADB:-}" ]; then adb=$ADB
+elif [ -x "$HOME/.local/bin/adb" ]; then adb=$HOME/.local/bin/adb
+else adb=adb; fi
 parts=${1:-gates10,gates100,extras} runs=${2:-3}
 port=47901
-if ! "$adb" devices | grep -qP '\tdevice$'; then
+if ! "$adb" devices | awk '$2=="device"{f=1} END{exit !f}'; then
   echo "[device] redmi: adb shows no device" >&2
   exit 5
 fi
