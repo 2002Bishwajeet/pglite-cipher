@@ -1,0 +1,402 @@
+{
+  "browser": "chromium",
+  "platform": "linux",
+  "mb": 100,
+  "measuredAt": "2026-11-13T15:57:04.000Z",
+  "parts": {
+    "ondemand": {
+      "variant": "plain",
+      "mb": 100,
+      "features": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36",
+        "crossOriginIsolated": true,
+        "sharedArrayBuffer": true,
+        "opfs": true,
+        "syncAccessHandle": "works"
+      },
+      "staleStorage": null,
+      "build": {
+        "rows": 100000,
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "initMs": 3143,
+        "ms": 8806,
+        "fs": {
+          "reads": 346,
+          "readBytes": 2367729,
+          "readMs": 22.410000205039978,
+          "writes": 34908,
+          "writeBytes": 460072625,
+          "writeMs": 2811.8200023174286,
+          "trips": 35772,
+          "treeSaves": 14,
+          "treeBytes": 251518,
+          "treeMs": 29.989999771118164
+        },
+        "containerBytes": 245334024
+      },
+      "storageUsageBytes": 245585953,
+      "baseline": {
+        "label": "baseline",
+        "rssKb": 589388,
+        "overBaselineKb": 0
+      },
+      "open": {
+        "openMs": 429,
+        "sharedBuffers": "128MB",
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 161,
+          "readBytes": 1669934,
+          "readMs": 16.18999969959259,
+          "writes": 145,
+          "writeBytes": 161778,
+          "writeMs": 20.080000162124634,
+          "trips": 304,
+          "treeSaves": 1,
+          "treeBytes": 251626,
+          "treeMs": 7.480000019073486
+        }
+      },
+      "afterOpen": {
+        "label": "open",
+        "rssKb": 820808,
+        "overBaselineKb": 231420
+      },
+      "point": {
+        "ms": 4,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 17,
+          "readBytes": 139264,
+          "readMs": 1.195,
+          "writes": 0,
+          "writeBytes": 0,
+          "writeMs": 0,
+          "trips": 17,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": 0.07,
+          "writeMeanMs": null
+        }
+      },
+      "pointWarm": {
+        "ms": 1,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 0,
+          "readBytes": 0,
+          "readMs": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "writeMs": 0,
+          "trips": 0,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": null,
+          "writeMeanMs": null
+        }
+      },
+      "scan": {
+        "ms": 1377,
+        "rows": [
+          {
+            "rows": 100000,
+            "bytes": "96000000"
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 796,
+          "readBytes": 102473728,
+          "readMs": 96.92,
+          "writes": 11808,
+          "writeBytes": 96731136,
+          "writeMs": 783.765,
+          "trips": 12874,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": 0.122,
+          "writeMeanMs": 0.066
+        }
+      },
+      "afterScan": {
+        "label": "scan",
+        "rssKb": 835528,
+        "overBaselineKb": 246140
+      },
+      "close": {
+        "containerBytes": 245489260
+      },
+      "scanMatchesBuild": true,
+      "cleanupError": null
+    },
+    "ondemand-aes": {
+      "variant": "aes",
+      "mb": 100,
+      "staleStorage": null,
+      "build": {
+        "rows": 100000,
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "initMs": 2388,
+        "ms": 10696,
+        "fs": {
+          "reads": 346,
+          "readBytes": 2367729,
+          "readMs": 52.82000023126602,
+          "writes": 34908,
+          "writeBytes": 460072625,
+          "writeMs": 5729.435001909733,
+          "trips": 35772,
+          "treeSaves": 14,
+          "treeBytes": 251518,
+          "treeMs": 35.86999994516373
+        },
+        "containerBytes": 245334024
+      },
+      "storageUsageBytes": 245585949,
+      "baseline": {
+        "label": "baseline",
+        "rssKb": 605316,
+        "overBaselineKb": 0
+      },
+      "open": {
+        "openMs": 334,
+        "sharedBuffers": "128MB",
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 161,
+          "readBytes": 1669934,
+          "readMs": 18.74999976158142,
+          "writes": 145,
+          "writeBytes": 161778,
+          "writeMs": 12.37500011920929,
+          "trips": 304,
+          "treeSaves": 1,
+          "treeBytes": 251626,
+          "treeMs": 4.110000014305115
+        }
+      },
+      "afterOpen": {
+        "label": "open",
+        "rssKb": 831776,
+        "overBaselineKb": 226460
+      },
+      "point": {
+        "ms": 3,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 17,
+          "readBytes": 139264,
+          "readMs": 1.655,
+          "writes": 0,
+          "writeBytes": 0,
+          "writeMs": 0,
+          "trips": 17,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": 0.097,
+          "writeMeanMs": null
+        }
+      },
+      "pointWarm": {
+        "ms": 1,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 0,
+          "readBytes": 0,
+          "readMs": 0,
+          "writes": 0,
+          "writeBytes": 0,
+          "writeMs": 0,
+          "trips": 0,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": null,
+          "writeMeanMs": null
+        }
+      },
+      "scan": {
+        "ms": 2243,
+        "rows": [
+          {
+            "rows": 100000,
+            "bytes": "96000000"
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 6248214
+        },
+        "fs": {
+          "reads": 796,
+          "readBytes": 102473728,
+          "readMs": 311.725,
+          "writes": 11808,
+          "writeBytes": 96731136,
+          "writeMs": 1467.83,
+          "trips": 12874,
+          "treeSaves": 0,
+          "treeBytes": 251626,
+          "treeMs": 0,
+          "readMeanMs": 0.392,
+          "writeMeanMs": 0.124
+        }
+      },
+      "afterScan": {
+        "label": "scan",
+        "rssKb": 851872,
+        "overBaselineKb": 246556
+      },
+      "close": {
+        "containerBytes": 245489260
+      },
+      "scanMatchesBuild": true,
+      "cleanupError": null
+    },
+    "ondemand-idb": {
+      "variant": "idb",
+      "mb": 100,
+      "staleStorage": null,
+      "build": {
+        "rows": 100000,
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "initMs": 1914,
+        "ms": 8354,
+        "fs": null,
+        "containerBytes": null
+      },
+      "storageUsageBytes": 216093851,
+      "baseline": {
+        "label": "baseline",
+        "rssKb": 605400,
+        "overBaselineKb": 0
+      },
+      "open": {
+        "openMs": 974,
+        "sharedBuffers": "128MB",
+        "dbBytes": 112287867,
+        "dataDirBytes": 245235907,
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121
+        },
+        "fs": null
+      },
+      "afterOpen": {
+        "label": "open",
+        "rssKb": 1091680,
+        "overBaselineKb": 486280
+      },
+      "point": {
+        "ms": 35,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121
+        },
+        "fs": null
+      },
+      "pointWarm": {
+        "ms": 33,
+        "rows": [
+          {
+            "n": 960
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121
+        },
+        "fs": null
+      },
+      "scan": {
+        "ms": 935,
+        "rows": [
+          {
+            "rows": 100000,
+            "bytes": "96000000"
+          }
+        ],
+        "mem": {
+          "wasmBytes": 197918720,
+          "memfsBytes": 251484121
+        },
+        "fs": null
+      },
+      "afterScan": {
+        "label": "scan",
+        "rssKb": 1142244,
+        "overBaselineKb": 536844
+      },
+      "close": {
+        "containerBytes": null
+      },
+      "scanMatchesBuild": true,
+      "cleanupError": null
+    },
+    "ondemand-handles": {
+      "requested": 1100,
+      "opened": 1100,
+      "stoppedBy": null,
+      "ms": 1468,
+      "cleanupError": null
+    }
+  }
+}

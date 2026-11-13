@@ -21,6 +21,8 @@ printed in the `<pre>`). Parts:
 | --- | --- | --- |
 | gates, 10 MB | G1, G1b, G2, G3, G4, G9; `changeKey`, `verify()`, `rotateDataKey` and the open after the rotation | a few minutes |
 | gates, 100 MB | the same at 100 MB | long; run it alone |
+| encrypted only, 10/100 MB (`enc10`, `enc100`) | the gates part without the plain build and opens; the ratio gates read "no plain baseline" | as the gates part, about half |
+| memory levers, 10/100 MB (`levers10`, `levers100`) | the gates pair (without the key operations) once per Postgres setting of #48: default, small WAL, `shared_buffers` 32 and 16 MB, both; `&levers=wal,sb16` picks some. Adds the data directory per subdirectory before and after the build's `CHECKPOINT` and after the last open, and the wasm memory | about 3 min at 10 MB in Chromium |
 | extras | G6 support, G8 `deriveKey` (median of 1,000), AES-GCM 100 MB at 8/32/64 KB, crypto overhead (one record and 100 sealed and opened, 8 and 64 KB) | under a minute |
 | year | G8: 365 open/edit/checkpoint/close sessions, then the number of session salts an open derives | several minutes |
 | ops | startup (fresh init, reopen) and operations (inserts, bulk insert, large text, selects, aggregate, a CRUD cycle), plain and encrypted | a few minutes |
@@ -89,6 +91,21 @@ G7 assumes `bench_blob_get(index, len)` reads `len` bytes at offset `index * len
 the G7 part reports `available: false` and the reason; that is itself a result (journal/02's STOP).
 `ipc.oneMbPutGetMs` times a 1 MB put and get through the commands: Tauri's `fetch`-based IPC takes a
 few milliseconds, the `postMessage` fallback an order of magnitude more (`ipcGuess` uses 50 ms).
+
+## Device runs
+
+`bench/device/serve.mjs` serves `bench/dist` and collects results into `bench/results/<target>.json`
+(`--self-test` checks it). With `&post=<target>` the page posts each part's result as soon as that
+part finishes, and the whole result at the end, so a later part that crashes the tab (iPhone, 100 MB)
+loses nothing already measured. When the plain 100 MB build crashes a phone first, run `enc100` (or
+`enc10`) alone to get the encrypted numbers. The Redmi is attached to the Mac:
+
+```sh
+scripts/harness/remote.sh mac bash bench/device/redmi.sh gates10,enc100 1
+```
+
+`redmi.sh` rebuilds `bench/dist` on the Mac first (remote.sh does not sync `dist`), then takes `adb`
+from `$ADB`, else `~/.local/bin/adb`, else `PATH`; exit 5 means no device.
 
 ## Where the results go
 

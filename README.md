@@ -58,8 +58,10 @@ const pg = await PGlite.create({ fs, relaxedDurability: true });
 await pg.exec('CREATE TABLE IF NOT EXISTS notes (id serial PRIMARY KEY, body text)');
 
 // PGlite does not always sync when it should (electric-sql/pglite#1191, #1065, #1063): sync
-// yourself when it matters, for example when the page is hidden.
-if (fs.hasDirty()) await fs.syncToFs(false);
+// yourself when it matters, for example when the page is hidden. A strict sync waits for a
+// running one and resolves once everything before it is committed strict, including what a
+// relaxed sync already committed (hasDirty() is false then, so do not skip on it).
+await fs.syncToFs(false);
 
 await pg.close(); // waits for a running sync, then commits everything strict
 ```
@@ -115,6 +117,25 @@ await fs.rotateDataKey({ onProgress: ({ phase, done, total }) => {} });
 - **With a single backend**, pass `backendFactory: () => ({ name, backend })` (an empty backend for the new store) to `rotateDataKey`, and `openOrigin: (name) => backend` to the constructor so that an open can resume an interrupted rotation.
 
 **`await fs.verify({ onProgress })`**, or `verifyStore(backend, key)` without Postgres, checks every record: both header copies, the root, the file table, every block and the manifest (like SQLCipher's `PRAGMA cipher_integrity_check`). It returns `{ ok, files, blocks, problems }`, each problem a record key (slot number or block id) and a reason, never a path, and it does not throw for damage.
+
+## Running on mobile
+The whole data directory sits in memory (as with PGlite's `idb://`), and it is larger than the database: a 100 MB database had a 254 MB data directory, half of it WAL, and 189 MB of wasm memory after an open. Two Postgres settings and a checkpoint cut that by about 157 MB at 100 MB, with no gate regression and no loss of durability (`bench/results/2026-11-13/memory-levers.md`):
+
+```ts
+const pg = await PGlite.create({
+  fs,
+  relaxedDurability: true,
+  // startParams replaces PGlite's defaults, so keep them.
+  startParams: [...PGlite.defaultStartParams, '-c', 'shared_buffers=16MB', '-c', 'min_wal_size=32MB', '-c', 'max_wal_size=32MB'],
+});
+
+// After bulk work (an import, a migration, a large delete):
+await pg.exec('CHECKPOINT');
+```
+
+- **WAL:** with the small WAL settings, a `CHECKPOINT` after bulk work removes the spare segments: at 100 MB `pg_wal` went from 128 MB to 32 MB, the data directory from 254 MB to 158 MB, and the encrypted open got 20 to 26 % faster. Neither half works alone: PGlite did not checkpoint by itself during a 100 MB import, and with the default settings a checkpoint keeps the old segments for reuse. At 10 MB `pg_wal` is already at its minimum, two 16 MB segments.
+- **`shared_buffers` 16 MB** (default 128 MB) keeps the wasm memory at its 128 MB floor: 61 MB less after an open, 98 MB less after a bulk import (wasm memory never shrinks). Postgres caches fewer pages; the data directory is in memory anyway. 32 MB measured the same.
+- **`initialMemory`** cannot help: PGlite 0.5.10 needs at least 128 MB, its default, and `PGlite.create` with less never settles.
 
 ## Docs
 - `FORMAT.md`: the on-disk format, version 1

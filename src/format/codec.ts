@@ -97,7 +97,7 @@ class Reader {
     return new CorruptStoreError(`${this.what}: ${reason}`);
   }
 
-  private need(n: number): void {
+  need(n: number): void {
     if (this.at + n > this.bytes.length) throw this.corrupt('a field runs past the end');
   }
 
@@ -352,6 +352,8 @@ export const decodeTable = (body: Uint8Array): TableEntry[] => {
       const first = r.u32();
       const n = r.u16();
       if (n === 0) throw r.corrupt('an empty run');
+      // A run longer than what is left is rejected before any of its ids is copied.
+      r.need(16 * n);
       const ids: Bytes[] = [];
       for (let j = 0; j < n; j++) ids.push(r.take(16));
       entries.push({ kind: 'run', fileId, first, ids });
