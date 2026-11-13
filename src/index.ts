@@ -5,6 +5,7 @@ export {
   CorruptStoreError,
   CryptoSelfTestError,
   IncompleteStoreError,
+  KeyChangeUnknownError,
   StaleWriterError,
   StoreExistsError,
   StoreFullError,

@@ -54,3 +54,11 @@ export class StoreFullError extends Error {
 export class CryptoSelfTestError extends Error {
   override name = 'CryptoSelfTestError';
 }
+
+/**
+ * A `changeKey` commit failed, and reading the header back did not tell whether it applied: either
+ * the old key or the new one opens the store.
+ */
+export class KeyChangeUnknownError extends Error {
+  override name = 'KeyChangeUnknownError';
+}
