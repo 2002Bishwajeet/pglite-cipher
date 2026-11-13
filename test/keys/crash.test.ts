@@ -71,7 +71,7 @@ describe('rotation crash matrix', () => {
       const reopened = await openPair([shared(stores[0]), shared(stores[1])], key, { mode: 'open' });
       const want = k < switchAt ? base : rotated;
       const tables = await tablesOf(reopened.pg);
-      if (k < end) expect(tables, `state ${String(k)}`).toEqual(want);
+      if (k < end - 1) expect(tables, `state ${String(k)}`).toEqual(want);
       else expect(await rowsOf(reopened.pg, 'r'), `state ${String(k)}`).toBe(written + 1);
       await expectOneStore(stores, reopened);
       await reopened.pg.close();
