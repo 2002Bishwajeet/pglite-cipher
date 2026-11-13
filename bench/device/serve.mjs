@@ -72,6 +72,7 @@ function serve({ port, dir, until, onDone }) {
         failed ||= bad;
         console.log(`${stamp()} ${body.target}: ${body.partial === true ? 'part saved' : `saved to ${join(dir, `${body.target}.json`)}`}${bad ? ' (with an error)' : ''}`);
         send(204, '');
+        if (body.partial === true) return;
         pending.delete(body.target);
         if (until.length > 0 && pending.size === 0) onDone(failed ? 1 : 0);
       });
@@ -107,6 +108,16 @@ async function selfTest() {
     checks['partial merged, no partial field'] = saved2.parts.ops?.a === 1 && !('partial' in saved2) && !('partial' in saved2.parts.ops);
     checks['file written'] = saved.target === 'self-test' && saved.parts.gates10?.runs === 3 && 'extras' in saved.parts;
     server.close();
+    let done = 0;
+    const gated = serve({ port: 0, dir, until: ['self-test'], onDone: () => (done += 1) });
+    await new Promise((r) => gated.once('listening', r));
+    const gbase = `http://127.0.0.1:${String(gated.address().port)}/result`;
+    const gpost = (body) => fetch(gbase, { method: 'POST', body: JSON.stringify(body) });
+    await gpost({ target: 'self-test', partial: true, finishedAt: 'x', ops: { a: 1 } });
+    checks['partial does not end --until'] = done === 0;
+    await gpost({ target: 'self-test', finishedAt: 'y', runs: 1 });
+    checks['final post ends --until once'] = done === 1;
+    gated.close();
     const failedChecks = Object.entries(checks).filter(([, ok]) => !ok);
     console.log(failedChecks.length === 0 ? 'self-test passed' : `self-test failed: ${failedChecks.map(([k]) => k).join(', ')}`);
     return failedChecks.length === 0 ? 0 : 1;
