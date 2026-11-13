@@ -39,7 +39,9 @@ What each gates part reports, per variant (`plain`, `encrypted`):
 - `g9` (encrypted): over every sync of the workload, p50/p95 of `lastSync.tableBlocks` and of
   `tableBlocks / dataBlocks`, and how many syncs repacked the table.
 - `keys` (encrypted): `changeKeyMs`, `verifyMs`, `rotateDataKeyMs`, and `openAfterRotation` (the
-  same data, its table now densely packed) beside `g2`.
+  same data, its table now densely packed) beside `g2`. `openBeforeRotation` is the same series on
+  the store as G2 opened it, but without a plain open in between, as after the rotation: its
+  `readMs` against `openAfterRotation.readMs` is what the rewrite alone changes (#41).
 - `ratios` and `gates`: the gate table, judged with the desktop budgets of #3 (`bench/judge.ts`).
 
 `importPlainDataDir` has no row: the package does not have it yet.

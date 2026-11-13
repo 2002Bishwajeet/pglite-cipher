@@ -330,8 +330,8 @@ export interface VariantResult {
   g3: Json;
   /** EncryptedFs, G9 over every sync of the workload (build, G1, G1b, G4). */
   g9?: { syncs: number; tableBlocks: Stat; tableToDataBlocks: Stat; repacked: number };
-  /** EncryptedFs: the key operations, then the open of the same data after the rotation. */
-  keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openAfterRotation: OpenResult };
+  /** EncryptedFs: the opens of the store alone (no plain open in between), the key operations, then the same opens after the rotation. */
+  keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openBeforeRotation: OpenResult; openAfterRotation: OpenResult };
 }
 
 /** The opens of one variant, collected. */
@@ -454,8 +454,8 @@ async function shut(v: Built): Promise<void> {
  * Builds the same `mb` MB database on plain IdbFs and on EncryptedFs and measures G1, G1b and G4
  * `runs` times each; then G2, `opens` opens per variant, plain and encrypted interleaved, so that a
  * machine that speeds up or slows down meanwhile moves both alike; G3 after the last open of each,
- * with the other closed; and with `keys` the key operations on the encrypted one, then its opens
- * after the rotation. Deletes both databases at the end.
+ * with the other closed; and with `keys` the encrypted one's opens alone, the key operations on it,
+ * then its opens after the rotation. Deletes both databases at the end.
  */
 export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean } = {}): Promise<{ plain: VariantResult; encrypted: VariantResult }> {
   const id = crypto.randomUUID();
@@ -488,6 +488,14 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted };
 
     if (opts.keys && e.fs instanceof TimedFs) {
+      // The same opens as after the rotation, on the store as G2 opened it: without a plain open in
+      // between, so that beside openAfterRotation they show what the rewrite alone changes (#41).
+      const before = new Opens();
+      for (let i = 0; i < n; i++) {
+        log(`${e.label}: open before the rotation ${String(i + 1)} of ${String(n)}`);
+        await reopen(e, before);
+      }
+      const openBeforeRotation = before.result(e.fs);
       log(`${e.label}: changeKey, verify, rotateDataKey`);
       const next = await newKek();
       let t = now();
@@ -505,7 +513,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
         log(`${e.label}: open after the rotation ${String(i + 1)} of ${String(n)}`);
         await reopen(e, after);
       }
-      encrypted.keys = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openAfterRotation: after.result(e.fs) };
+      encrypted.keys = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openBeforeRotation, openAfterRotation: after.result(e.fs) };
     }
     return { plain, encrypted };
   } finally {
