@@ -1,7 +1,7 @@
 // Decoder fuzz: random and mutated buffers into every decoder and into assembleFiles. The only
 // outcomes are a value or a documented error; never another exception, never a hang.
 import fc from 'fast-check';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Bytes } from '../../src/format/bytes.ts';
 import {
   BLOCK_SIZES,
@@ -134,6 +134,14 @@ describe('decoder fuzz', () => {
       { numRuns: RUNS },
     );
   }, timeout(300_000, 50));
+
+  // The counterexample of #45 (seed 905168194, path "6179"): the 64 KiB block with four edits, the
+  // one at 68 raising its first run to 25,603 ids, far past the end of the block.
+  it('decodeTable, a run longer than the block (#45)', () => {
+    const bytes = encodeTable(tableEntries(65536), 65536);
+    for (const [at, value] of [[27, 160], [68, 100], [224, 30], [308, 61]] as const) bytes[at] = value;
+    expect(() => decodeTable(bytes)).toThrow(CorruptStoreError);
+  });
 
   it('assembleFiles, over decoded mutated table blocks and roots', () => {
     fc.assert(
