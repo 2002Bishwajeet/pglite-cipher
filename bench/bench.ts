@@ -8,7 +8,7 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
 import { runG7 } from './g7.ts';
 import { judgeGates, judgeYear } from './judge.ts';
-import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
+import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
 const BLOCK_SIZE = 65536;
 const MB = 1024 * 1024;
@@ -62,7 +62,7 @@ async function runLevers(mb: number, runs: number): Promise<Json> {
     const pgOptions: PgOptions = { startParams: [...PGlite.defaultStartParams, ...conf.flatMap((c) => ['-c', c])] };
     const probe = await PGlite.create(pgOptions);
     const settings = (await probe.query<Record<string, string>>("SELECT current_setting('shared_buffers') AS shared_buffers, current_setting('min_wal_size') AS min_wal_size, current_setting('max_wal_size') AS max_wal_size, current_setting('wal_segment_size') AS wal_segment_size")).rows[0];
-    const emptyWasm = (probe.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+    const emptyWasm = wasmBytes(probe);
     await probe.close();
     log(`levers ${String(mb)} MB: ${name}`);
     const { plain, encrypted } = await runPair(mb, runs, log, { pgOptions });

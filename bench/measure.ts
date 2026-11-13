@@ -28,8 +28,8 @@ export const stat = (xs: readonly number[]): Stat => ({ p50: round(pct(xs, 50)),
 // ---- the workload (kept from the spike, so the numbers compare) -------------------------------
 
 const extensions = { live, pg_trgm };
-/** PGlite settings the memory levers (#48) vary: Postgres settings through `startParams`, and `initialMemory`. */
-export type PgOptions = Pick<PGliteOptions, 'relaxedDurability' | 'startParams' | 'initialMemory'>;
+/** PGlite settings the memory levers (#48) vary: Postgres settings through `startParams`. */
+export type PgOptions = Pick<PGliteOptions, 'relaxedDurability' | 'startParams'>;
 export const createPg = (fs: NonNullable<PGliteOptions['fs']>, opts: PgOptions = {}) => PGlite.create({ fs, extensions, ...opts });
 export type Pg = Awaited<ReturnType<typeof createPg>>;
 
@@ -238,7 +238,7 @@ const dirBytes = (pg: Pg): Record<string, number> => {
   }
   return out;
 };
-const wasmBytes = (pg: Pg): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+export const wasmBytes = (pg: Pg): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
 
 /** The data directory as a file map: path to mode and size. */
 const tree = (pg: Pg): Map<string, string> => new Map(nodes(pg).map((n) => [n.path, `${String(n.mode)} ${String(n.size)}`]));
