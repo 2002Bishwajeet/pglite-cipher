@@ -1,7 +1,7 @@
 #!/bin/bash
 # Throwaway spike code (issue #11): runs the bench page in Chrome on the Redmi from the G14, with the
 # collector here and `adb reverse` so the phone opens http://localhost (a secure context).
-# Usage: ~/.claude/bin/heavy bash spike/device/redmi.sh [parts] [runs]   (after npm run bench:build)
+# Usage: ~/.claude/bin/heavy bash bench/device/redmi.sh [parts] [runs]   (after npm run bench:build)
 # Exit 5 = no device attached (record it owner-pending); otherwise serve.mjs's exit.
 set -u
 adb=${ADB:-$HOME/.local/bin/adb}
@@ -11,7 +11,7 @@ if ! "$adb" devices | grep -qP '\tdevice$'; then
   echo "[device] redmi: adb shows no device" >&2
   exit 5
 fi
-node spike/device/serve.mjs --port "$port" --until redmi &
+node bench/device/serve.mjs --port "$port" --until redmi &
 srv=$!
 trap 'kill $srv 2>/dev/null; "$adb" reverse --remove tcp:$port >/dev/null 2>&1' EXIT
 sleep 1

@@ -3,10 +3,11 @@
 // Postgres recover, and find exactly some acknowledged prefix of the rows: every row acknowledged
 // as durable, and at most the one that was being written.
 import { describe, expect, it } from 'vitest';
+import { LONG, timeout } from '../long.ts';
 import { inBrowser } from './helpers.ts';
 import type { FromWorker, ToWorker } from './killWorker.ts';
 
-const REPETITIONS = 50;
+const REPETITIONS = LONG ? 500 : 50;
 
 interface Run {
   opened: Promise<{ n: number; max: number }>;
@@ -82,5 +83,5 @@ describe.runIf(inBrowser)('a worker killed mid-sync', () => {
         request.onsuccess = request.onerror = request.onblocked = resolve;
       });
     }
-  }, 900_000);
+  }, timeout(900_000, 10));
 });

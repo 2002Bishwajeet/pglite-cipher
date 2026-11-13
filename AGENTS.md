@@ -18,7 +18,8 @@ SQLCipher-style encryption at rest for PGlite (AES-256-GCM through WebCrypto, bl
 | `npm run lint` | ESLint, typescript-eslint strict type-checked |
 | `npm test` | vitest in Node (with `fake-indexeddb`) |
 | `npm run test:browser` | vitest browser mode, headless; all three engines, or `-- --project chromium` (repeatable) and a path filter after `--` |
-| `npm run test:long` | Node tests with `CIPHER_LONG=1` (long fuzz and property runs) |
+| `npm run test:long` | Node tests with `CIPHER_LONG=1` (long fuzz, property, crash and soak runs; `test/long.ts`) |
+| `npm run bench:build` | the benchmark page, `bench/dist` (`bench/README.md`) |
 | `npm run harness:test` | `node --test scripts/harness/select.test.mjs` |
 
 Install browsers once with `npx playwright install chromium firefox` (no `--with-deps`). WebKit does not run on the Linux host: `scripts/harness/webkit.sh npm run test:browser -- --project webkit` (exit 3 means "CI covers it").

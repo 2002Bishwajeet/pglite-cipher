@@ -17,8 +17,10 @@ import {
 import { CorruptStoreError, UnsupportedFormatError } from '../../src/format/errors.ts';
 import { assembleFiles, packEntries, type StoredFile } from '../../src/format/table.ts';
 import { seeded } from './helpers.ts';
+import { LONG, timeout } from '../long.ts';
 
-const RUNS = 20_000;
+// Decoder fuzz: 1,000,000 cases each under CIPHER_LONG.
+const RUNS = LONG ? 1_000_000 : 20_000;
 const BUDGET_MS = 50;
 
 type ErrorType = typeof CorruptStoreError | typeof UnsupportedFormatError;
@@ -113,7 +115,7 @@ describe('decoder fuzz', () => {
       }),
       { numRuns: RUNS },
     );
-  }, 300_000);
+  }, timeout(300_000, 50));
 
   it('decodeRoot', () => {
     fc.assert(
@@ -122,7 +124,7 @@ describe('decoder fuzz', () => {
       }),
       { numRuns: RUNS },
     );
-  }, 300_000);
+  }, timeout(300_000, 50));
 
   it('decodeTable', () => {
     fc.assert(
@@ -131,7 +133,7 @@ describe('decoder fuzz', () => {
       }),
       { numRuns: RUNS },
     );
-  }, 300_000);
+  }, timeout(300_000, 50));
 
   it('assembleFiles, over decoded mutated table blocks and roots', () => {
     fc.assert(
@@ -148,5 +150,5 @@ describe('decoder fuzz', () => {
       ),
       { numRuns: RUNS },
     );
-  }, 300_000);
+  }, timeout(300_000, 50));
 });

@@ -7,8 +7,9 @@ import { testBlockId, testValue } from '../../src/backend/conformance.ts';
 import { IndexedDbBackend } from '../../src/backend/indexeddb.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import { freshName } from './names.ts';
+import { runs } from '../long.ts';
 
-const RUNS = 40;
+const RUNS = runs(40);
 
 // A small key universe, so puts, deletes and root checks collide often.
 const key: fc.Arbitrary<RecordKey> = fc.oneof(

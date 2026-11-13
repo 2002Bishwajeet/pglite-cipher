@@ -1,6 +1,7 @@
-// A load holds one page of ciphertext at a time (review S5): the database, one page and the file
-// map. The counting backend zero-fills every page it handed out as soon as the next read starts, so
-// a load that kept using an earlier page (or a view into it, such as a tag) would fail.
+// A load holds at most two pages of ciphertext at a time (review S5, restated by the owner on #10:
+// the next page is read while one decrypts): the database, two pages and the file map. The counting
+// backend zero-fills every page but the latest it handed out as soon as the next read starts, so a
+// load that kept using an older page (or a view into it, such as a tag) would fail.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
@@ -33,9 +34,9 @@ class CountingBackend implements StorageBackend {
   }
 
   async #read<T extends ReadonlyArray<Uint8Array | undefined | [BlockId, Uint8Array]>>(phase: 'table' | 'blocks', read: () => Promise<T>): Promise<T> {
-    // A new read: every page returned before it is dropped now. A read still in flight counts as held.
-    for (const page of this.#held) for (const v of page) v.fill(0);
-    this.#held = [];
+    // A new read: every page returned before the latest is dropped now. A read in flight counts as held.
+    for (const page of this.#held.slice(0, -1)) for (const v of page) v.fill(0);
+    this.#held = this.#held.slice(-1);
     this.#inFlight++;
     this.#note(phase);
     const values = await read();
@@ -66,7 +67,7 @@ class CountingBackend implements StorageBackend {
 
 describe('memory shape', () => {
   for (const blockSize of [8192, 65536] as const) {
-    it(`a load holds at most one page of ciphertext at a time (${String(blockSize)}-byte blocks)`, async () => {
+    it(`a load holds at most two pages of ciphertext at a time (${String(blockSize)}-byte blocks)`, async () => {
       const memory = new MemoryBackend();
       const key = await newKey();
       const a = await openStore({ backend: shared(memory), key, blockSize });
@@ -78,7 +79,7 @@ describe('memory shape', () => {
       expect((await b.pg.query('SELECT count(*)::int AS n FROM t')).rows).toEqual([{ n: 5000 }]);
       expect(counting.pages.table).toBeGreaterThanOrEqual(1);
       expect(counting.pages.blocks).toBeGreaterThan(2);
-      expect(counting.maxHeld).toEqual({ table: 1, blocks: 1 });
+      expect(counting.maxHeld).toEqual({ table: 1, blocks: 2 });
       await b.pg.close();
 
       // Control: a page dropped before the loader is done with it fails the open.

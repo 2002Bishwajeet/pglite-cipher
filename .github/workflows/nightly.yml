@@ -1,0 +1,111 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The bench's absolute budgets (#3: open 100 MB in 1,500 ms and a WAL segment switch in 500 ms on
+  # desktop, and G8 and G9 derived from the open budget) are multiplied by this factor. Why 2: the
+  # runner is a mini PC (yantra-box), slower than the desktop the budgets were set for, running
+  # headless browsers; 2x the desktop budget is the owner's budget for the slowest target (3 s and
+  # 1 s), so a pass here still means "within the slowest-target budget". The ratio gates (encrypted
+  # <= 2x plain idb://, and the others) are not relaxed: both sides of a ratio run on this machine.
+  CI_FACTOR: 2
+
+# Every job runs on the owner's self-hosted runner, one job at a time (see ci.yml).
+jobs:
+  # (a) and (d): the bench at 100 MB in each engine, judged with the CI factor; the gate table goes
+  # to the job summary, the JSON to an artifact.
+  bench:
+    runs-on: [self-hosted, yantra-box]
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install ${{ matrix.browser }}
+      - run: npm run bench:build
+      - run: node bench/run.mjs ${{ matrix.browser }} --parts gates100,extras,year --runs 10
+      - name: gate table
+        if: ${{ !cancelled() }}
+        run: node bench/gates.ts --factor "$CI_FACTOR" --require gates100,extras,year bench/results/${{ matrix.browser }}.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: bench-${{ matrix.browser }}
+          path: bench/results/${{ matrix.browser }}.json
+          if-no-files-found: warn
+
+  # (b): the long suites (CIPHER_LONG=1, test/long.ts) in Node and in each browser, with the
+  # 30-minute soak.
+  long:
+    runs-on: [self-hosted, yantra-box]
+    timeout-minutes: 720
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [node, chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - if: matrix.project != 'node'
+        run: npx playwright install ${{ matrix.project }}
+      - run: npx vitest run --project ${{ matrix.project }}
+        env:
+          CIPHER_LONG: '1'
+
+  # (c): the same long suites against the newest published PGlite, as an early warning for
+  # upgrades; allowed to fail. Node and Chromium only, to keep the night within the one runner's time.
+  latest-pglite:
+    runs-on: [self-hosted, yantra-box]
+    timeout-minutes: 720
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [node, chromium]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # pgvector is built for one exact PGlite: install the version whose peer dependency is the
+      # newest PGlite, and fail (allowed) when none is published yet.
+      - name: newest PGlite and the pgvector built for it
+        run: |
+          pglite=$(npm view @electric-sql/pglite@latest version)
+          pgvector=$(curl -fsS https://registry.npmjs.org/@electric-sql%2fpglite-pgvector | node -e '
+            const doc = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const match = Object.values(doc.versions).filter((v) => v.peerDependencies?.["@electric-sql/pglite"] === process.argv[1]);
+            if (match.length === 0) { console.error(`no pglite-pgvector for @electric-sql/pglite ${process.argv[1]}`); process.exit(1); }
+            console.log(match.at(-1).version);
+          ' "$pglite")
+          npm install --no-save "@electric-sql/pglite@$pglite" "@electric-sql/pglite-pgvector@$pgvector"
+      - run: npm ls @electric-sql/pglite @electric-sql/pglite-pgvector || true
+      - if: matrix.project != 'node'
+        run: npx playwright install ${{ matrix.project }}
+      - run: npx vitest run --project ${{ matrix.project }}
+        env:
+          CIPHER_LONG: '1'

@@ -3,20 +3,23 @@
 // after. For every k the stores as a kill after write k leaves them are opened: the database is the
 // state of step 1 before the switch commit, the catch-up snapshot after it (with the rows written
 // during the rotation), and the open leaves one store, with no record nobody owns. In the browser,
-// every tenth k and the two around the switch.
+// every tenth k and the two around the switch. Under CIPHER_LONG: a 100 MB store, and every k
+// everywhere.
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { CommitBatch } from '../../src/backend/backend.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import { inBrowser, restore, shared } from '../fs/helpers.ts';
+import { LONG, timeout } from '../long.ts';
 import { baseStore, expectOneStore, Logged, openPair, replay, tablesOf, type Event } from './helpers.ts';
 
 const rowsOf = async (pg: PGlite, table: string) =>
   ((await pg.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0] as { n: number }).n;
 
 describe('rotation crash matrix', () => {
-  it('a kill at any write of a rotation opens to a consistent database, and leaves one store', { timeout: 1_200_000 }, async () => {
-    const { key, recs } = await baseStore(8192);
+  it('a kill at any write of a rotation opens to a consistent database, and leaves one store', { timeout: timeout(1_200_000, 15) }, async () => {
+    // 100,000 rows of 1,024 characters: about 100 MB of heap.
+    const { key, recs } = await (LONG ? baseStore(8192, 100_000, 32) : baseStore(8192));
     const journal: Event[] = [];
     let pg: PGlite | null = null;
     let copying = true;
@@ -61,7 +64,7 @@ describe('rotation crash matrix', () => {
     expect(end - start).toBeGreaterThanOrEqual(written + 5);
 
     const states: number[] = [];
-    for (let k = start; k <= end; k++) if (!inBrowser || k % 10 === 0 || k === switchAt - 1 || k === switchAt) states.push(k);
+    for (let k = start; k <= end; k++) if (LONG || !inBrowser || k % 10 === 0 || k === switchAt - 1 || k === switchAt) states.push(k);
     for (const k of states) {
       const stores = [await restore(recs), new MemoryBackend()] as const;
       await replay(journal, k, stores);

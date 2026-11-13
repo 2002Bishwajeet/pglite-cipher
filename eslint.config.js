@@ -8,7 +8,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['eslint.config.js', 'scripts/*.mjs', 'spike/*.mjs', 'bench/*.mjs'] },
+        projectService: { allowDefaultProject: ['eslint.config.js', 'scripts/*.mjs', 'bench/*.mjs', 'bench/device/*.mjs'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },

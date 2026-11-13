@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pglite-cipher spike bench</title>
+    <title>pglite-cipher bench</title>
     <style>
       body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; max-width: 900px; }
       fieldset { margin-bottom: 12px; }
@@ -12,14 +12,15 @@
     </style>
   </head>
   <body>
-    <h1>pglite-cipher spike bench (issue #2)</h1>
-    <p>Throwaway. Builds a database with plain <code>idb://</code> and with the prototype at 8, 32 and 64 KB, and times the gates of the plan (03-spike-prototype-benchmarks.md).</p>
+    <h1>pglite-cipher bench</h1>
+    <p>Builds a database with plain <code>idb://</code> and with <code>EncryptedFs</code> over IndexedDB (64 KB blocks), and times the gates of <code>docs/plan/01-sqlcipher-comparison.md</code> 3.3 and the key operations.</p>
     <fieldset>
       <legend>Run</legend>
       <label><input type="checkbox" name="part" value="gates10" checked /> gates, 10 MB</label>
       <label><input type="checkbox" name="part" value="gates100" /> gates, 100 MB</label>
-      <label><input type="checkbox" name="part" value="extras" checked /> G6, G8 deriveKey, AES-GCM micro</label>
+      <label><input type="checkbox" name="part" value="extras" checked /> G6, G8 deriveKey, AES-GCM micro, crypto overhead</label>
       <label><input type="checkbox" name="part" value="year" /> G8 simulated year (365 sessions)</label>
+      <label><input type="checkbox" name="part" value="ops" /> startup and operations, plain and encrypted</label>
       <label><input type="checkbox" name="part" value="g7" checked /> G7 (Tauri only)</label>
       <br />
       <label>Runs per measurement <input id="runs" type="number" value="20" min="1" max="100" /></label>

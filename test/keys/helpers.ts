@@ -15,12 +15,14 @@ export interface Base {
   recs: Map<RecordKey, Uint8Array>;
 }
 
-/** A store with a table `t` of `rows` rows, as records. */
-export async function baseStore(blockSize: BlockSize, rows = 2000): Promise<Base> {
+/** A store with a table `t` of `rows` rows (each `md5` repeated `pad` times), as records. */
+export async function baseStore(blockSize: BlockSize, rows = 2000, pad = 1): Promise<Base> {
   const key = await newKey();
   const memory = new MemoryBackend();
   const { pg } = await openStore({ backend: shared(memory), key, blockSize });
-  await pg.exec(`CREATE TABLE t (id int PRIMARY KEY, v text); INSERT INTO t SELECT i, md5(i::text) FROM generate_series(1, ${String(rows)}) i;`);
+  await pg.exec(
+    `CREATE TABLE t (id int PRIMARY KEY, v text); INSERT INTO t SELECT i, repeat(md5(i::text), ${String(pad)}) FROM generate_series(1, ${String(rows)}) i;`,
+  );
   await pg.close();
   return { key, recs: await records(memory) };
 }

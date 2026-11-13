@@ -22,6 +22,7 @@ import {
   type Stream,
   type TestModule,
 } from './harness.ts';
+import { runs as longRuns, timeout } from '../long.ts';
 
 const KINDS = {
   create: 3,
@@ -59,7 +60,7 @@ const opArb: fc.Arbitrary<Op> = fc.record({
   d: fc.nat(),
 });
 const runArb = fc.tuple(fc.constantFrom(8, 16, 64), fc.array(opArb, { maxLength: 60, size: 'max' }));
-const numRuns = inBrowser ? 200 : 2000;
+const numRuns = longRuns(inBrowser ? 200 : 2000);
 
 let pg: PGlite;
 let mod: TestModule;
@@ -237,7 +238,7 @@ describe('tracker model-based property', () => {
         { numRuns },
       );
     },
-    600_000,
+    timeout(600_000),
   );
 
   it(
@@ -250,6 +251,6 @@ describe('tracker model-based property', () => {
         { numRuns },
       );
     },
-    600_000,
+    timeout(600_000),
   );
 });

@@ -1,4 +1,4 @@
-// The crash matrix over the 200-transaction workload, for one block size. For every commit number K:
+// The crash matrix over the 200-transaction workload (2,000 under CIPHER_LONG), for one block size. For every commit number K:
 // (a) commit K fails before writing; (b) commit K applies but reports failure; (b′) as (b), and the
 // read of the root that follows fails too; (c) the instance is dropped at commit K, and the store as
 // of K − 1 and as of K commits is opened by a fresh one. In the browser, every tenth K.
@@ -8,10 +8,12 @@ import { FaultyBackend, InjectedFault } from '../../src/backend/faulty.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import type { BlockSize } from '../../src/format/codec.ts';
 import { expectStoreEquals, fsOf, inBrowser, newKey, openStore, shared, type Opened } from './helpers.ts';
-import { lastLogging, runSteps, stepsHeld, STEPS } from './workload.ts';
+import { LONG, timeout } from '../long.ts';
+import { lastLogging, runSteps, stepsHeld, STEPS, workload } from './workload.ts';
 
 const QUICK = inBrowser;
 const EVERY = QUICK ? 10 : 1;
+const WORKLOAD = LONG ? workload(2000) : STEPS;
 
 type FaultMode = 'a' | 'b' | 'b′';
 
@@ -84,12 +86,16 @@ async function record(blockSize: BlockSize): Promise<Recording> {
   const before: number[] = [];
   const after: number[] = [];
   let last = faulty.committed.length;
-  await runSteps(pg, (_i, error) => {
-    expect(error).toBeNull();
-    before.push(last);
-    last = faulty.committed.length;
-    after.push(last);
-  });
+  await runSteps(
+    pg,
+    (_i, error) => {
+      expect(error).toBeNull();
+      before.push(last);
+      last = faulty.committed.length;
+      after.push(last);
+    },
+    WORKLOAD,
+  );
   await pg.close();
   return { key, faulty, before, after };
 }
@@ -110,7 +116,7 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
     if (mode === 'a') expect(await memory.isEmpty()).toBe(true);
     else {
       const reopened = await openStore({ backend: shared(memory), key, mode: 'open' });
-      expect(await stepsHeld(reopened.pg)).toBe(0);
+      expect(await stepsHeld(reopened.pg, WORKLOAD)).toBe(0);
       await expectNoOrphans(memory, reopened);
       await reopened.pg.close();
     }
@@ -118,26 +124,30 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
   }
   const { pg, fs } = opened;
   let checked = 0;
-  await runSteps(pg, async (_i, error) => {
-    if (error !== null) {
-      // The sync of this step failed: Postgres committed it in memory, the next sync carries it.
-      expect(error).toBeInstanceOf(InjectedFault);
-      expect(mode).not.toBe('b');
-      return;
-    }
-    if (backend.faulted.length > checked) {
-      // The first successful sync after a fault: the store is exactly the running database.
-      expect(fs.hasDirty()).toBe(false);
-      await expectStoreEquals(memory, key, fsOf(pg));
-      checked = backend.faulted.length;
-    }
-  });
+  await runSteps(
+    pg,
+    async (_i, error) => {
+      if (error !== null) {
+        // The sync of this step failed: Postgres committed it in memory, the next sync carries it.
+        expect(error).toBeInstanceOf(InjectedFault);
+        expect(mode).not.toBe('b');
+        return;
+      }
+      if (backend.faulted.length > checked) {
+        // The first successful sync after a fault: the store is exactly the running database.
+        expect(fs.hasDirty()).toBe(false);
+        await expectStoreEquals(memory, key, fsOf(pg));
+        checked = backend.faulted.length;
+      }
+    },
+    WORKLOAD,
+  );
   await pg.close().catch((error: unknown) => {
     // The final sync of close was one of the failed commits.
     expect(error).toBeInstanceOf(InjectedFault);
   });
   const reopened = await openStore({ backend: shared(memory), key, mode: 'open' });
-  expect(await stepsHeld(reopened.pg)).toBe(lastLogging(STEPS.length));
+  expect(await stepsHeld(reopened.pg, WORKLOAD)).toBe(lastLogging(WORKLOAD.length, WORKLOAD));
   await expectNoOrphans(memory, reopened);
   await reopened.pg.close();
   return backend.faulted;
@@ -146,10 +156,10 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
 export function crashMatrix(blockSize: BlockSize): void {
   let recording: Promise<Recording> | null = null;
   const recorded = () => (recording ??= record(blockSize));
-  const timeout = inBrowser ? 1_200_000 : 900_000;
+  const limit = timeout(inBrowser ? 1_200_000 : 900_000, 20);
 
   describe(`crash matrix at ${String(blockSize)}-byte blocks`, () => {
-    it('(c) the store as of K − 1 and as of K commits opens to an acknowledged prefix', { timeout }, async () => {
+    it('(c) the store as of K − 1 and as of K commits opens to an acknowledged prefix', { timeout: limit }, async () => {
       const { key, faulty, before, after } = await recorded();
       const total = faulty.committed.length;
       const states = new Set<number>();
@@ -158,9 +168,9 @@ export function crashMatrix(blockSize: BlockSize): void {
         const target = new MemoryBackend();
         await faulty.replayInto(target, s);
         const opened = await openStore({ backend: shared(target), key, mode: 'open-or-create' });
-        const m = await stepsHeld(opened.pg);
+        const m = await stepsHeld(opened.pg, WORKLOAD);
         // Every step acknowledged by commit s is in; no step that had not started is.
-        const acked = lastLogging(after.filter((n) => n <= s).length);
+        const acked = lastLogging(after.filter((n) => n <= s).length, WORKLOAD);
         const started = before.filter((n) => n < s).length;
         expect(m, `state ${String(s)}`).toBeGreaterThanOrEqual(acked);
         expect(m, `state ${String(s)}`).toBeLessThanOrEqual(started);
@@ -170,7 +180,7 @@ export function crashMatrix(blockSize: BlockSize): void {
     });
 
     for (const mode of ['a', 'b', 'b′'] as const) {
-      it(`(${mode}) the instance keeps working, and the store is whole after the next sync`, { timeout }, async () => {
+      it(`(${mode}) the instance keeps working, and the store is whole after the next sync`, { timeout: limit }, async () => {
         const total = (await recorded()).faulty.committed.length;
         const faulted = new Set<number>();
         const runs: Array<(n: number) => boolean> = QUICK

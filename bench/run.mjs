@@ -1,7 +1,7 @@
-// Throwaway spike code (issue #2): runs the benchmark page headless in Playwright's browsers and
-// saves what it reports to spike/results/<browser>.json (merged per part, so parts can run apart).
-// Usage: node spike/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year] [--runs 20]
-// Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node spike/run.mjs webkit
+// Runs the benchmark page headless in Playwright's browsers and saves what it reports to
+// bench/results/<browser>.json (merged per part, so parts can run apart).
+// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20]
+// Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node bench/run.mjs webkit
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';
@@ -15,11 +15,11 @@ const opt = (name, fallback) => {
 const parts = opt('parts', 'gates10,gates100,extras,year').split(',');
 const runs = Number(opt('runs', '20'));
 const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
-const config = fileURLToPath(new URL('../bench/vite.config.ts', import.meta.url));
+const config = fileURLToPath(new URL('./vite.config.ts', import.meta.url));
 const results = new URL('./results/', import.meta.url);
 const PART_TIMEOUT = 60 * 60 * 1000;
 
-if (!existsSync(new URL('../bench/dist/index.html', import.meta.url))) await build({ configFile: config, logLevel: 'warn' });
+if (!existsSync(new URL('./dist/index.html', import.meta.url))) await build({ configFile: config, logLevel: 'warn' });
 const server = await preview({ configFile: config, logLevel: 'warn' });
 const base = server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:47900/';
 mkdirSync(results, { recursive: true });
@@ -51,7 +51,7 @@ try {
         merged.userAgent = meta.userAgent;
         merged.parts[part] = { ...value, measuredAt: meta.finishedAt, runs };
         writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`);
-        console.log(`[${name}] ${part} saved to spike/results/${name}.json`);
+        console.log(`[${name}] ${part} saved to bench/results/${name}.json`);
       }
     } finally {
       await browser.close();

@@ -1,8 +1,11 @@
-# Spike benchmark page (issue #2): owner run sheet
+# Benchmark page: run sheet
 
-Throwaway. The page builds a database with plain `idb://` and with the prototype filesystem
-(`spike/protoFs.ts`) at 8, 32 and 64 KB blocks, and measures the gates of
-`docs/plan/03-spike-prototype-benchmarks.md`. Nothing here ships.
+The page builds a database with plain `idb://` (`IdbFs`) and with the real implementation
+(`EncryptedFs` over `IndexedDbBackend.pair`, 64 KB blocks) and measures the gates of
+`docs/plan/01-sqlcipher-comparison.md` 3.3, the key operations, and rows ported from
+davidmuggleton/pglite-encrypted-fs's bench (`THIRD_PARTY.md`). `bench/measure.ts` holds the
+measurements, which `test/perf/gates.browser.test.ts` also runs on every PR at 10 MB, as ratios.
+The prototype's results are in `SPIKE-RESULTS.md`.
 
 ## Build and serve
 
@@ -16,16 +19,44 @@ printed in the `<pre>`). Parts:
 
 | Part | What | Time (desktop Chromium) |
 | --- | --- | --- |
-| gates, 10 MB | G1, G1b, G2, G3, G4, G9 at 10 MB | a few minutes |
+| gates, 10 MB | G1, G1b, G2, G3, G4, G9; `changeKey`, `verify()`, `rotateDataKey` and the open after the rotation | a few minutes |
 | gates, 100 MB | the same at 100 MB | long; run it alone |
-| extras | G6 support, G8 `deriveKey` (median of 1,000), AES-GCM 100 MB at 8/32/64 KB | under a minute |
-| year | G8: 365 open/edit/checkpoint/close sessions on the prototype, live salts at the end | several minutes |
+| extras | G6 support, G8 `deriveKey` (median of 1,000), AES-GCM 100 MB at 8/32/64 KB, crypto overhead (one record and 100 sealed and opened, 8 and 64 KB) | under a minute |
+| year | G8: 365 open/edit/checkpoint/close sessions, then the number of session salts an open derives | several minutes |
+| ops | startup (fresh init, reopen) and operations (inserts, bulk insert, large text, selects, aggregate, a CRUD cycle), plain and encrypted | a few minutes |
 | G7 | Rust store throughput; only inside a Tauri shell built with `encfs-bench` | about a minute |
 
+What each gates part reports, per variant (`plain`, `encrypted`):
+
+- `g1`, `g1b`, `g4`: sync time per run (p50, p95, max); encrypted also the `stats().lastSync`
+  breakdown summed per run (table and data blocks, bytes, deletes, encrypt and commit ms, repacks),
+  and `fileChanges` / `tableBlocksWithoutFileChange` (G9: runs that changed no file must write no
+  table block, the owner's rule on #2).
+- `g2`: the open from `initialSyncFs` to Postgres ready, plain and encrypted opens interleaved;
+  encrypted also `lastOpen.tableMs` (G9) and `lastOpen.blocksMs`, `readMs` and `decryptMs` (the
+  open's wall time with an IndexedDB page read in flight and with a decrypt in flight), the table
+  blocks and `table.fill`, data blocks, files and subkeys.
+- `g9` (encrypted): over every sync of the workload, p50/p95 of `lastSync.tableBlocks` and of
+  `tableBlocks / dataBlocks`, and how many syncs repacked the table.
+- `keys` (encrypted): `changeKeyMs`, `verifyMs`, `rotateDataKeyMs`, and `openAfterRotation` (the
+  same data, its table now densely packed) beside `g2`.
+- `ratios` and `gates`: the gate table, judged with the desktop budgets of #3 (`bench/judge.ts`).
+
+`importPlainDataDir` has no row: the package does not have it yet.
+
 URL parameters run it without clicking: `?auto=1&parts=gates10,extras&runs=20` (and `&sessions=365`
-for the year). The page sets `window.__benchResult` when it finishes; `node spike/run.mjs` uses that.
+for the year). The page sets `window.__benchResult` when it finishes; `node bench/run.mjs` uses that
+to run the page headless in Playwright's browsers and save `bench/results/<browser>.json`.
 `&post=<target>` also sends the progress and the result to the device collector
-(`spike/device/serve.mjs`, issue #11), which saves `spike/results/<target>.json`.
+(`bench/device/serve.mjs`, issue #11), which saves `bench/results/<target>.json`.
+
+## Nightly gates
+
+`.github/workflows/nightly.yml` runs `gates100`, `extras` and `year` in Chromium, Firefox and WebKit
+and checks them with `node bench/gates.ts --factor <CI factor>`: the ratios against plain `idb://`
+as they are, the absolute budgets (open 100 MB in 1,500 ms, a segment switch in 500 ms, G8 and G9
+from them) times the CI factor the workflow states. The gate table goes to the job summary and the
+JSON is an artifact.
 
 ## Inside the Tauri shells (G7, WKWebView, WebView2, Android WebView, iOS)
 

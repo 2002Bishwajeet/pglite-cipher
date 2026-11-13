@@ -1,7 +1,9 @@
 // Scenarios ported from davidmuggleton/pglite-encrypted-fs (MIT, see THIRD_PARTY.md):
-// test/integration/pglite-basic.test.ts and pglite-failure.test.ts, adapted to this API (a KEK and a
-// backend in place of a passphrase and a directory). Its passphrase-only cases have no counterpart.
+// test/integration/pglite-basic.test.ts, pglite-failure.test.ts and pglite-pgvector.test.ts, adapted
+// to this API (a KEK and a backend in place of a passphrase and a directory). Its passphrase-only
+// cases have no counterpart.
 import type { PGlite } from '@electric-sql/pglite';
+import { vector } from '@electric-sql/pglite-pgvector';
 import { describe, expect, it } from 'vitest';
 import type { RecordKey } from '../../src/backend/backend.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
@@ -277,5 +279,88 @@ describe('ported: pglite-failure', () => {
     const db2 = await reopen(s);
     expect((await db2.query('SELECT count(*)::int AS count FROM growth_test')).rows).toEqual([{ count: 100 }]);
     await db2.close();
+  }, 60_000);
+  it('both of two tables read back after a reopen (the baseline of its sibling-corruption case)', async () => {
+    // Its corruption half has no counterpart: here any damaged record refuses the whole open.
+    const s = await fresh();
+    await s.db.exec('CREATE TABLE table_a (id INTEGER); INSERT INTO table_a VALUES (1), (2), (3);');
+    await s.db.exec('CREATE TABLE table_b (id INTEGER); INSERT INTO table_b VALUES (10), (20), (30);');
+    await s.db.close();
+    const db = await reopen(s);
+    expect((await db.query('SELECT count(*)::int AS count FROM table_a')).rows).toEqual([{ count: 3 }]);
+    expect((await db.query('SELECT count(*)::int AS count FROM table_b')).rows).toEqual([{ count: 3 }]);
+    await db.close();
+  }, 60_000);
+});
+
+describe('ported: pglite-pgvector (an extension with its own index access methods)', () => {
+  const withVector = { pglite: { extensions: { vector } } };
+  const freshVector = async (): Promise<Store> => {
+    const memory = new MemoryBackend();
+    const key = await newKey();
+    const { pg } = await openStore({ backend: shared(memory), key, ...withVector });
+    await pg.exec('CREATE EXTENSION IF NOT EXISTS vector');
+    return { memory, key, db: pg };
+  };
+  const reopenVector = async ({ memory, key }: Pick<Store, 'memory' | 'key'>): Promise<PGlite> =>
+    (await openStore({ backend: shared(memory), key, mode: 'open', ...withVector })).pg;
+  // Deterministic in place of its Math.random(): the same points on every engine.
+  const point = (i: number, dims = 3) => `[${Array.from({ length: dims }, (_, d) => Math.abs(Math.sin(i * 7 + d * 13)).toFixed(6)).join(',')}]`;
+  const ids = (rows: unknown[]) => rows.map((r) => (r as { id: number }).id);
+
+  it('installs vector, stores a vector column, and orders by L2, cosine and inner-product distance', async () => {
+    const { db } = await freshVector();
+    expect((await db.query(`SELECT extname FROM pg_extension WHERE extname = 'vector'`)).rows).toHaveLength(1);
+    await db.exec(`CREATE TABLE docs (id INTEGER, embedding vector(3)); INSERT INTO docs VALUES (1, '[1,0,0]'), (2, '[0,1,0]'), (3, '[0.9,0.1,0]'), (4, '[2,0,0]');`);
+    expect((await db.query(`SELECT data_type FROM information_schema.columns WHERE table_name = 'docs' AND column_name = 'embedding'`)).rows).toHaveLength(1);
+    expect(ids((await db.query(`SELECT id FROM docs WHERE id < 4 ORDER BY embedding <-> '[1,0,0]' LIMIT 2`)).rows)).toEqual([1, 3]);
+    expect(ids((await db.query(`SELECT id FROM docs WHERE id < 4 ORDER BY embedding <=> '[1,0,0]' LIMIT 2`)).rows)).toEqual([1, 3]);
+    expect(ids((await db.query(`SELECT id FROM docs WHERE id <> 3 ORDER BY embedding <#> '[1,0,0]' LIMIT 2`)).rows)).toEqual([4, 1]);
+    await db.close();
+  }, 60_000);
+
+  it('builds IVFFlat and HNSW indexes, and a search scans the HNSW index', async () => {
+    const { db } = await freshVector();
+    await db.exec('CREATE TABLE items (id INTEGER, embedding vector(3))');
+    for (let i = 0; i < 100; i++) await db.exec(`INSERT INTO items VALUES (${String(i)}, '${point(i)}')`);
+    await db.exec('CREATE INDEX items_ivfflat ON items USING ivfflat (embedding vector_l2_ops) WITH (lists = 10)');
+    await db.exec('CREATE INDEX items_hnsw ON items USING hnsw (embedding vector_l2_ops) WITH (m = 16, ef_construction = 64)');
+    expect((await db.query(`SELECT indexname FROM pg_indexes WHERE tablename = 'items' ORDER BY 1`)).rows).toEqual([{ indexname: 'items_hnsw' }, { indexname: 'items_ivfflat' }]);
+    await db.exec('DROP INDEX items_ivfflat; SET enable_seqscan = off; SET hnsw.ef_search = 40;');
+    const plan = (await db.query<{ 'QUERY PLAN': string }>(`EXPLAIN SELECT id FROM items ORDER BY embedding <-> '[0.5,0.5,0.5]' LIMIT 5`)).rows.map((r) => r['QUERY PLAN']).join('\n');
+    expect(plan).toContain('items_hnsw');
+    expect((await db.query(`SELECT id FROM items ORDER BY embedding <-> '[0.5,0.5,0.5]' LIMIT 5`)).rows).toHaveLength(5);
+    await db.close();
+  }, 60_000);
+
+  it('vector rows, the extension and an HNSW index survive a restart, and the search works after it', async () => {
+    const s = await freshVector();
+    await s.db.exec('CREATE TABLE persist (id INTEGER, embedding vector(3))');
+    for (let i = 0; i < 50; i++) await s.db.exec(`INSERT INTO persist VALUES (${String(i)}, '${point(i)}')`);
+    await s.db.exec(`INSERT INTO persist VALUES (100, '[1,0,0]'); CREATE INDEX persist_hnsw ON persist USING hnsw (embedding vector_l2_ops);`);
+    await s.db.exec('SET enable_seqscan = off');
+    const before = ids((await s.db.query(`SELECT id FROM persist ORDER BY embedding <-> '[0.5,0.5,0.5]' LIMIT 3`)).rows);
+    await s.db.close();
+    const db = await reopenVector(s);
+    expect((await db.query(`SELECT extname FROM pg_extension WHERE extname = 'vector'`)).rows).toHaveLength(1);
+    expect((await db.query(`SELECT indexname FROM pg_indexes WHERE indexname = 'persist_hnsw'`)).rows).toHaveLength(1);
+    expect((await db.query('SELECT count(*)::int AS count FROM persist')).rows).toEqual([{ count: 51 }]);
+    await db.exec('SET enable_seqscan = off');
+    expect(ids((await db.query(`SELECT id FROM persist ORDER BY embedding <-> '[0.5,0.5,0.5]' LIMIT 3`)).rows)).toEqual(before);
+    expect(ids((await db.query(`SELECT id FROM persist ORDER BY embedding <-> '[1,0,0]' LIMIT 1`)).rows)).toEqual([100]);
+    await db.exec(`INSERT INTO persist VALUES (101, '[1,1,1]')`);
+    await db.close();
+  }, 60_000);
+
+  it('1536-dimension vectors survive a restart and are found by similarity', async () => {
+    const s = await freshVector();
+    await s.db.exec('CREATE TABLE openai_embeddings (id INTEGER, embedding vector(1536))');
+    const v1 = point(1, 1536);
+    await s.db.query('INSERT INTO openai_embeddings VALUES (1, $1), (2, $2)', [v1, point(2, 1536)]);
+    await s.db.close();
+    const db = await reopenVector(s);
+    expect((await db.query('SELECT count(*)::int AS count FROM openai_embeddings')).rows).toEqual([{ count: 2 }]);
+    expect(ids((await db.query('SELECT id FROM openai_embeddings ORDER BY embedding <-> $1 LIMIT 1', [v1])).rows)).toEqual([1]);
+    await db.close();
   }, 60_000);
 });

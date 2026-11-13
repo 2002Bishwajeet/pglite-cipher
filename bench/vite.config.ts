@@ -1,5 +1,5 @@
-// Throwaway spike code (issue #2): builds the benchmark page to bench/dist and serves it
-// cross-origin isolated (PGlite and measureUserAgentSpecificMemory want it).
+// Builds the benchmark page to bench/dist and serves it cross-origin isolated (PGlite and
+// measureUserAgentSpecificMemory want it).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 

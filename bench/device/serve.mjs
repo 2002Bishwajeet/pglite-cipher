@@ -1,8 +1,8 @@
 // Throwaway spike code (issue #11): serves the built bench page (bench/dist) cross-origin isolated
 // and collects what device runs send. `POST /result` takes the page's JSON plus a `target` name and
-// merges it per part into spike/results/<target>.json; `POST /log` prints a progress line.
-// Usage: node spike/device/serve.mjs [--port 47901] [--until target,...] [--timeout-min 170]
-//        node spike/device/serve.mjs --self-test
+// merges it per part into bench/results/<target>.json; `POST /log` prints a progress line.
+// Usage: node bench/device/serve.mjs [--port 47901] [--until target,...] [--timeout-min 170]
+//        node bench/device/serve.mjs --self-test
 // --until exits once every named target has posted: 0, or 1 if a result holds an error; 2 on timeout.
 // No dependencies beyond Node. Build the page first: npm run bench:build.
 import { createServer } from 'node:http';
