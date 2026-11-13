@@ -1,14 +1,14 @@
 // The benchmark page: the real implementation (EncryptedFs over IndexedDbBackend, 64 KB blocks)
 // against plain IdbFs, gates G1-G9 of docs/plan/01-sqlcipher-comparison.md 3.3, the key operations,
 // and the rows ported from davidmuggleton/pglite-encrypted-fs's bench (THIRD_PARTY.md).
-import { IdbFs } from '@electric-sql/pglite';
+import { IdbFs, PGlite } from '@electric-sql/pglite';
 import { EncryptedFs, IndexedDbBackend } from '../src/index.ts';
 import type { BlockSize } from '../src/format/codec.ts';
 import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
 import { runG7 } from './g7.ts';
 import { judgeGates, judgeYear } from './judge.ts';
-import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, type Json, type Pg, type Stat } from './measure.ts';
+import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
 const BLOCK_SIZE = 65536;
 const MB = 1024 * 1024;
@@ -37,6 +37,38 @@ async function runEncrypted(mb: number, runs: number): Promise<Json> {
   const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true });
   const result = { sizeMB: mb, blockSize: BLOCK_SIZE, encrypted };
   return { ...result, gates: judgeGates(result, 1) };
+}
+
+// ---- memory levers (#48): WAL sizes, shared_buffers, initialMemory ---------------------------
+
+const SMALL_WAL = ['min_wal_size=32MB', 'max_wal_size=32MB']; // the least Postgres allows: two 16 MB segments
+// No smaller `initialMemory`: PGlite 0.5.10's wasm declares 2048 pages (128 MB) as its minimum, and
+// `PGlite.create` with less never settles (instantiate fails: "memory import has 512 pages which is
+// smaller than the declared initial of 2048").
+const LEVERS: Record<string, string[]> = {
+  default: [],
+  wal: SMALL_WAL,
+  sb32: ['shared_buffers=32MB'],
+  sb16: ['shared_buffers=16MB'],
+  'wal+sb16': [...SMALL_WAL, 'shared_buffers=16MB'],
+};
+
+/** The gates pair once per lever (`&levers=a,b` picks some), with the settings Postgres reports and the wasm memory of an empty in-memory instance. */
+async function runLevers(mb: number, runs: number): Promise<Json> {
+  const only = new URLSearchParams(location.search).get('levers')?.split(',');
+  const out: Json = { sizeMB: mb };
+  for (const [name, conf] of Object.entries(LEVERS)) {
+    if (only && !only.includes(name)) continue;
+    const pgOptions: PgOptions = { startParams: [...PGlite.defaultStartParams, ...conf.flatMap((c) => ['-c', c])] };
+    const probe = await PGlite.create(pgOptions);
+    const settings = (await probe.query<Record<string, string>>("SELECT current_setting('shared_buffers') AS shared_buffers, current_setting('min_wal_size') AS min_wal_size, current_setting('max_wal_size') AS max_wal_size, current_setting('wal_segment_size') AS wal_segment_size")).rows[0];
+    const emptyWasm = wasmBytes(probe);
+    await probe.close();
+    log(`levers ${String(mb)} MB: ${name}`);
+    const { plain, encrypted } = await runPair(mb, runs, log, { pgOptions });
+    out[name] = { conf, settings, emptyWasm, ratios: ratios(plain, encrypted), plain, encrypted };
+  }
+  return out;
 }
 
 // ---- G6 support, G8 deriveKey, AES-GCM, crypto overhead ----------------------------------------
@@ -315,6 +347,8 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   gates100: (runs) => runGates(100, runs),
   enc10: (runs) => runEncrypted(10, runs),
   enc100: (runs) => runEncrypted(100, runs),
+  levers10: (runs) => runLevers(10, runs),
+  levers100: (runs) => runLevers(100, runs),
   extras: (runs) => runExtras(runs),
   year: () => runYear(Number(new URLSearchParams(location.search).get('sessions') ?? 365)),
   ops: (runs) => runOps(runs),
