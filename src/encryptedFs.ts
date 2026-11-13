@@ -134,6 +134,8 @@ interface Prepared {
   stats: SyncStats;
 }
 
+type Durability = CommitBatch['durability'];
+
 const now = () => performance.now();
 
 const isEmpty = (s: Snapshot) =>
@@ -288,10 +290,12 @@ export class EncryptedFs extends MemoryFS {
   /** Set when another writer committed: syncs stay disabled. */
   #fatal: Error | null = null;
   /** A commit whose outcome is unknown: its plan and snapshot, kept until a read of the root settles it. */
-  #unsettled: { prepared: Prepared; snap: Snapshot } | null = null;
+  #unsettled: { prepared: Prepared; snap: Snapshot; durability: Durability } | null = null;
   #drain: Promise<void> | null = null;
   #requested = false;
   #strict = false;
+  /** A commit applied since the last strict one: a strict request still owes a strict commit. */
+  #owesStrict = false;
   /** The sync running now, if any. */
   #syncing: Promise<void> | null = null;
   /** Set while a key change, rotation or verify runs: syncs wait for it. */
@@ -613,7 +617,7 @@ export class EncryptedFs extends MemoryFS {
         const strict = this.#strict;
         this.#strict = false;
         try {
-          const sync = this.#syncOnce(strict ? 'strict' : 'relaxed');
+          const sync = strict ? this.#syncStrict() : this.#syncOnce('relaxed');
           this.#syncing = sync;
           await sync;
           failure = null;
@@ -631,7 +635,7 @@ export class EncryptedFs extends MemoryFS {
     if (failure) throw failure.error;
   }
 
-  async #syncOnce(durability: 'strict' | 'relaxed'): Promise<void> {
+  async #syncOnce(durability: Durability): Promise<void> {
     if (this.#fatal) throw this.#fatal;
     if (this.#unsettled) await this.#settle();
     const tracker = this.#tracker as Tracker;
@@ -657,14 +661,32 @@ export class EncryptedFs extends MemoryFS {
       try {
         stored = await this.#backend.get(2);
       } catch {
-        this.#unsettled = { prepared, snap };
+        this.#unsettled = { prepared, snap, durability };
         throw error;
       }
-      if (!this.#settled(prepared, snap, stored as Bytes | undefined)) throw error;
+      if (!this.#settled(prepared, snap, stored as Bytes | undefined, durability)) throw error;
       return;
     }
     prepared.stats.commitMs = now() - t0;
-    this.#apply(prepared, snap);
+    this.#apply(prepared, snap, durability);
+  }
+
+  /**
+   * A strict sync. When it had nothing to commit but a commit since the last strict one was not
+   * strict (a relaxed sync it joined, say), it puts the root again, unchanged, in a strict commit:
+   * that makes the store durable up to it.
+   */
+  async #syncStrict(): Promise<void> {
+    await this.#syncOnce('strict');
+    if (!this.#owesStrict) return;
+    const root = this.#lastRoot as Bytes;
+    try {
+      await this.#backend.commit({ expectRoot: root, puts: [[2, root]], deletes: [], durability: 'strict' });
+    } catch (error) {
+      if (error instanceof StaleWriterError) this.#setFatal(error);
+      throw error;
+    }
+    this.#owesStrict = false;
   }
 
   /** Plans the snapshot against the file map and seals every record it writes. */
@@ -710,9 +732,9 @@ export class EncryptedFs extends MemoryFS {
    * applied (true); the previous root means nothing was written (false, the snapshot is owed
    * again); anything else is another writer.
    */
-  #settled(prepared: Prepared, snap: Snapshot, stored: Bytes | undefined): boolean {
+  #settled(prepared: Prepared, snap: Snapshot, stored: Bytes | undefined, durability: Durability): boolean {
     if (stored !== undefined && equalBytes(stored, prepared.root)) {
-      this.#apply(prepared, snap);
+      this.#apply(prepared, snap, durability);
       return true;
     }
     const previous = this.#lastRoot;
@@ -727,18 +749,19 @@ export class EncryptedFs extends MemoryFS {
 
   /** Settles an unsettled commit before anything else is planned. */
   async #settle(): Promise<void> {
-    const { prepared, snap } = this.#unsettled as { prepared: Prepared; snap: Snapshot };
+    const { prepared, snap, durability } = this.#unsettled as { prepared: Prepared; snap: Snapshot; durability: Durability };
     const stored = await this.#backend.get(2);
     this.#unsettled = null;
-    this.#settled(prepared, snap, stored as Bytes | undefined);
+    this.#settled(prepared, snap, stored as Bytes | undefined, durability);
   }
 
-  #apply(prepared: Prepared, snap: Snapshot): void {
+  #apply(prepared: Prepared, snap: Snapshot, durability: Durability): void {
     (this.#map as FileMap).apply(prepared.draft);
     (this.#tracker as Tracker).commit(snap);
     this.#lastRoot = prepared.root;
     this.#gen++;
     this.#headerRepair = false;
+    this.#owesStrict = durability !== 'strict';
     this.#lastSync = prepared.stats;
   }
 
@@ -1039,7 +1062,7 @@ export class EncryptedFs extends MemoryFS {
     try {
       while (this.#hold) await this.#hold;
       await this.#drain?.catch(() => undefined);
-      if (this.#ready && !this.#fatal && this.hasDirty()) await this.syncToFs(false);
+      if (this.#ready && !this.#fatal && (this.hasDirty() || this.#owesStrict)) await this.syncToFs(false);
     } finally {
       this.#ready = false;
       await Promise.all(this.#slots.map((backend) => backend.close()));
