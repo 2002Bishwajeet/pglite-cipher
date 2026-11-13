@@ -62,9 +62,14 @@ async function runLevers(mb: number, runs: number): Promise<Json> {
     if (only && !only.includes(name)) continue;
     const pgOptions: PgOptions = { startParams: [...PGlite.defaultStartParams, ...conf.flatMap((c) => ['-c', c])] };
     const probe = await PGlite.create(pgOptions);
-    const settings = (await probe.query<Record<string, string>>("SELECT current_setting('shared_buffers') AS shared_buffers, current_setting('min_wal_size') AS min_wal_size, current_setting('max_wal_size') AS max_wal_size, current_setting('wal_segment_size') AS wal_segment_size")).rows[0];
-    const emptyWasm = wasmBytes(probe);
-    await probe.close();
+    let settings: Record<string, string> | undefined;
+    let emptyWasm: number;
+    try {
+      settings = (await probe.query<Record<string, string>>("SELECT current_setting('shared_buffers') AS shared_buffers, current_setting('min_wal_size') AS min_wal_size, current_setting('max_wal_size') AS max_wal_size, current_setting('wal_segment_size') AS wal_segment_size")).rows[0];
+      emptyWasm = wasmBytes(probe);
+    } finally {
+      await probe.close();
+    }
     log(`levers ${String(mb)} MB: ${name}`);
     const { plain, encrypted } = await runPair(mb, runs, log, { pgOptions });
     out[name] = { conf, settings, emptyWasm, ratios: ratios(plain, encrypted), plain, encrypted };
