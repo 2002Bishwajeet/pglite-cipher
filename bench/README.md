@@ -34,16 +34,17 @@ What each gates part reports, per variant (`plain`, `encrypted`):
   breakdown summed per run (table and data blocks, bytes, deletes, encrypt and commit ms, repacks),
   and `fileChanges` / `tableBlocksWithoutFileChange` (G9: runs that changed no file must write no
   table block, the owner's rule on #2).
-- `g2`: the open from `initialSyncFs` to Postgres ready, plain and encrypted opens interleaved;
-  encrypted also `lastOpen.tableMs` (G9) and `lastOpen.blocksMs`, `readMs` and `decryptMs` (the
+- `g2`: the open from `initialSyncFs` to Postgres ready, plain and encrypted opens interleaved,
+  each timed open after an untimed open of the same variant, never right after the other's (#41: on
+  the iPad a plain open just before an encrypted one made that open 8× slower); encrypted also `lastOpen.tableMs` (G9) and `lastOpen.blocksMs`, `readMs` and `decryptMs` (the
   open's wall time with an IndexedDB page read in flight and with a decrypt in flight), the table
   blocks and `table.fill`, data blocks, files and subkeys.
 - `g9` (encrypted): over every sync of the workload, p50/p95 of `lastSync.tableBlocks` and of
   `tableBlocks / dataBlocks`, and how many syncs repacked the table.
 - `keys` (encrypted): `changeKeyMs`, `verifyMs`, `rotateDataKeyMs`, and `openAfterRotation` (the
   same data, its table now densely packed) beside `g2`. `openBeforeRotation` is the same series on
-  the store as G2 opened it, but without a plain open in between, as after the rotation: its
-  `readMs` against `openAfterRotation.readMs` is what the rewrite alone changes (#41).
+  the store as G2 opened it, without a plain open in between, as after the rotation: its `readMs`
+  against `openAfterRotation.readMs` is what the rewrite alone changes (#41).
 - `ratios` and `gates`: the gate table, judged with the desktop budgets of #3 (`bench/judge.ts`).
 
 `importPlainDataDir` has no row: the package does not have it yet.

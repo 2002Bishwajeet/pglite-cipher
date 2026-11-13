@@ -11,7 +11,8 @@
 // records, unasserted, the switch ÷ the encrypted sync and ÷ the plain switch.
 //
 // G2 is 20 opens per variant (plan 03), plain and encrypted interleaved, so that a machine that
-// speeds up or slows down during the run moves both medians alike.
+// speeds up or slows down during the run moves both medians alike. Each timed open follows an
+// untimed open of the same variant, never the other's (#41).
 import { describe, expect, it } from 'vitest';
 import { ratios, runPair } from '../../bench/measure.ts';
 

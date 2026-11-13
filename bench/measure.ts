@@ -473,7 +473,8 @@ async function shut(v: Built): Promise<void> {
 /**
  * Builds the same `mb` MB database on plain IdbFs and on EncryptedFs and measures G1, G1b and G4
  * `runs` times each; then G2, `opens` opens per variant, plain and encrypted interleaved, so that a
- * machine that speeds up or slows down meanwhile moves both alike; G3 after the last open of each,
+ * machine that speeds up or slows down meanwhile moves both alike, and each after an untimed open of
+ * the same variant, so that no timed open follows the other's (#41); G3 after the last open of each,
  * with the other closed; and with `keys` the encrypted one's opens alone, the key operations on it,
  * then its opens after the rotation. Deletes both databases at the end.
  */
@@ -503,6 +504,10 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     for (let i = 0; i < n; i++) {
       for (const v of p ? [p, e] : [e]) {
         log(`${v.label}: G2 open ${String(i + 1)} of ${String(n)}`);
+        // With both variants, an untimed open of this one first, so that a timed open follows an
+        // open of its own database, never the other's: on the iPad a plain open just before an
+        // encrypted one made that open 8× slower (#41).
+        if (p) await reopen(v, new Opens());
         await reopen(v, g2[v.kind]);
         if (i < n - 1) await shut(v);
         else {
