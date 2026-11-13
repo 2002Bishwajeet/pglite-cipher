@@ -28,8 +28,9 @@ export const stat = (xs: readonly number[]): Stat => ({ p50: round(pct(xs, 50)),
 // ---- the workload (kept from the spike, so the numbers compare) -------------------------------
 
 const extensions = { live, pg_trgm };
-export const createPg = (fs: NonNullable<PGliteOptions['fs']>, opts: { relaxedDurability?: boolean } = {}) =>
-  PGlite.create({ fs, extensions, ...opts });
+/** PGlite settings the memory levers (#48) vary: Postgres settings through `startParams`, and `initialMemory`. */
+export type PgOptions = Pick<PGliteOptions, 'relaxedDurability' | 'startParams' | 'initialMemory'>;
+export const createPg = (fs: NonNullable<PGliteOptions['fs']>, opts: PgOptions = {}) => PGlite.create({ fs, extensions, ...opts });
 export type Pg = Awaited<ReturnType<typeof createPg>>;
 
 export const SCHEMA = `
@@ -64,7 +65,7 @@ export const randomBytes = (n: number): Uint8Array<ArrayBuffer> => {
 const walFile = async (pg: PGlite): Promise<string> =>
   (await pg.query<{ f: string }>('SELECT pg_walfile_name(pg_current_wal_insert_lsn()) AS f')).rows[0]?.f ?? '';
 
-/** The schema, 50 documents, and `mb` MB of 1 MB update blobs; then a checkpoint. */
+/** The schema, 50 documents, and `mb` MB of 1 MB update blobs (the caller checkpoints). */
 async function build(pg: Pg, mb: number): Promise<string[]> {
   await pg.exec(SCHEMA);
   const docs = Array.from({ length: 50 }, () => crypto.randomUUID());
@@ -76,7 +77,6 @@ async function build(pg: Pg, mb: number): Promise<string[]> {
   for (let bytes = 0; bytes < mb * MB; bytes += rows * MB) {
     await pg.query(`INSERT INTO doc_updates (doc_id, data) VALUES ${values}`, [docs[0], ...Array.from({ length: rows }, () => randomBytes(MB))]);
   }
-  await pg.exec('CHECKPOINT');
   return docs;
 }
 
@@ -228,6 +228,18 @@ function nodes(pg: Pg): Array<{ path: string; mode: number; size: number }> {
   return out;
 }
 
+/** Bytes in files per top-level entry of the data directory (`base`, `global`, `pg_wal`, ...; files at the top count as `.`). */
+const dirBytes = (pg: Pg): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const n of nodes(pg)) {
+    const parts = n.path.slice('/pglite/data/'.length).split('/');
+    const top = parts.length > 1 ? (parts[0] ?? '.') : '.';
+    out[top] = (out[top] ?? 0) + n.size;
+  }
+  return out;
+};
+const wasmBytes = (pg: Pg): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+
 /** The data directory as a file map: path to mode and size. */
 const tree = (pg: Pg): Map<string, string> => new Map(nodes(pg).map((n) => [n.path, `${String(n.mode)} ${String(n.size)}`]));
 
@@ -285,7 +297,7 @@ async function memory(pg: Pg): Promise<Json> {
     measureUserAgentSpecificMemory?: () => Promise<{ bytes: number }>;
     memory?: { usedJSHeapSize: number };
   };
-  const wasmHeapBytes = (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
+  const wasmHeapBytes = wasmBytes(pg);
   let unavailable = '';
   if (p.measureUserAgentSpecificMemory && crossOriginIsolated) {
     try {
@@ -316,8 +328,12 @@ export interface OpenResult {
 
 export interface VariantResult {
   buildMs: number;
-  /** The data directory after the build: nodes, and bytes in files (G3's "database"). */
-  dataDir: { nodes: number; bytes: number };
+  /** The data directory after the build and its checkpoint: nodes, and bytes in files (G3's "database"); bytes per top-level directory before and after that checkpoint. */
+  dataDir: { nodes: number; bytes: number; dirs: Record<string, number>; dirsBeforeCheckpoint: Record<string, number> };
+  /** The wasm memory after the build (it never shrinks while the instance lives). */
+  wasmAfterBuild: number;
+  /** Bytes per top-level directory of the data directory after the last open, beside G3. */
+  dirsAfterOpen: Record<string, number>;
   /** G1: the sync after a one-row UPDATE. */
   g1: Sample;
   /** G1b: the sync after one 4 KB insert. */
@@ -376,14 +392,15 @@ interface Built {
   label: string;
   key: { kek: CryptoKey };
   make: () => AnyFs;
+  pgOptions: PgOptions;
   fs: AnyFs;
   pg: Pg;
   open: boolean;
-  part: Omit<VariantResult, 'g2' | 'g3' | 'keys'>;
+  part: Omit<VariantResult, 'g2' | 'g3' | 'dirsAfterOpen' | 'keys'>;
 }
 
 /** Builds an `mb` MB database on one filesystem and measures G1, G1b and G4 (and, encrypted, G9), `runs` times each. */
-async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void): Promise<Built> {
+async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void, pgOptions: PgOptions): Promise<Built> {
   const label = `${kind} ${String(mb)} MB`;
   const key = { kek: await newKek() };
   const make = (): AnyFs => (kind === 'plain' ? new PlainFs(name) : new TimedFs({ backend: timedBackend(name), key: key.kek, mode: 'open-or-create' }));
@@ -391,11 +408,14 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
   const cur = () => fs;
   log(`${label}: build`);
   const t0 = now();
-  const pg = await createPg(fs);
+  const pg = await createPg(fs, pgOptions);
   const docs = await build(pg, mb);
+  const dirsBeforeCheckpoint = dirBytes(pg);
+  await pg.exec('CHECKPOINT');
   const buildMs = round(now() - t0);
+  const wasmAfterBuild = wasmBytes(pg);
   const dir = nodes(pg);
-  const dataDir = { nodes: dir.length, bytes: dir.reduce((n, f) => n + f.size, 0) };
+  const dataDir = { nodes: dir.length, bytes: dir.reduce((n, f) => n + f.size, 0), dirs: dirBytes(pg), dirsBeforeCheckpoint };
 
   log(`${label}: G1, G1b`);
   const g1 = await sample(cur, () => pg, runs, (i) => pg.query('UPDATE doc_search SET body = $2 WHERE doc_id = $1', [docs[1], `edit ${String(i)}`]));
@@ -433,14 +453,14 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
       repacked: all.filter((s) => s.repacked).length,
     };
   }
-  return { kind, label, key, make, fs, pg, open: true, part: { buildMs, dataDir, g1, g1b, g4, ...(g9 ? { g9 } : {}) } };
+  return { kind, label, key, make, pgOptions, fs, pg, open: true, part: { buildMs, dataDir, wasmAfterBuild, g1, g1b, g4, ...(g9 ? { g9 } : {}) } };
 }
 
 /** Closes the variant's PGlite if it is open, opens the data again and records the open. */
 async function reopen(v: Built, into: Opens): Promise<void> {
   await shut(v);
   v.fs = v.make();
-  v.pg = await createPg(v.fs);
+  v.pg = await createPg(v.fs, v.pgOptions);
   v.open = true;
   into.record(v.fs);
 }
@@ -457,10 +477,10 @@ async function shut(v: Built): Promise<void> {
  * with the other closed; and with `keys` the key operations on the encrypted one, then its opens
  * after the rotation. Deletes both databases at the end.
  */
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false; pgOptions?: PgOptions }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
 /** With `onlyEncrypted` the plain database is neither built nor opened and there is no `plain`. */
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true }): Promise<{ plain: undefined; encrypted: VariantResult }>;
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true; pgOptions?: PgOptions }): Promise<{ plain: undefined; encrypted: VariantResult }>;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean; pgOptions?: PgOptions } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
   const id = crypto.randomUUID();
   const names = { plain: `bench-plain-${String(mb)}-${id}`, encrypted: `bench-encrypted-${String(mb)}-${id}` };
   const n = opts.opens ?? runs;
@@ -468,16 +488,17 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
   try {
     let p: Built | undefined;
     if (!opts.onlyEncrypted) {
-      p = await buildVariant('plain', names.plain, mb, runs, log);
+      p = await buildVariant('plain', names.plain, mb, runs, log, opts.pgOptions ?? {});
       built.push(p);
       await shut(p);
     }
-    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log);
+    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log, opts.pgOptions ?? {});
     built.push(e);
     await shut(e);
 
     const g2 = { plain: new Opens(), encrypted: new Opens() };
     const g3: Record<Kind, Json> = { plain: {}, encrypted: {} };
+    const dirsAfterOpen: Record<Kind, Record<string, number>> = { plain: {}, encrypted: {} };
     for (let i = 0; i < n; i++) {
       for (const v of p ? [p, e] : [e]) {
         log(`${v.label}: G2 open ${String(i + 1)} of ${String(n)}`);
@@ -486,12 +507,13 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
         else {
           log(`${v.label}: G3 memory`);
           g3[v.kind] = await memory(v.pg);
+          dirsAfterOpen[v.kind] = dirBytes(v.pg);
           if (v === p) await shut(v);
         }
       }
     }
-    const plain: VariantResult | undefined = p && { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain };
-    const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted };
+    const plain: VariantResult | undefined = p && { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain, dirsAfterOpen: dirsAfterOpen.plain };
+    const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted, dirsAfterOpen: dirsAfterOpen.encrypted };
 
     if (opts.keys && e.fs instanceof TimedFs) {
       log(`${e.label}: changeKey, verify, rotateDataKey`);

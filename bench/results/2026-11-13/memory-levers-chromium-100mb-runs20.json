@@ -1,0 +1,1737 @@
+{
+  "browser": "chromium",
+  "parts": {
+    "levers100": {
+      "sizeMB": 100,
+      "default": {
+        "conf": [],
+        "settings": {
+          "shared_buffers": "128MB",
+          "min_wal_size": "80MB",
+          "max_wal_size": "1GB",
+          "wal_segment_size": "16MB"
+        },
+        "emptyWasm": 197918720,
+        "ratios": {
+          "g1": 0.09,
+          "g2": 1.43,
+          "g4": 1.73,
+          "g4ToEncryptedSync": 19.89,
+          "g4ToPlainSwitch": 0.18,
+          "g9Open": 0.0115
+        },
+        "plain": {
+          "buildMs": 34127.06,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 237502464,
+          "g1": {
+            "ms": {
+              "p50": 78.69,
+              "p95": 105.81,
+              "max": 118.32,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 706.19,
+              "p95": 807.94,
+              "max": 814.81,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 766.13,
+              "p95": 900.49,
+              "max": 931.24,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 743.7,
+              "p95": 991.77,
+              "max": 1714.82,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 952545055,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "base": 131941529,
+            "global": 555832,
+            "pg_logical": 8,
+            "pg_multixact": 16384,
+            "pg_subtrans": 8192,
+            "pg_wal": 83886080,
+            "pg_xact": 8192
+          }
+        },
+        "encrypted": {
+          "buildMs": 28845.34,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 237502464,
+          "g1": {
+            "ms": {
+              "p50": 6.86,
+              "p95": 11.01,
+              "max": 12.2,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 1,
+            "lastSync": {
+              "bytes": {
+                "p50": 131160,
+                "p95": 131160,
+                "max": 262320,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 2.97,
+                "p95": 5.64,
+                "max": 5.71,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 3.44,
+                "p95": 5.6,
+                "max": 6.88,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 9.51,
+              "p95": 13.36,
+              "max": 14.65,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 2,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 262320,
+                "p95": 327900,
+                "max": 327900,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 5.56,
+                "p95": 8.03,
+                "max": 8.57,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 3.53,
+                "p95": 6.92,
+                "max": 8.11,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 136.42,
+              "p95": 161.08,
+              "max": 161.62,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 17050800,
+                "p95": 17116380,
+                "max": 17116380,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 40.5,
+                "p95": 44.22,
+                "max": 52.17,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 82.88,
+                "p95": 102.74,
+                "max": 104.6,
+                "n": 20
+              },
+              "repacked": 0
+            },
+            "switched": 20
+          },
+          "g9": {
+            "syncs": 144,
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 144
+            },
+            "tableToDataBlocks": {
+              "p50": 0,
+              "p95": 0.5,
+              "max": 1,
+              "n": 144
+            },
+            "repacked": 1
+          },
+          "g2": {
+            "ms": {
+              "p50": 1066.37,
+              "p95": 1438.63,
+              "max": 1442.46,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 12.3,
+              "p95": 24.5,
+              "max": 28.57,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 896.45,
+              "p95": 1146.16,
+              "max": 1150.04,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 843.68,
+              "p95": 1062.24,
+              "max": 1097.38,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 288.81,
+              "p95": 357.2,
+              "max": 375.08,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.65,
+            "dataBlocks": 3904,
+            "files": 1020,
+            "subkeys": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 1056620591,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "pg_wal": 83886080,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131941529,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        }
+      },
+      "wal": {
+        "conf": [
+          "min_wal_size=32MB",
+          "max_wal_size=32MB"
+        ],
+        "settings": {
+          "shared_buffers": "128MB",
+          "min_wal_size": "32MB",
+          "max_wal_size": "32MB",
+          "wal_segment_size": "16MB"
+        },
+        "emptyWasm": 197918720,
+        "ratios": {
+          "g1": 0.09,
+          "g2": 1.8,
+          "g4": 1.93,
+          "g4ToEncryptedSync": 22.47,
+          "g4ToPlainSwitch": 0.22,
+          "g9Open": 0.0125
+        },
+        "plain": {
+          "buildMs": 25320.4,
+          "dataDir": {
+            "nodes": 1017,
+            "bytes": 165896387,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 33554432,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 237502464,
+          "g1": {
+            "ms": {
+              "p50": 55.75,
+              "p95": 57.71,
+              "max": 58.72,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 475.99,
+              "p95": 493.46,
+              "max": 495.66,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 481.75,
+              "p95": 493.06,
+              "max": 508.45,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 457.98,
+              "p95": 469.79,
+              "max": 855.64,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 979120283,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "base": 131941529,
+            "global": 555832,
+            "pg_logical": 8,
+            "pg_multixact": 16384,
+            "pg_subtrans": 8192,
+            "pg_wal": 33554432,
+            "pg_xact": 8192
+          }
+        },
+        "encrypted": {
+          "buildMs": 22913.28,
+          "dataDir": {
+            "nodes": 1017,
+            "bytes": 165896387,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 33554432,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 237502464,
+          "g1": {
+            "ms": {
+              "p50": 4.78,
+              "p95": 5.71,
+              "max": 6.63,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 1,
+            "lastSync": {
+              "bytes": {
+                "p50": 131160,
+                "p95": 131160,
+                "max": 262320,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 2.05,
+                "p95": 2.42,
+                "max": 3.47,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.3,
+                "p95": 2.68,
+                "max": 3.12,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 6.12,
+              "p95": 8.72,
+              "max": 8.91,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 2,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 262320,
+                "p95": 327900,
+                "max": 327900,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 3.05,
+                "p95": 5.62,
+                "max": 5.65,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.55,
+                "p95": 3.07,
+                "max": 3.09,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 107.42,
+              "p95": 114.01,
+              "max": 114.36,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 17050800,
+                "p95": 17116380,
+                "max": 17116380,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 31.7,
+                "p95": 34.58,
+                "max": 36,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 63.69,
+                "p95": 68.79,
+                "max": 70.55,
+                "n": 20
+              },
+              "repacked": 0
+            },
+            "switched": 20
+          },
+          "g9": {
+            "syncs": 144,
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 144
+            },
+            "tableToDataBlocks": {
+              "p50": 0,
+              "p95": 0.5,
+              "max": 1,
+              "n": 144
+            },
+            "repacked": 1
+          },
+          "g2": {
+            "ms": {
+              "p50": 825.43,
+              "p95": 839.36,
+              "max": 845.35,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 10.28,
+              "p95": 11.36,
+              "max": 11.89,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 689.99,
+              "p95": 699.97,
+              "max": 702.1,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 672.65,
+              "p95": 681.66,
+              "max": 684.58,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 217.38,
+              "p95": 228.43,
+              "max": 229.87,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.59,
+            "dataBlocks": 3136,
+            "files": 1017,
+            "subkeys": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 1069939003,
+            "wasmHeapBytes": 197918720,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131941529,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        }
+      },
+      "sb32": {
+        "conf": [
+          "shared_buffers=32MB"
+        ],
+        "settings": {
+          "shared_buffers": "32MB",
+          "min_wal_size": "80MB",
+          "max_wal_size": "1GB",
+          "wal_segment_size": "16MB"
+        },
+        "emptyWasm": 134217728,
+        "ratios": {
+          "g1": 0.09,
+          "g2": 1.94,
+          "g4": 1.85,
+          "g4ToEncryptedSync": 20.17,
+          "g4ToPlainSwitch": 0.22,
+          "g9Open": 0.0116
+        },
+        "plain": {
+          "buildMs": 26506.23,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 55.25,
+              "p95": 57.37,
+              "max": 61.32,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 475.26,
+              "p95": 529.94,
+              "max": 541.39,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 472.01,
+              "p95": 570.88,
+              "max": 571.93,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 489.05,
+              "p95": 545.36,
+              "max": 905.47,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 890567833,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "base": 131941529,
+            "global": 555832,
+            "pg_logical": 8,
+            "pg_multixact": 16384,
+            "pg_subtrans": 8192,
+            "pg_wal": 83886080,
+            "pg_xact": 8192
+          }
+        },
+        "encrypted": {
+          "buildMs": 22684.46,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 5.07,
+              "p95": 8.63,
+              "max": 8.66,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 1,
+            "lastSync": {
+              "bytes": {
+                "p50": 131160,
+                "p95": 131160,
+                "max": 262320,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 2.21,
+                "p95": 2.72,
+                "max": 5.5,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.31,
+                "p95": 3.5,
+                "max": 5.88,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 7.94,
+              "p95": 19.35,
+              "max": 22.76,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 2,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 262320,
+                "p95": 327900,
+                "max": 327900,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 4.88,
+                "p95": 8.02,
+                "max": 15.77,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.56,
+                "p95": 3.68,
+                "max": 15.31,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 102.25,
+              "p95": 113.93,
+              "max": 114.34,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 17050800,
+                "p95": 17116380,
+                "max": 17116380,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 33.53,
+                "p95": 35.88,
+                "max": 38.12,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 59.06,
+                "p95": 67.04,
+                "max": 68.14,
+                "n": 20
+              },
+              "repacked": 0
+            },
+            "switched": 20
+          },
+          "g9": {
+            "syncs": 144,
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 144
+            },
+            "tableToDataBlocks": {
+              "p50": 0,
+              "p95": 0.5,
+              "max": 1,
+              "n": 144
+            },
+            "repacked": 1
+          },
+          "g2": {
+            "ms": {
+              "p50": 948.84,
+              "p95": 994.53,
+              "max": 1087.05,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 10.98,
+              "p95": 12.04,
+              "max": 12.06,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 844.77,
+              "p95": 877.53,
+              "max": 971.51,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 805.22,
+              "p95": 828.29,
+              "max": 928.84,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 269.69,
+              "p95": 283.98,
+              "max": 288.12,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.65,
+            "dataBlocks": 3904,
+            "files": 1020,
+            "subkeys": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 1039960248,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "pg_wal": 83886080,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131941529,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        }
+      },
+      "sb16": {
+        "conf": [
+          "shared_buffers=16MB"
+        ],
+        "settings": {
+          "shared_buffers": "16MB",
+          "min_wal_size": "80MB",
+          "max_wal_size": "1GB",
+          "wal_segment_size": "16MB"
+        },
+        "emptyWasm": 134217728,
+        "ratios": {
+          "g1": 0.09,
+          "g2": 1.95,
+          "g4": 1.85,
+          "g4ToEncryptedSync": 21.04,
+          "g4ToPlainSwitch": 0.21,
+          "g9Open": 0.0116
+        },
+        "plain": {
+          "buildMs": 26911.64,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 55.54,
+              "p95": 59.4,
+              "max": 60.2,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 471.14,
+              "p95": 482.34,
+              "max": 488.57,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 487.96,
+              "p95": 544.19,
+              "max": 554.37,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 481.07,
+              "p95": 549.29,
+              "max": 874.39,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 888556064,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "base": 131941529,
+            "global": 555832,
+            "pg_logical": 8,
+            "pg_multixact": 16384,
+            "pg_subtrans": 8192,
+            "pg_wal": 83886080,
+            "pg_xact": 8192
+          }
+        },
+        "encrypted": {
+          "buildMs": 22784.61,
+          "dataDir": {
+            "nodes": 1023,
+            "bytes": 266559683,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 4.88,
+              "p95": 7.88,
+              "max": 9.57,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 1,
+            "lastSync": {
+              "bytes": {
+                "p50": 131160,
+                "p95": 131160,
+                "max": 262320,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 2.23,
+                "p95": 2.6,
+                "max": 5.53,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.24,
+                "p95": 3.44,
+                "max": 4.66,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 8.07,
+              "p95": 11.77,
+              "max": 12.76,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 2,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 262320,
+                "p95": 327900,
+                "max": 327900,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 4.89,
+                "p95": 8.25,
+                "max": 9.33,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.6,
+                "p95": 2.94,
+                "max": 3.65,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 102.67,
+              "p95": 110.12,
+              "max": 113.1,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 17050800,
+                "p95": 17116380,
+                "max": 17116380,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 32.97,
+                "p95": 36.15,
+                "max": 37.01,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 59.98,
+                "p95": 68.29,
+                "max": 68.31,
+                "n": 20
+              },
+              "repacked": 0
+            },
+            "switched": 20
+          },
+          "g9": {
+            "syncs": 144,
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 144
+            },
+            "tableToDataBlocks": {
+              "p50": 0,
+              "p95": 0.5,
+              "max": 1,
+              "n": 144
+            },
+            "repacked": 1
+          },
+          "g2": {
+            "ms": {
+              "p50": 938.84,
+              "p95": 986.81,
+              "max": 990.82,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 10.93,
+              "p95": 13,
+              "max": 13.89,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 833.66,
+              "p95": 853.94,
+              "max": 854.38,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 791.2,
+              "p95": 812.82,
+              "max": 813.88,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 265.93,
+              "p95": 281.63,
+              "max": 281.66,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.65,
+            "dataBlocks": 3904,
+            "files": 1020,
+            "subkeys": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 1107366998,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "pg_wal": 83886080,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131941529,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        }
+      },
+      "wal+sb16": {
+        "conf": [
+          "min_wal_size=32MB",
+          "max_wal_size=32MB",
+          "shared_buffers=16MB"
+        ],
+        "settings": {
+          "shared_buffers": "16MB",
+          "min_wal_size": "32MB",
+          "max_wal_size": "32MB",
+          "wal_segment_size": "16MB"
+        },
+        "emptyWasm": 134217728,
+        "ratios": {
+          "g1": 0.09,
+          "g2": 1.79,
+          "g4": 1.92,
+          "g4ToEncryptedSync": 22.39,
+          "g4ToPlainSwitch": 0.22,
+          "g9Open": 0.0129
+        },
+        "plain": {
+          "buildMs": 26602.83,
+          "dataDir": {
+            "nodes": 1017,
+            "bytes": 165896387,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 33554432,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 54.74,
+              "p95": 56.29,
+              "max": 56.47,
+              "n": 20
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 472.24,
+              "p95": 497.88,
+              "max": 498.69,
+              "n": 20
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 482.45,
+              "p95": 497.67,
+              "max": 529.22,
+              "n": 20
+            },
+            "switched": 20
+          },
+          "g2": {
+            "ms": {
+              "p50": 448.96,
+              "p95": 497.51,
+              "max": 844.5,
+              "n": 20
+            }
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 735452561,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "base": 131941529,
+            "global": 555832,
+            "pg_logical": 8,
+            "pg_multixact": 16384,
+            "pg_subtrans": 8192,
+            "pg_wal": 33554432,
+            "pg_xact": 8192
+          }
+        },
+        "encrypted": {
+          "buildMs": 23018.87,
+          "dataDir": {
+            "nodes": 1017,
+            "bytes": 165896387,
+            "dirs": {
+              ".": 41194,
+              "pg_wal": 33554432,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            },
+            "dirsBeforeCheckpoint": {
+              ".": 41194,
+              "pg_wal": 134217728,
+              "global": 555832,
+              "pg_subtrans": 8192,
+              "pg_multixact": 16384,
+              "base": 131712153,
+              "pg_xact": 8192,
+              "pg_logical": 8
+            }
+          },
+          "wasmAfterBuild": 134217728,
+          "g1": {
+            "ms": {
+              "p50": 4.69,
+              "p95": 5.98,
+              "max": 7.28,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 1,
+              "p95": 1,
+              "max": 2,
+              "n": 20
+            },
+            "fileChanges": 1,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 1,
+            "lastSync": {
+              "bytes": {
+                "p50": 131160,
+                "p95": 131160,
+                "max": 262320,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 2,
+                "p95": 2.42,
+                "max": 3.25,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.26,
+                "p95": 3.43,
+                "max": 3.43,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g1b": {
+            "ms": {
+              "p50": 6.09,
+              "p95": 8.68,
+              "max": 8.88,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 2,
+              "p95": 2,
+              "max": 3,
+              "n": 20
+            },
+            "fileChanges": 14,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 262320,
+                "p95": 327900,
+                "max": 327900,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 3.01,
+                "p95": 5.51,
+                "max": 5.56,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 2.62,
+                "p95": 3.23,
+                "max": 4.15,
+                "n": 20
+              },
+              "repacked": 0
+            }
+          },
+          "g4": {
+            "ms": {
+              "p50": 105.02,
+              "p95": 110.59,
+              "max": 111.42,
+              "n": 20
+            },
+            "tableBlocks": {
+              "p50": 1,
+              "p95": 2,
+              "max": 2,
+              "n": 20
+            },
+            "dataBlocks": {
+              "p50": 258,
+              "p95": 258,
+              "max": 258,
+              "n": 20
+            },
+            "fileChanges": 13,
+            "tableBlocksWithoutFileChange": 0,
+            "maxTableBlocksPerChangedFile": 2,
+            "lastSync": {
+              "bytes": {
+                "p50": 17050800,
+                "p95": 17116380,
+                "max": 17116380,
+                "n": 20
+              },
+              "deletes": {
+                "p50": 0,
+                "p95": 0,
+                "max": 0,
+                "n": 20
+              },
+              "encryptMs": {
+                "p50": 31.7,
+                "p95": 34.29,
+                "max": 34.8,
+                "n": 20
+              },
+              "commitMs": {
+                "p50": 62.35,
+                "p95": 67.68,
+                "max": 69.28,
+                "n": 20
+              },
+              "repacked": 0
+            },
+            "switched": 20
+          },
+          "g9": {
+            "syncs": 144,
+            "tableBlocks": {
+              "p50": 0,
+              "p95": 2,
+              "max": 3,
+              "n": 144
+            },
+            "tableToDataBlocks": {
+              "p50": 0,
+              "p95": 0.5,
+              "max": 1,
+              "n": 144
+            },
+            "repacked": 1
+          },
+          "g2": {
+            "ms": {
+              "p50": 805.42,
+              "p95": 819.3,
+              "max": 820.14,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 10.37,
+              "p95": 11.07,
+              "max": 11.17,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 694.75,
+              "p95": 707.37,
+              "max": 714.77,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 667.3,
+              "p95": 681.23,
+              "max": 690.5,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 218.47,
+              "p95": 228.57,
+              "max": 232.93,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.59,
+            "dataBlocks": 3136,
+            "files": 1017,
+            "subkeys": 4
+          },
+          "g3": {
+            "source": "performance.memory + wasm heap",
+            "bytes": 796501906,
+            "wasmHeapBytes": 134217728,
+            "measureUserAgentSpecificMemory": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+          },
+          "dirsAfterOpen": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131941529,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        }
+      },
+      "measuredAt": "2026-11-13T15:20:47.990Z",
+      "runs": 20
+    }
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36"
+}
