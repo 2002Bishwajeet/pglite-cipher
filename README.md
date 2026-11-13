@@ -91,12 +91,13 @@ Whatever the mode, storage that holds something other than a complete store is n
 | `StoreExistsError` | `create` found storage that is not empty | Open it instead, or choose another name |
 | `StaleWriterError` | Another instance wrote the store after this one opened it, or kept writing while it opened | Close this instance and reopen; its unsynced changes are lost |
 | `StoreFullError` | A sync would pass the format's limits (file table size, ids in a run) | Nothing was written; the store is as it was before that sync. Report it |
+| `KeyChangeUnknownError` | `changeKey` failed, and it could not tell whether the new key was written: the old key or the new one opens the store | Keep both keys. Call `changeKey` again, or close and open with either |
 | `CryptoSelfTestError` | WebCrypto on this platform gives wrong answers | Do not use encryption on this platform |
 
 ## Keys
 The key you pass (the key-encryption key) wraps a random data key kept in the store's header, and the data key encrypts every record. So there are two operations, with different costs and guarantees:
 
-- **`await fs.changeKey(newKey)`** wraps the same data key under a new key: one small write of both header copies, done at once. Afterwards the old key does not open the store. **But anyone who kept a copy of the old header and has the old key can still read every later copy of the store.**
+- **`await fs.changeKey(newKey)`** wraps the same data key under a new key: one small write of both header copies, done at once. Afterwards the old key does not open the store. **But anyone who kept a copy of the old header and has the old key can still read every later copy of the store.** If the write fails, `changeKey` reads the header back to learn whether it applied: if it did, `changeKey` resolves; if not, it rejects with the backend's error and the old key still opens the store. If it cannot tell, it rejects with `KeyChangeUnknownError`: one of the two keys opens the store, so keep both, then call `changeKey` again or open with either.
 - **`await fs.rotateDataKey({ onProgress })`** draws a new data key and re-encrypts every record into a second store, checks it, switches to it, and deletes the old one. It takes about as long as an open plus a full write. This is the one that defeats a copied header. It keeps the current key, so after a suspected exposure do both: `changeKey`, then `rotateDataKey`.
 
 Nothing ever forces a rotation. Each writer session encrypts under its own subkey derived from the data key (as SQLCipher 5 does for each page write), which keeps every AES-GCM key far below the NIST SP 800-38D limit for the life of the data key. Rotate for one reason only: the key, or an old copy of the header, may have been exposed.

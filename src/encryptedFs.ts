@@ -17,6 +17,7 @@ import {
 import {
   CorruptStoreError,
   IncompleteStoreError,
+  KeyChangeUnknownError,
   StaleWriterError,
   StoreExistsError,
   StoreMissingError,
@@ -161,6 +162,23 @@ async function commitSettled(backend: StorageBackend, batch: CommitBatch, slot: 
     }
     if (stored === undefined || !equalBytes(stored, value)) throw error;
   }
+}
+
+/**
+ * Which key opens the header `backend` holds, read back after a header commit that rejected: 'new'
+ * when `newKek` does, 'old' when only `oldKek` does, 'unknown' when the read fails or neither does.
+ */
+async function headerKey(backend: StorageBackend, oldKek: CryptoKey, newKek: CryptoKey): Promise<'new' | 'old' | 'unknown'> {
+  const copies = await Promise.all([backend.get(0), backend.get(1)]).catch(() => null);
+  if (copies === null) return 'unknown';
+  const [copy0, copy1] = copies as Array<Bytes | undefined>;
+  const opens = (kek: CryptoKey) =>
+    openHeader(kek, copy0, copy1).then(
+      () => true,
+      () => false,
+    );
+  if (await opens(newKek)) return 'new';
+  return (await opens(oldKek)) ? 'old' : 'unknown';
 }
 
 /** A store's header and root, opened. */
@@ -784,6 +802,10 @@ export class EncryptedFs extends MemoryFS {
    * keys at once. Afterwards the old key does not open the store, but it still opens a copy of the
    * old header, and with it any later copy of the store: after a suspected exposure, rotate the
    * data key too (`rotateDataKey`).
+   *
+   * A commit that rejects is settled by reading the header back: when the new key opens it, the
+   * change is done; when the old key does, this rejects with the commit's error; when the read
+   * fails (or neither opens it), with KeyChangeUnknownError: either key may open the store.
    */
   changeKey(newKek: CryptoKey): Promise<void> {
     return this.#exclusive(async () => {
@@ -793,10 +815,20 @@ export class EncryptedFs extends MemoryFS {
       if (this.#lastRoot !== null) {
         const batch: CommitBatch = { expectRoot: this.#lastRoot, puts: [[0, header], [1, header]], deletes: [], durability: 'strict' };
         try {
-          await commitSettled(this.#backend, batch, 0, header);
+          await this.#backend.commit(batch);
         } catch (error) {
-          if (error instanceof StaleWriterError) this.#setFatal(error);
-          throw error;
+          if (error instanceof StaleWriterError) {
+            this.#setFatal(error);
+            throw error;
+          }
+          const opener = await headerKey(this.#backend, this.#key, newKek);
+          if (opener === 'old') throw error;
+          if (opener === 'unknown') {
+            throw new KeyChangeUnknownError(
+              'changeKey: the commit failed, and reading the header back did not show whether it applied: keep both keys, then call changeKey again or open with either',
+              { cause: error },
+            );
+          }
         }
       }
       this.#key = newKek;

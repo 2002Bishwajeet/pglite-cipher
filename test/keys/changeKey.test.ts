@@ -1,12 +1,14 @@
 // changeKey: the same data key wrapped under a new KEK, in both header copies at once. The new key
-// opens, the old does not; a failed commit leaves one key or the other, never a copy of each; and,
-// documented, a copy of the old header still opens later copies of the store with the old key.
+// opens, the old does not; a failed commit leaves one key or the other, never a copy of each, and
+// changeKey tells which, or that it cannot; and, documented, a copy of the old header still opens
+// later copies of the store with the old key.
 import { describe, expect, it } from 'vitest';
+import type { Slot, StorageBackend } from '../../src/backend/backend.ts';
 import { InjectedFault } from '../../src/backend/faulty.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
-import { concat, type Bytes } from '../../src/format/bytes.ts';
-import { CorruptStoreError, StaleWriterError, WrongKeyError } from '../../src/format/errors.ts';
-import { openHeader } from '../../src/format/keys.ts';
+import { concat, toHex, type Bytes } from '../../src/format/bytes.ts';
+import { CorruptStoreError, KeyChangeUnknownError, StaleWriterError, WrongKeyError } from '../../src/format/errors.ts';
+import { importKek, openHeader } from '../../src/format/keys.ts';
 import { newKey, openStore, records, rejection, resealRoot, restore, sameRecords, shared } from '../fs/helpers.ts';
 import { baseStore, Faults, openPair, tablesOf, type Base, type FaultCounter } from './helpers.ts';
 
@@ -16,6 +18,26 @@ const base = (): Promise<Base> => (stored ??= baseStore(65536, 500));
 
 const rowsOf = async (pg: Awaited<ReturnType<typeof openStore>>['pg']) =>
   ((await pg.query<{ n: number }>('SELECT count(*)::int AS n FROM t')).rows[0] as { n: number }).n;
+
+/** A KEK, and the forms its bytes would take in a message. */
+const keyAndBytes = async (): Promise<{ kek: CryptoKey; bytes: string[] }> => {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  return { bytes: [toHex(raw), raw.join(',')], kek: await importKek(raw.slice()) };
+};
+
+/** `backend`, but every read of a header copy rejects once commit number `counter.at` is under way. */
+const headerReadsFail = (backend: StorageBackend, counter: FaultCounter): StorageBackend =>
+  new Proxy(backend, {
+    get(target, prop, receiver) {
+      if (prop !== 'get') return Reflect.get(target, prop, receiver) as unknown;
+      return (slot: Slot) =>
+        slot !== 2 && counter.commits >= counter.at ? Promise.reject(new InjectedFault(`header read ${String(slot)} failed`)) : target.get(slot);
+    },
+  });
+
+/** An error's name and message, and its cause's. */
+const textOf = (e: unknown): string =>
+  e instanceof Error ? `${e.name} ${e.message} ${e.cause === undefined ? '' : textOf(e.cause)}` : String(e);
 
 describe('changeKey', () => {
   it('the new key opens, the old gives WrongKeyError; only the header copies changed, and the data is intact', async () => {
@@ -96,6 +118,66 @@ describe('changeKey', () => {
       await reopened.pg.close();
     }
   }, 180_000);
+
+  it('settles a header commit that rejected: applied, it resolves; not applied, the commit’s error; not readable back, KeyChangeUnknownError, and exactly one key opens', async () => {
+    const { key, recs } = await base();
+    // `after`: the commit applies, then rejects. `before`: it rejects and writes nothing. With
+    // `readFails`, reading the header back rejects too, so the outcome cannot be known.
+    for (const [mode, readFails] of [
+      ['after', false],
+      ['before', false],
+      ['after', true],
+      ['before', true],
+    ] as const) {
+      const label = `${mode}${readFails ? ', read back fails' : ''}`;
+      const memory = await restore(recs);
+      const counter: FaultCounter = { commits: 0, at: Infinity, mode };
+      const inner = readFails ? headerReadsFail(shared(memory), counter) : shared(memory);
+      const { pg, fs } = await openStore({ backend: new Faults(inner, counter), key, mode: 'open' });
+      const [old, next] = [await keyAndBytes(), await keyAndBytes()];
+      await fs.changeKey(old.kek);
+      counter.at = counter.commits + 1;
+      const outcome = await fs.changeKey(next.kek).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      counter.at = Infinity;
+      if (readFails) expect(outcome, label).toBeInstanceOf(KeyChangeUnknownError);
+      else if (mode === 'before') expect(outcome, label).toBeInstanceOf(InjectedFault);
+      else expect(outcome, label).toBeNull();
+
+      // Exactly one key opens the store: the new one where the commit applied.
+      const errors: unknown[] = [outcome];
+      const now = await records(memory);
+      const opens: boolean[] = [];
+      for (const { kek } of [old, next]) {
+        const opened = await openStore({ backend: shared(await restore(now)), key: kek, mode: 'open' }).then(
+          async (o) => {
+            await o.pg.close();
+            return true;
+          },
+          (e: unknown) => {
+            expect(e, label).toBeInstanceOf(WrongKeyError);
+            errors.push(e);
+            return false;
+          },
+        );
+        opens.push(opened);
+      }
+      expect(opens, label).toEqual(mode === 'after' ? [false, true] : [true, false]);
+      for (const e of errors) for (const bytes of [...old.bytes, ...next.bytes]) expect(textOf(e), label).not.toContain(bytes);
+
+      // Whatever the outcome, changeKey again on the same instance puts the store under the new key,
+      // and the instance keeps working.
+      await fs.changeKey(next.kek);
+      await pg.exec(`INSERT INTO t VALUES (-1, 'after')`);
+      await pg.close();
+      await rejection(openStore({ backend: shared(memory), key: old.kek, mode: 'open' }), WrongKeyError);
+      const reopened = await openStore({ backend: shared(memory), key: next.kek, mode: 'open' });
+      expect(await rowsOf(reopened.pg), label).toBe(501);
+      await reopened.pg.close();
+    }
+  }, 240_000);
 
   it('documented limit: a copy of the old header, with the old key, still opens a later copy of the store', async () => {
     const { key, recs } = await base();
