@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { BlockBitmap } from '../../src/tracker/bitmap.ts';
 import { inBrowser } from './harness.ts';
+import { runs } from '../long.ts';
 
 describe('BlockBitmap', () => {
   it('holds the same indexes as a Set across word boundaries', () => {
@@ -20,7 +21,7 @@ describe('BlockBitmap', () => {
         expect(bitmap.isEmpty).toBe(true);
         expect(bitmap.indexes(limit)).toEqual([]);
       }),
-      { numRuns: inBrowser ? 100 : 1000 },
+      { numRuns: runs(inBrowser ? 100 : 1000) },
     );
   });
 });

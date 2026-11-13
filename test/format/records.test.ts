@@ -17,6 +17,7 @@ import {
   type RecordContext,
 } from '../../src/format/records.ts';
 import { flipBit, newStore, random, rejection, seeded } from './helpers.ts';
+import { runs, timeout } from '../long.ts';
 
 type Kind = 'root' | 'table' | 'block';
 
@@ -57,9 +58,9 @@ describe('sealed records', () => {
           expect(sealed.length).toBe(SEALED_OVERHEAD + blockSize);
           expect(await openAs(ctx, kind, sealed)).toEqual(padded(b, blockSize));
         }),
-        { numRuns: 60 },
+        { numRuns: runs(60) },
       );
-    }, 120_000);
+    }, timeout(120_000));
   }
 
   it('reject any single-bit flip in salt, nonce, ciphertext or tag', async () => {
@@ -76,9 +77,9 @@ describe('sealed records', () => {
       fc.asyncProperty(fc.constantFrom(...KINDS), fc.integer({ min: 0, max: length - 1 }), async (kind, bit) => {
         await rejection(openAs(ctx, kind, flipBit(sealed.get(kind) as Bytes, bit)), CorruptStoreError);
       }),
-      { numRuns: 300 },
+      { numRuns: runs(300) },
     );
-  }, 120_000);
+  }, timeout(120_000));
 
   it('do not open a data block under another fileId, index, storeId or keyId', async () => {
     const ctx = ctxFor(8192);
@@ -109,7 +110,7 @@ describe('sealed records', () => {
           await rejection(openBlock(other, blockId, id, index, sealed), CorruptStoreError);
         },
       ),
-      { numRuns: 200 },
+      { numRuns: runs(200) },
     );
   });
 
@@ -121,7 +122,7 @@ describe('sealed records', () => {
         fc.pre(other.some((b, i) => b !== blockId[i]));
         await rejection(openTable(ctx, new Uint8Array(other), sealed), CorruptStoreError);
       }),
-      { numRuns: 200 },
+      { numRuns: runs(200) },
     );
   });
 

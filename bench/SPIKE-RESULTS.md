@@ -1,5 +1,8 @@
 # Spike results (issue #2)
 
+Moved from `spike/RESULTS.md` when the spike was deleted (#10). The `spike/` files it cites,
+`spike/results/*.json` among them, are in the git history before that change.
+
 Throwaway measurements for the owner's decision in #3. PGlite 0.5.10. Nothing under `spike/` or
 `bench/` ships. Raw numbers: `spike/results/trace.json` (the trace, Node) and
 `spike/results/<browser>.json` (the benchmark page, headless Playwright on the Linux host, a 16 GB

@@ -24,7 +24,25 @@ It does not:
 - **cover exports.** `dumpTar`, `pg.dumpDataDir()` and `pg_dump` output are plaintext by design;
 - protect against software running as the same user while the database is open.
 
-`docs/plan/01-sqlcipher-comparison.md` has the full comparison with SQLCipher.
+`SECURITY.md` has the threat model and how to report a problem.
+
+## Compared to SQLCipher
+The same idea, encryption underneath the database engine, adapted to Postgres in a webview. Short version of `docs/plan/01-sqlcipher-comparison.md` section 2, weaker rows included:
+
+| | SQLCipher | pglite-cipher | Verdict |
+|---|---|---|---|
+| Cipher | v4: AES-256-CBC + HMAC-SHA512; v5 beta: AES-256-GCM | AES-256-GCM through WebCrypto | parity |
+| Unit | one SQLite page (4 KB in v4) | one block of a Postgres file (64 KB by default), every file under PGDATA | parity; covers more files |
+| Nonce and subkey | v5 beta: random IV and a one-time subkey per page write | random 96-bit nonce per record, under a subkey derived once per writer session (HKDF-SHA256) | parity by a cheaper route; a session's records share a salt |
+| Header | 16-byte random salt, the rest encrypted | 168 bytes stored twice; only random nonces and salts are readable; version, cipher and block size inside an authenticated envelope | parity |
+| What the stored bytes show | file size, which pages change | that a database exists, the total number of blocks, write timing (which records change, which were written in one session) | parity |
+| What the tag binds | ciphertext, IV, page number | ciphertext, nonce, record type, store id, key id, file id and block index | stronger |
+| What is detected | modified or swapped pages | also truncation, a replayed older block, a deleted file; every open checks every record. Neither detects a rollback of the whole store | stronger |
+| Rekey | `PRAGMA rekey` re-encrypts every page | `changeKey` re-wraps the data key at once; `rotateDataKey` re-encrypts into a fresh store | stronger, but only `rotateDataKey` defeats a copied old header |
+| Memory | page cache only; keys `mlock`ed and wiped | the whole database in memory; JavaScript cannot lock or wipe keys | weaker, accepted |
+| Open cost | random access, opens at once | decrypts everything at open (budget: 100 MB in 1.5 s on desktop, 3 s on the slowest phone) | weaker, accepted |
+| Passphrase | PBKDF2-HMAC-SHA512 | none: the key is 32 random bytes from the keychain | weaker if a passphrase is ever wanted |
+| Compliance, maturity | FIPS-validated enterprise builds; in wide use since 2008 | not FIPS validated; new code, no external review yet | weaker |
 
 ## Use
 
@@ -99,6 +117,9 @@ await fs.rotateDataKey({ onProgress: ({ phase, done, total }) => {} });
 
 ## Docs
 - `FORMAT.md`: the on-disk format, version 1
+- `SECURITY.md`: the threat model, the primitives, reporting a vulnerability
+- `RELEASE-CHECKLIST.md`: what the owner checks before a release
+- `bench/README.md`: the benchmark page and the nightly gates
 - `docs/plan/`: the issue plans, starting at `00-overview.md`
 - `docs/research/`: the design, its review and prior art
 
@@ -113,7 +134,8 @@ npm run typecheck
 npm run lint
 npm test               # vitest in Node
 npm run test:browser   # vitest browser mode: chromium, firefox, webkit; or `-- --project chromium`
-npm run test:long      # long fuzz/property runs (CIPHER_LONG=1)
+npm run test:long      # long fuzz, property, crash and soak runs (CIPHER_LONG=1; CIPHER_SOAK_MINUTES, CIPHER_SEED)
+npm run bench:build    # the benchmark page, bench/dist
 npm run harness:test   # the harness's issue selector
 ```
 

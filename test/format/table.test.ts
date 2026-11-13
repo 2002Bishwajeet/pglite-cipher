@@ -24,6 +24,7 @@ import {
   type StoredFile,
 } from '../../src/format/table.ts';
 import { hex, seeded } from './helpers.ts';
+import { runs, timeout } from '../long.ts';
 
 /** A unique 16-byte id: a tag byte, a counter and a seed. */
 const idOf = (tag: number, n: number, seed: number): Bytes => {
@@ -117,9 +118,9 @@ describe('file table', () => {
         for (const g of groups) expect(g.reduce((n, e) => n + entrySize(e), 2)).toBeLessThanOrEqual(blockSize);
         expectSameFiles(roundTrip(groups, files, blockSize), files);
       }),
-      { numRuns: 100 },
+      { numRuns: runs(100) },
     );
-  }, 120_000);
+  }, timeout(120_000));
 
   it('splits a file with more ids than one table block holds into runs, and joins them again', () => {
     const blockSize = 8192;
@@ -157,9 +158,9 @@ describe('file table', () => {
         fc.pre(groups.length <= maxTableBlocks(blockSize));
         expectSameFiles(roundTrip(groups, files, blockSize), files);
       }),
-      { numRuns: 100 },
+      { numRuns: runs(100) },
     );
-  }, 120_000);
+  }, timeout(120_000));
 
   describe('assembleFiles rejects', () => {
     const blockSize = 8192;

@@ -73,3 +73,54 @@ jobs:
       - run: npm ci
       - run: npx playwright install ${{ matrix.browser }}
       - run: npm run test:browser -- --project ${{ matrix.browser }}
+
+  # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
+  # every engine opens both. Two engines that each read only their own stores is what this catches.
+  compat-write:
+    runs-on: [self-hosted, yantra-box]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [webkit, chromium]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install ${{ matrix.browser }}
+      - run: npx vitest run --project ${{ matrix.browser }} test/fs/compat.test.ts
+        env:
+          CIPHER_COMPAT_WRITE: '1'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compat-${{ matrix.browser }}
+          path: test-results/compat/${{ matrix.browser }}.bin
+          if-no-files-found: error
+          retention-days: 3
+
+  compat-read:
+    needs: compat-write
+    runs-on: [self-hosted, yantra-box]
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [node, chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: compat-*
+          merge-multiple: true
+          path: test-results/compat
+      - if: matrix.project != 'node'
+        run: npx playwright install ${{ matrix.project }}
+      - run: npx vitest run --project ${{ matrix.project }} test/fs/compat.test.ts
+        env:
+          CIPHER_COMPAT_READ: webkit,chromium

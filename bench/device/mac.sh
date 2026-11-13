@@ -1,8 +1,8 @@
 #!/bin/bash
 # Throwaway spike code (issue #11): runs the bench page on one Apple target and saves what it posts
-# to spike/results/<target>.json. From the Linux host:
-#   scripts/harness/remote.sh mac bash spike/device/mac.sh <target> [parts] [runs]
-# Targets: mac-webkit (Playwright WebKit), mac-wkwebview (spike/device/wkhost.swift), ios-sim (Mobile
+# to bench/results/<target>.json. From the Linux host:
+#   scripts/harness/remote.sh mac bash bench/device/mac.sh <target> [parts] [runs]
+# Targets: mac-webkit (Playwright WebKit), mac-wkwebview (bench/device/wkhost.swift), ios-sim (Mobile
 # Safari in a simulator it boots and shuts down), iphone-15, ipad-air-m3 (Safari on the paired device,
 # over HTTPS through `tailscale serve` on the bench port only, turned off again on exit).
 # Exit 5 = the device is not available (record it owner-pending); otherwise serve.mjs's exit.
@@ -30,7 +30,7 @@ esac
 
 # Always rebuild: remote.sh's rsync excludes dist, so a build left by an earlier run would go stale.
 npm run bench:build >/tmp/pc-device-build.log 2>&1 || { tail -20 /tmp/pc-device-build.log; exit 1; }
-node spike/device/serve.mjs --port "$port" --until "$target" &
+node bench/device/serve.mjs --port "$port" --until "$target" &
 srv=$!
 booted='' ts=''
 cleanup() {
@@ -44,9 +44,9 @@ sleep 1
 case $target in
   mac-webkit)
     npx playwright install webkit >/tmp/pc-pw-webkit.log 2>&1 || { tail -5 /tmp/pc-pw-webkit.log; exit 1; }
-    node spike/device/pw.mjs "http://localhost:$port/$q" || exit 1
+    node bench/device/pw.mjs "http://localhost:$port/$q" || exit 1
     ;;
-  mac-wkwebview) swift spike/device/wkhost.swift "http://localhost:$port/$q" || exit 1 ;;
+  mac-wkwebview) swift bench/device/wkhost.swift "http://localhost:$port/$q" || exit 1 ;;
   ios-sim)
     if ! xcrun simctl list devices booted | grep -qF "$udid"; then xcrun simctl boot "$udid" && booted=1; fi
     xcrun simctl bootstatus "$udid" -b >/dev/null

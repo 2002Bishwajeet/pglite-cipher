@@ -1,6 +1,6 @@
 // Throwaway spike code (issue #11): opens a bench URL in Playwright's WebKit (target mac-webkit) and
-// waits until the page has posted its result to spike/device/serve.mjs.
-// Usage: node spike/device/pw.mjs <url>
+// waits until the page has posted its result to bench/device/serve.mjs.
+// Usage: node bench/device/pw.mjs <url>
 import { webkit } from 'playwright';
 
 const browser = await webkit.launch({ headless: true });

@@ -1,12 +1,12 @@
 // Throwaway spike code (issue #11): a minimal WKWebView host (the engine Tauri uses on macOS) for
 // target mac-wkwebview. Loads the bench URL in a visible window with the default, persistent
-// website data store, and exits once the page has posted its result to spike/device/serve.mjs.
-// Usage: swift spike/device/wkhost.swift <url>
+// website data store, and exits once the page has posted its result to bench/device/serve.mjs.
+// Usage: swift bench/device/wkhost.swift <url>
 import Cocoa
 import WebKit
 
 guard CommandLine.arguments.count > 1, let url = URL(string: CommandLine.arguments[1]) else {
-  print("usage: swift spike/device/wkhost.swift <url>")
+  print("usage: swift bench/device/wkhost.swift <url>")
   exit(2)
 }
 
