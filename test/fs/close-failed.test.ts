@@ -83,6 +83,7 @@ describe('close', () => {
     }
     expect(await afterGc(held, max)).toBeLessThanOrEqual(max);
     expect(kept.map((fs) => fs.stats().files)).toEqual(kept.map(() => 0));
+    expect(kept.map((fs) => fs.hasDirty())).toEqual(kept.map(() => false));
     // Reopening recovers: the store holds every row the syncs before each failed close committed.
     const { pg } = await openStore({ backend: shared(memory), key, mode: 'open' });
     const rows = await pg.query<{ n: number }>('SELECT count(*)::int AS n FROM t');
