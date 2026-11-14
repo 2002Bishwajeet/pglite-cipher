@@ -1,7 +1,8 @@
 // Runs the benchmark page headless in Playwright's browsers and saves what it reports to
 // bench/results/<browser>.json (merged per part, so parts can run apart).
-// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4]
+// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144]
 // --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
+// --block N builds the gates' encrypted store with N-byte blocks (#63) and saves to <browser>-block<N>.json.
 // Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node bench/run.mjs webkit
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ const opt = (name, fallback) => {
 const parts = opt('parts', 'gates10,gates100,extras,year').split(',');
 const runs = Number(opt('runs', '20'));
 const throttle = Number(opt('throttle', '1'));
+const block = opt('block', '');
 const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
 const config = fileURLToPath(new URL('./vite.config.ts', import.meta.url));
 const results = new URL('./results/', import.meta.url);
@@ -29,7 +31,7 @@ mkdirSync(results, { recursive: true });
 let failed = false;
 try {
   for (const name of browsers) {
-    const file = new URL(`${name}${throttle > 1 ? `-throttle${String(throttle)}` : ''}.json`, results);
+    const file = new URL(`${name}${throttle > 1 ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}.json`, results);
     const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
     // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
     const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
@@ -44,7 +46,7 @@ try {
         page.on('pageerror', (e) => {
           console.log(`[${name}] pageerror: ${e.message}`);
         });
-        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}`);
+        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}`);
         await page.waitForFunction(() => window.__benchResult || window.__benchError, undefined, { timeout: PART_TIMEOUT, polling: 1000 });
         const { result, error } = await page.evaluate(() => ({ result: window.__benchResult, error: window.__benchError }));
         await page.close();

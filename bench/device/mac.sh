@@ -1,15 +1,16 @@
 #!/bin/bash
 # Throwaway spike code (issue #11): runs the bench page on one Apple target and saves what it posts
 # to bench/results/<target>.json. From the Linux host:
-#   scripts/harness/remote.sh mac bash bench/device/mac.sh <target> [parts] [runs]
+#   scripts/harness/remote.sh mac bash bench/device/mac.sh <target> [parts] [runs] [block]
+# (block: the gates' encrypted block size, e.g. 262144 (#63); default the codec's 65536)
 # Targets: mac-webkit (Playwright WebKit), mac-wkwebview (bench/device/wkhost.swift), ios-sim (Mobile
 # Safari in a simulator it boots and shuts down), iphone-15, ipad-air-m3 (Safari on the paired device,
 # over HTTPS through `tailscale serve` on the bench port only, turned off again on exit).
 # Exit 5 = the device is not available (record it owner-pending); otherwise serve.mjs's exit.
 set -u
-target=$1 parts=${2:-gates10,gates100,extras} runs=${3:-3}
+target=$1 parts=${2:-gates10,gates100,extras} runs=${3:-3} block=${4:+&block=$4}
 port=47901
-q="?auto=1&parts=$parts&runs=$runs&post=$target"
+q="?auto=1&parts=$parts&runs=$runs$block&post=$target"
 
 udid=''
 case $target in
