@@ -1,6 +1,7 @@
 // Runs the benchmark page headless in Playwright's browsers and saves what it reports to
 // bench/results/<browser>.json (merged per part, so parts can run apart).
-// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20]
+// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4]
+// --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
 // Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node bench/run.mjs webkit
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,7 @@ const opt = (name, fallback) => {
 };
 const parts = opt('parts', 'gates10,gates100,extras,year').split(',');
 const runs = Number(opt('runs', '20'));
+const throttle = Number(opt('throttle', '1'));
 const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
 const config = fileURLToPath(new URL('./vite.config.ts', import.meta.url));
 const results = new URL('./results/', import.meta.url);
@@ -27,7 +29,7 @@ mkdirSync(results, { recursive: true });
 let failed = false;
 try {
   for (const name of browsers) {
-    const file = new URL(`${name}.json`, results);
+    const file = new URL(`${name}${throttle > 1 ? `-throttle${String(throttle)}` : ''}.json`, results);
     const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
     // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
     const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
@@ -35,6 +37,7 @@ try {
     try {
       for (const part of parts) {
         const page = await browser.newPage();
+        if (throttle > 1 && name === 'chromium') await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
         page.on('console', (m) => {
           if (m.text().startsWith('[bench]') || m.type() === 'error') console.log(`${new Date().toISOString().slice(11, 19)} [${name}] ${m.type()}: ${m.text()}`);
         });
@@ -51,7 +54,7 @@ try {
         merged.userAgent = meta.userAgent;
         merged.parts[part] = { ...value, measuredAt: meta.finishedAt, runs };
         writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`);
-        console.log(`[${name}] ${part} saved to bench/results/${name}.json`);
+        console.log(`[${name}] ${part} saved to ${fileURLToPath(file)}`);
       }
     } finally {
       await browser.close();

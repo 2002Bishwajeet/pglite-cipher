@@ -27,6 +27,7 @@ printed in the `<pre>`). Parts:
 | year | G8: 365 open/edit/checkpoint/close sessions, then the number of session salts an open derives | several minutes |
 | ops | startup (fresh init, reopen) and operations (inserts, bulk insert, large text, selects, aggregate, a CRUD cycle), plain and encrypted | a few minutes |
 | G7 | Rust store throughput; only inside a Tauri shell built with `encfs-bench` | about a minute |
+| idbread (spike #58) | IndexedDB alone: 100 MB of random records (32 KiB to 1 MiB) read back with `getAll` pages of 64, 512, 2048 and all, 2 and 4 parallel streams, a page split into 2 and 4 parallel parts, and a cursor; MB/s per cell, median of `runs`. `&idbmb=` sets the size | about 3 min desktop, 6 min on the Redmi |
 
 What each gates part reports, per variant (`plain`, `encrypted`):
 
@@ -52,6 +53,7 @@ What each gates part reports, per variant (`plain`, `encrypted`):
 URL parameters run it without clicking: `?auto=1&parts=gates10,extras&runs=20` (and `&sessions=365`
 for the year). The page sets `window.__benchResult` when it finishes; `node bench/run.mjs` uses that
 to run the page headless in Playwright's browsers and save `bench/results/<browser>.json`.
+`--throttle 4` slows Chromium's CPU 4x through CDP and saves `bench/results/chromium-throttle4.json`.
 `&post=<target>` also sends the progress and the result to the device collector
 (`bench/device/serve.mjs`, issue #11), which saves `bench/results/<target>.json`.
 

@@ -1,0 +1,297 @@
+{
+  "target": "redmi",
+  "parts": {
+    "idbread": {
+      "32768": {
+        "records": 3200,
+        "writeMBps": 18.07,
+        "page64": {
+          "ms": 2293.34,
+          "MBps": 43.6
+        },
+        "page512": {
+          "ms": 1854.14,
+          "MBps": 53.93
+        },
+        "page2048": {
+          "ms": 1574.49,
+          "MBps": 63.51
+        },
+        "all": {
+          "ms": 1489.18,
+          "MBps": 67.15
+        },
+        "streams2": {
+          "ms": 1598.75,
+          "MBps": 62.55
+        },
+        "streams4": {
+          "ms": 1505.14,
+          "MBps": 66.44
+        },
+        "split2": {
+          "ms": 1804.26,
+          "MBps": 55.42
+        },
+        "split4": {
+          "ms": 1753.98,
+          "MBps": 57.01
+        },
+        "cursor": {
+          "ms": 2129.78,
+          "MBps": 46.95
+        }
+      },
+      "65400": {
+        "records": 1604,
+        "writeMBps": 20.64,
+        "page64": {
+          "ms": 1948.26,
+          "MBps": 51.35
+        },
+        "page512": {
+          "ms": 1679.01,
+          "MBps": 59.58
+        },
+        "page2048": {
+          "ms": 1456.72,
+          "MBps": 68.68
+        },
+        "all": {
+          "ms": 1451.63,
+          "MBps": 68.92
+        },
+        "streams2": {
+          "ms": 1467.25,
+          "MBps": 68.18
+        },
+        "streams4": {
+          "ms": 1351.51,
+          "MBps": 74.02
+        },
+        "split2": {
+          "ms": 1625.36,
+          "MBps": 61.55
+        },
+        "split4": {
+          "ms": 1565.58,
+          "MBps": 63.9
+        },
+        "cursor": {
+          "ms": 1816.76,
+          "MBps": 55.07
+        }
+      },
+      "65536": {
+        "records": 1600,
+        "writeMBps": 27.36,
+        "page64": {
+          "ms": 2346.4,
+          "MBps": 42.62
+        },
+        "page512": {
+          "ms": 2222.92,
+          "MBps": 44.99
+        },
+        "page2048": {
+          "ms": 2266.25,
+          "MBps": 44.13
+        },
+        "all": {
+          "ms": 2240.81,
+          "MBps": 44.63
+        },
+        "streams2": {
+          "ms": 1501.52,
+          "MBps": 66.6
+        },
+        "streams4": {
+          "ms": 1598.21,
+          "MBps": 62.57
+        },
+        "split2": {
+          "ms": 1571,
+          "MBps": 63.65
+        },
+        "split4": {
+          "ms": 1604.11,
+          "MBps": 62.34
+        },
+        "cursor": {
+          "ms": 3212,
+          "MBps": 31.13
+        }
+      },
+      "65580": {
+        "records": 1599,
+        "writeMBps": 28.59,
+        "page64": {
+          "ms": 2368.36,
+          "MBps": 42.23
+        },
+        "page512": {
+          "ms": 2254.32,
+          "MBps": 44.36
+        },
+        "page2048": {
+          "ms": 2258.55,
+          "MBps": 44.28
+        },
+        "all": {
+          "ms": 2241.16,
+          "MBps": 44.62
+        },
+        "streams2": {
+          "ms": 1482.07,
+          "MBps": 67.48
+        },
+        "streams4": {
+          "ms": 1600.63,
+          "MBps": 62.48
+        },
+        "split2": {
+          "ms": 1579.05,
+          "MBps": 63.33
+        },
+        "split4": {
+          "ms": 1571.58,
+          "MBps": 63.63
+        },
+        "cursor": {
+          "ms": 3203.49,
+          "MBps": 31.22
+        }
+      },
+      "131072": {
+        "records": 800,
+        "writeMBps": 42.47,
+        "page64": {
+          "ms": 1397.96,
+          "MBps": 71.53
+        },
+        "page512": {
+          "ms": 1334.42,
+          "MBps": 74.94
+        },
+        "page2048": {
+          "ms": 1325.39,
+          "MBps": 75.45
+        },
+        "all": {
+          "ms": 1323.14,
+          "MBps": 75.58
+        },
+        "streams2": {
+          "ms": 1000.59,
+          "MBps": 99.94
+        },
+        "streams4": {
+          "ms": 1045.23,
+          "MBps": 95.67
+        },
+        "split2": {
+          "ms": 1006.25,
+          "MBps": 99.38
+        },
+        "split4": {
+          "ms": 1021.86,
+          "MBps": 97.86
+        },
+        "cursor": {
+          "ms": 1988.81,
+          "MBps": 50.28
+        }
+      },
+      "262144": {
+        "records": 400,
+        "writeMBps": 63.19,
+        "page64": {
+          "ms": 913.63,
+          "MBps": 109.45
+        },
+        "page512": {
+          "ms": 870.78,
+          "MBps": 114.84
+        },
+        "page2048": {
+          "ms": 900.48,
+          "MBps": 111.05
+        },
+        "all": {
+          "ms": 911.33,
+          "MBps": 109.73
+        },
+        "streams2": {
+          "ms": 718.04,
+          "MBps": 139.27
+        },
+        "streams4": {
+          "ms": 718.16,
+          "MBps": 139.25
+        },
+        "split2": {
+          "ms": 698.43,
+          "MBps": 143.18
+        },
+        "split4": {
+          "ms": 693.82,
+          "MBps": 144.13
+        },
+        "cursor": {
+          "ms": 1256.92,
+          "MBps": 79.56
+        }
+      },
+      "1048576": {
+        "records": 100,
+        "writeMBps": 64.67,
+        "page64": {
+          "ms": 575.91,
+          "MBps": 173.64
+        },
+        "page512": {
+          "ms": 589.28,
+          "MBps": 169.7
+        },
+        "page2048": {
+          "ms": 573.11,
+          "MBps": 174.49
+        },
+        "all": {
+          "ms": 670.45,
+          "MBps": 149.15
+        },
+        "streams2": {
+          "ms": 590.36,
+          "MBps": 169.39
+        },
+        "streams4": {
+          "ms": 600.3,
+          "MBps": 166.58
+        },
+        "split2": {
+          "ms": 597.77,
+          "MBps": 167.29
+        },
+        "split4": {
+          "ms": 488.74,
+          "MBps": 204.61
+        },
+        "cursor": {
+          "ms": 873.63,
+          "MBps": 114.47
+        }
+      },
+      "sizeMB": 100,
+      "measuredAt": "2026-11-13T19:54:10.674Z",
+      "runs": 3
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36",
+  "runs": 3,
+  "finishedAt": "2026-11-13T19:54:10.674Z",
+  "crossOriginIsolated": true,
+  "hardwareConcurrency": 8,
+  "deviceMemory": 4,
+  "startedAt": "2026-11-13T19:48:50.388Z"
+}
