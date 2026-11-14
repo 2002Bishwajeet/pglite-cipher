@@ -1,0 +1,1068 @@
+{
+  "browser": "firefox",
+  "parts": {
+    "gates10": {
+      "sizeMB": 10,
+      "blockSize": 65536,
+      "plain": {
+        "buildMs": 11672.7,
+        "dataDir": {
+          "nodes": 1016,
+          "bytes": 67829955,
+          "dirs": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 33645721,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          },
+          "dirsBeforeCheckpoint": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 33645721,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        },
+        "wasmAfterBuild": 237502464,
+        "g1": {
+          "ms": {
+            "p50": 137.04,
+            "p95": 185.74,
+            "max": 188.84,
+            "n": 20
+          }
+        },
+        "g1b": {
+          "ms": {
+            "p50": 185.26,
+            "p95": 211.36,
+            "max": 214.8,
+            "n": 20
+          }
+        },
+        "g4": {
+          "ms": {
+            "p50": 265.66,
+            "p95": 298.26,
+            "max": 299.06,
+            "n": 20
+          },
+          "switched": 20
+        },
+        "g2": {
+          "ms": {
+            "p50": 605.7,
+            "p95": 716.66,
+            "max": 718.78,
+            "n": 20
+          }
+        },
+        "g3": {
+          "source": "not available",
+          "wasmHeapBytes": 197918720
+        },
+        "dirsAfterOpen": {
+          ".": 41194,
+          "base": 33875097,
+          "global": 555832,
+          "pg_logical": 8,
+          "pg_multixact": 16384,
+          "pg_subtrans": 8192,
+          "pg_wal": 33554432,
+          "pg_xact": 8192
+        }
+      },
+      "encrypted": {
+        "buildMs": 4869.72,
+        "dataDir": {
+          "nodes": 1016,
+          "bytes": 67829955,
+          "dirs": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 33645721,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          },
+          "dirsBeforeCheckpoint": {
+            ".": 41194,
+            "pg_wal": 33554432,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 33645721,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        },
+        "wasmAfterBuild": 237502464,
+        "g1": {
+          "ms": {
+            "p50": 6.12,
+            "p95": 10.2,
+            "max": 14.94,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 0,
+            "p95": 0,
+            "max": 1,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 1,
+            "p95": 1,
+            "max": 2,
+            "n": 20
+          },
+          "fileChanges": 1,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 1,
+          "lastSync": {
+            "bytes": {
+              "p50": 131160,
+              "p95": 131160,
+              "max": 262320,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 2.4,
+              "p95": 3.72,
+              "max": 3.82,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 3.04,
+              "p95": 5.84,
+              "max": 12.08,
+              "n": 20
+            },
+            "repacked": 0
+          }
+        },
+        "g1b": {
+          "ms": {
+            "p50": 7.96,
+            "p95": 10.26,
+            "max": 10.74,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 1,
+            "p95": 1,
+            "max": 1,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 2,
+            "p95": 2,
+            "max": 3,
+            "n": 20
+          },
+          "fileChanges": 14,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 1,
+          "lastSync": {
+            "bytes": {
+              "p50": 262320,
+              "p95": 262320,
+              "max": 327900,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 3.32,
+              "p95": 4.28,
+              "max": 5,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 4.34,
+              "p95": 5.78,
+              "max": 5.9,
+              "n": 20
+            },
+            "repacked": 0
+          }
+        },
+        "g4": {
+          "ms": {
+            "p50": 267.44,
+            "p95": 293.52,
+            "max": 312.38,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 1,
+            "p95": 1,
+            "max": 1,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 258,
+            "p95": 258,
+            "max": 258,
+            "n": 20
+          },
+          "fileChanges": 13,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 1,
+          "lastSync": {
+            "bytes": {
+              "p50": 17050800,
+              "p95": 17050800,
+              "max": 17050800,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 37.12,
+              "p95": 45.9,
+              "max": 73.14,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 223.06,
+              "p95": 246.32,
+              "max": 248.2,
+              "n": 20
+            },
+            "repacked": 0
+          },
+          "switched": 20
+        },
+        "g9": {
+          "syncs": 135,
+          "tableBlocks": {
+            "p50": 0,
+            "p95": 2,
+            "max": 2,
+            "n": 135
+          },
+          "tableToDataBlocks": {
+            "p50": 0,
+            "p95": 0.5,
+            "max": 0.5,
+            "n": 135
+          },
+          "repacked": 1
+        },
+        "g2": {
+          "ms": {
+            "p50": 640.06,
+            "p95": 801.96,
+            "max": 853.02,
+            "n": 20
+          },
+          "tableMs": {
+            "p50": 10.78,
+            "p95": 18,
+            "max": 22.98,
+            "n": 20
+          },
+          "blocksMs": {
+            "p50": 444.2,
+            "p95": 584.18,
+            "max": 667.88,
+            "n": 20
+          },
+          "readMs": {
+            "p50": 402.52,
+            "p95": 518.98,
+            "max": 607.18,
+            "n": 20
+          },
+          "decryptMs": {
+            "p50": 183.68,
+            "p95": 300.14,
+            "max": 311.38,
+            "n": 20
+          },
+          "tableBlocks": 2,
+          "tableFill": 0.7,
+          "dataBlocks": 1639,
+          "files": 1016,
+          "subkeys": 4
+        },
+        "g3": {
+          "source": "not available",
+          "wasmHeapBytes": 197918720
+        },
+        "dirsAfterOpen": {
+          ".": 41194,
+          "pg_wal": 33554432,
+          "global": 555832,
+          "pg_subtrans": 8192,
+          "pg_multixact": 16384,
+          "base": 33875097,
+          "pg_xact": 8192,
+          "pg_logical": 8
+        },
+        "keys": {
+          "changeKeyMs": 13.6,
+          "verifyMs": 636.98,
+          "verifyOk": true,
+          "rotateDataKeyMs": 2414.32,
+          "openBeforeRotation": {
+            "ms": {
+              "p50": 662.14,
+              "p95": 791.82,
+              "max": 803.6,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 11.92,
+              "p95": 23.86,
+              "max": 27.74,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 462.76,
+              "p95": 591.8,
+              "max": 593,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 418.76,
+              "p95": 521.14,
+              "max": 538.76,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 199.1,
+              "p95": 342.4,
+              "max": 386.54,
+              "n": 20
+            },
+            "tableBlocks": 2,
+            "tableFill": 0.7,
+            "dataBlocks": 1639,
+            "files": 1016,
+            "subkeys": 4
+          },
+          "openAfterRotation": {
+            "ms": {
+              "p50": 655.04,
+              "p95": 724.04,
+              "max": 755.04,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 11.7,
+              "p95": 22.42,
+              "max": 64.06,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 468.38,
+              "p95": 517.34,
+              "max": 529.44,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 425.48,
+              "p95": 469.6,
+              "max": 484.1,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 175.16,
+              "p95": 216.42,
+              "max": 265.32,
+              "n": 20
+            },
+            "tableBlocks": 2,
+            "tableFill": 0.7,
+            "dataBlocks": 1639,
+            "files": 1016,
+            "subkeys": 3
+          }
+        }
+      },
+      "ratios": {
+        "g1": 0.04,
+        "g2": 1.06,
+        "g4": 1.95,
+        "g4ToEncryptedSync": 43.7,
+        "g4ToPlainSwitch": 1.01,
+        "g9Open": 0.0168
+      },
+      "gates": [
+        {
+          "gate": "G1 sync after a one-row UPDATE, p50 ÷ plain",
+          "value": 0.04,
+          "limit": "≤ 2",
+          "pass": true
+        },
+        {
+          "gate": "G2 open, p50 ÷ plain",
+          "value": 1.06,
+          "limit": "≤ 2",
+          "pass": true
+        },
+        {
+          "gate": "G3 memory after the open, bytes (not available)",
+          "value": "not available",
+          "limit": "≤ database (67829955) + 64 MB",
+          "pass": "not measurable"
+        },
+        {
+          "gate": "G4 segment switch, p50 ms",
+          "value": 267.44,
+          "limit": "≤ 500",
+          "pass": true
+        },
+        {
+          "gate": "G4 segment switch, p50 ÷ plain normal sync",
+          "value": 1.95,
+          "limit": "≤ 10",
+          "pass": true
+        },
+        {
+          "gate": "G9 file-table phase of the open, p50 ms",
+          "value": 10.78,
+          "limit": "≤ 32",
+          "pass": true
+        },
+        {
+          "gate": "G9 G1 syncs that changed no file and wrote a table block",
+          "value": 0,
+          "limit": "0",
+          "pass": true
+        },
+        {
+          "gate": "G9 table blocks of a G1 sync, p50",
+          "value": 0,
+          "limit": "0",
+          "pass": true
+        },
+        {
+          "gate": "G9 table blocks per changed file, most of any G1 sync (1 changed a file)",
+          "value": 1,
+          "limit": "≤ 1",
+          "pass": true
+        }
+      ],
+      "measuredAt": "2026-11-14T03:46:18.713Z",
+      "runs": 20
+    },
+    "gates100": {
+      "sizeMB": 100,
+      "blockSize": 65536,
+      "plain": {
+        "buildMs": 26148.94,
+        "dataDir": {
+          "nodes": 1023,
+          "bytes": 266559683,
+          "dirs": {
+            ".": 41194,
+            "pg_wal": 134217728,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131712153,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          },
+          "dirsBeforeCheckpoint": {
+            ".": 41194,
+            "pg_wal": 134217728,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131712153,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        },
+        "wasmAfterBuild": 237502464,
+        "g1": {
+          "ms": {
+            "p50": 143.16,
+            "p95": 173.08,
+            "max": 179.26,
+            "n": 20
+          }
+        },
+        "g1b": {
+          "ms": {
+            "p50": 749.62,
+            "p95": 853,
+            "max": 860.2,
+            "n": 20
+          }
+        },
+        "g4": {
+          "ms": {
+            "p50": 792.98,
+            "p95": 819.34,
+            "max": 869.04,
+            "n": 20
+          },
+          "switched": 20
+        },
+        "g2": {
+          "ms": {
+            "p50": 1304.52,
+            "p95": 1392.12,
+            "max": 1492.94,
+            "n": 20
+          }
+        },
+        "g3": {
+          "source": "not available",
+          "wasmHeapBytes": 197918720
+        },
+        "dirsAfterOpen": {
+          ".": 41194,
+          "base": 131941529,
+          "global": 555832,
+          "pg_logical": 8,
+          "pg_multixact": 16384,
+          "pg_subtrans": 8192,
+          "pg_wal": 83886080,
+          "pg_xact": 8192
+        }
+      },
+      "encrypted": {
+        "buildMs": 19468.58,
+        "dataDir": {
+          "nodes": 1023,
+          "bytes": 266559683,
+          "dirs": {
+            ".": 41194,
+            "pg_wal": 134217728,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131712153,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          },
+          "dirsBeforeCheckpoint": {
+            ".": 41194,
+            "pg_wal": 134217728,
+            "global": 555832,
+            "pg_subtrans": 8192,
+            "pg_multixact": 16384,
+            "base": 131712153,
+            "pg_xact": 8192,
+            "pg_logical": 8
+          }
+        },
+        "wasmAfterBuild": 237502464,
+        "g1": {
+          "ms": {
+            "p50": 6.88,
+            "p95": 10.7,
+            "max": 44.92,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 0,
+            "p95": 0,
+            "max": 1,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 1,
+            "p95": 1,
+            "max": 2,
+            "n": 20
+          },
+          "fileChanges": 1,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 1,
+          "lastSync": {
+            "bytes": {
+              "p50": 131160,
+              "p95": 131160,
+              "max": 262320,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 2.9,
+              "p95": 5.98,
+              "max": 15.04,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 3.38,
+              "p95": 4.48,
+              "max": 29.14,
+              "n": 20
+            },
+            "repacked": 0
+          }
+        },
+        "g1b": {
+          "ms": {
+            "p50": 11.32,
+            "p95": 13.46,
+            "max": 13.6,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 1,
+            "p95": 2,
+            "max": 2,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 2,
+            "p95": 2,
+            "max": 3,
+            "n": 20
+          },
+          "fileChanges": 14,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 2,
+          "lastSync": {
+            "bytes": {
+              "p50": 262320,
+              "p95": 327900,
+              "max": 327900,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 4.98,
+              "p95": 6.46,
+              "max": 7.32,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 5.62,
+              "p95": 6.86,
+              "max": 7.24,
+              "n": 20
+            },
+            "repacked": 0
+          }
+        },
+        "g4": {
+          "ms": {
+            "p50": 275.68,
+            "p95": 326.52,
+            "max": 340.94,
+            "n": 20
+          },
+          "tableBlocks": {
+            "p50": 1,
+            "p95": 2,
+            "max": 2,
+            "n": 20
+          },
+          "dataBlocks": {
+            "p50": 258,
+            "p95": 258,
+            "max": 258,
+            "n": 20
+          },
+          "fileChanges": 13,
+          "tableBlocksWithoutFileChange": 0,
+          "maxTableBlocksPerChangedFile": 2,
+          "lastSync": {
+            "bytes": {
+              "p50": 17050800,
+              "p95": 17116380,
+              "max": 17116380,
+              "n": 20
+            },
+            "deletes": {
+              "p50": 0,
+              "p95": 0,
+              "max": 0,
+              "n": 20
+            },
+            "encryptMs": {
+              "p50": 33.32,
+              "p95": 44.28,
+              "max": 71.82,
+              "n": 20
+            },
+            "commitMs": {
+              "p50": 237.18,
+              "p95": 270.38,
+              "max": 281.74,
+              "n": 20
+            },
+            "repacked": 0
+          },
+          "switched": 20
+        },
+        "g9": {
+          "syncs": 144,
+          "tableBlocks": {
+            "p50": 0,
+            "p95": 2,
+            "max": 3,
+            "n": 144
+          },
+          "tableToDataBlocks": {
+            "p50": 0,
+            "p95": 0.5,
+            "max": 1,
+            "n": 144
+          },
+          "repacked": 1
+        },
+        "g2": {
+          "ms": {
+            "p50": 1255,
+            "p95": 1443.3,
+            "max": 1589.66,
+            "n": 20
+          },
+          "tableMs": {
+            "p50": 21.24,
+            "p95": 37.64,
+            "max": 54.78,
+            "n": 20
+          },
+          "blocksMs": {
+            "p50": 1008.26,
+            "p95": 1214.64,
+            "max": 1320.22,
+            "n": 20
+          },
+          "readMs": {
+            "p50": 958.5,
+            "p95": 1128.5,
+            "max": 1225.9,
+            "n": 20
+          },
+          "decryptMs": {
+            "p50": 472.9,
+            "p95": 670.22,
+            "max": 893.98,
+            "n": 20
+          },
+          "tableBlocks": 3,
+          "tableFill": 0.65,
+          "dataBlocks": 3904,
+          "files": 1020,
+          "subkeys": 5
+        },
+        "g3": {
+          "source": "not available",
+          "wasmHeapBytes": 197918720
+        },
+        "dirsAfterOpen": {
+          ".": 41194,
+          "pg_wal": 83886080,
+          "global": 555832,
+          "pg_subtrans": 8192,
+          "pg_multixact": 16384,
+          "base": 131941529,
+          "pg_xact": 8192,
+          "pg_logical": 8
+        },
+        "keys": {
+          "changeKeyMs": 23.26,
+          "verifyMs": 1348.74,
+          "verifyOk": true,
+          "rotateDataKeyMs": 5102.06,
+          "openBeforeRotation": {
+            "ms": {
+              "p50": 1310.16,
+              "p95": 1391.86,
+              "max": 1393.12,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 19.16,
+              "p95": 37.92,
+              "max": 42.32,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 1048.98,
+              "p95": 1159.3,
+              "max": 1162.78,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 998.26,
+              "p95": 1108.02,
+              "max": 1115.58,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 456.54,
+              "p95": 641.7,
+              "max": 683.06,
+              "n": 20
+            },
+            "tableBlocks": 3,
+            "tableFill": 0.65,
+            "dataBlocks": 3904,
+            "files": 1020,
+            "subkeys": 5
+          },
+          "openAfterRotation": {
+            "ms": {
+              "p50": 1273.32,
+              "p95": 1369.66,
+              "max": 1373.42,
+              "n": 20
+            },
+            "tableMs": {
+              "p50": 26.22,
+              "p95": 36.16,
+              "max": 41.18,
+              "n": 20
+            },
+            "blocksMs": {
+              "p50": 1031,
+              "p95": 1125.32,
+              "max": 1133.14,
+              "n": 20
+            },
+            "readMs": {
+              "p50": 971.9,
+              "p95": 1076.6,
+              "max": 1083.62,
+              "n": 20
+            },
+            "decryptMs": {
+              "p50": 449.74,
+              "p95": 498.64,
+              "max": 538.32,
+              "n": 20
+            },
+            "tableBlocks": 2,
+            "tableFill": 0.98,
+            "dataBlocks": 3904,
+            "files": 1020,
+            "subkeys": 3
+          }
+        }
+      },
+      "ratios": {
+        "g1": 0.05,
+        "g2": 0.96,
+        "g4": 1.93,
+        "g4ToEncryptedSync": 40.07,
+        "g4ToPlainSwitch": 0.35,
+        "g9Open": 0.0169
+      },
+      "gates": [
+        {
+          "gate": "G1 sync after a one-row UPDATE, p50 ÷ plain",
+          "value": 0.05,
+          "limit": "≤ 2",
+          "pass": true
+        },
+        {
+          "gate": "G2 open, p50 ÷ plain",
+          "value": 0.96,
+          "limit": "≤ 2",
+          "pass": true
+        },
+        {
+          "gate": "G2 open, p50 ms",
+          "value": 1255,
+          "limit": "≤ 1500",
+          "pass": true
+        },
+        {
+          "gate": "G3 memory after the open, bytes (not available)",
+          "value": "not available",
+          "limit": "≤ database (266559683) + 64 MB",
+          "pass": "not measurable"
+        },
+        {
+          "gate": "G4 segment switch, p50 ms",
+          "value": 275.68,
+          "limit": "≤ 500",
+          "pass": true
+        },
+        {
+          "gate": "G4 segment switch, p50 ÷ plain normal sync",
+          "value": 1.93,
+          "limit": "≤ 10",
+          "pass": true
+        },
+        {
+          "gate": "G9 file-table phase of the open, p50 ms",
+          "value": 21.24,
+          "limit": "≤ 75",
+          "pass": true
+        },
+        {
+          "gate": "G9 G1 syncs that changed no file and wrote a table block",
+          "value": 0,
+          "limit": "0",
+          "pass": true
+        },
+        {
+          "gate": "G9 table blocks of a G1 sync, p50",
+          "value": 0,
+          "limit": "0",
+          "pass": true
+        },
+        {
+          "gate": "G9 table blocks per changed file, most of any G1 sync (1 changed a file)",
+          "value": 1,
+          "limit": "≤ 1",
+          "pass": true
+        }
+      ],
+      "measuredAt": "2026-11-14T03:50:55.900Z",
+      "runs": 20
+    },
+    "extras": {
+      "g6": {
+        "aesGcm": true,
+        "hkdfDeriveKeyToAesGcm": true,
+        "unwrapKeyRawIntoHkdf": true,
+        "idbDurability_strict": "strict",
+        "idbDurability_relaxed": "relaxed",
+        "idbNumberKeysOrderedFirst": true,
+        "idbStringKeyRangeGetAll": true
+      },
+      "g8DeriveKeyMs": {
+        "p50": 0.08,
+        "p95": 0.12,
+        "max": 17.4,
+        "n": 1000
+      },
+      "aesGcm": {
+        "8k": {
+          "calls": 12800,
+          "encryptMs": 518.82,
+          "encryptMBps": 192.75,
+          "decryptMs": 482.68,
+          "decryptMBps": 207.18
+        },
+        "32k": {
+          "calls": 3200,
+          "encryptMs": 158.14,
+          "encryptMBps": 632.35,
+          "decryptMs": 169.48,
+          "decryptMBps": 590.04
+        },
+        "64k": {
+          "calls": 1600,
+          "encryptMs": 84.96,
+          "encryptMBps": 1177.02,
+          "decryptMs": 92.24,
+          "decryptMBps": 1084.13
+        }
+      },
+      "cryptoOverhead": {
+        "8k": {
+          "sealOneMs": {
+            "p50": 0.14,
+            "p95": 0.24,
+            "max": 0.36,
+            "n": 20
+          },
+          "openOneMs": {
+            "p50": 0.12,
+            "p95": 0.18,
+            "max": 0.2,
+            "n": 20
+          },
+          "seal100Ms": {
+            "p50": 5.74,
+            "p95": 7.06,
+            "max": 7.52,
+            "n": 20
+          },
+          "open100Ms": {
+            "p50": 4.68,
+            "p95": 4.96,
+            "max": 7.34,
+            "n": 20
+          }
+        },
+        "64k": {
+          "sealOneMs": {
+            "p50": 0.22,
+            "p95": 0.28,
+            "max": 0.64,
+            "n": 20
+          },
+          "openOneMs": {
+            "p50": 0.16,
+            "p95": 0.24,
+            "max": 0.26,
+            "n": 20
+          },
+          "seal100Ms": {
+            "p50": 7.44,
+            "p95": 10.66,
+            "max": 10.74,
+            "n": 20
+          },
+          "open100Ms": {
+            "p50": 6.62,
+            "p95": 9,
+            "max": 10.9,
+            "n": 20
+          }
+        }
+      },
+      "measuredAt": "2026-11-14T03:51:19.389Z",
+      "runs": 20
+    },
+    "year": {
+      "sessions": 365,
+      "blockSize": 65536,
+      "liveSalts": 263,
+      "records": 1507,
+      "deriveKeyP50Ms": 0.08,
+      "totalMs": 273682.2,
+      "gates": [
+        {
+          "gate": "G8 live salts × deriveKey p50 after a year, ms",
+          "value": 21.04,
+          "limit": "≤ 150",
+          "pass": true
+        }
+      ],
+      "measuredAt": "2026-11-14T03:55:54.433Z",
+      "runs": 20
+    }
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:159.0) Gecko/20100101 Firefox/159.0"
+}
