@@ -29,7 +29,8 @@ mkdirSync(results, { recursive: true });
 let failed = false;
 try {
   for (const name of browsers) {
-    const file = new URL(`${name}${throttle > 1 ? `-throttle${String(throttle)}` : ''}.json`, results);
+    const slow = throttle > 1 && name === 'chromium';
+    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}.json`, results);
     const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
     // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
     const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
@@ -37,7 +38,7 @@ try {
     try {
       for (const part of parts) {
         const page = await browser.newPage();
-        if (throttle > 1 && name === 'chromium') await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
+        if (slow) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
         page.on('console', (m) => {
           if (m.text().startsWith('[bench]') || m.type() === 'error') console.log(`${new Date().toISOString().slice(11, 19)} [${name}] ${m.type()}: ${m.text()}`);
         });
