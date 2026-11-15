@@ -10,13 +10,13 @@ describe('repository invariants', () => {
     expect(Object.keys(pkg.dependencies ?? {})).toEqual([]);
   });
 
-  it('runs every CI job on a self-hosted runner: any free pc-ci one, WebKit on yantra-box', () => {
+  it('runs every CI job on a self-hosted runner: pc-ci, browser jobs on pc-ci-heavy, WebKit on yantra-box', () => {
     const workflow = read('.github/workflows/ci.yml');
     const jobs = /^jobs:\n([\s\S]*)$/m.exec(workflow)?.[1] ?? '';
     const jobCount = jobs.match(/^ {2}[\w-]+:$/gm)?.length ?? 0;
     const anyFree = jobs.match(/^ {4}runs-on: \[self-hosted, pc-ci\]$/gm)?.length ?? 0;
     const webkitOnBox =
-      jobs.match(/^ {4}runs-on: \$\{\{ matrix\.(browser|project) == 'webkit' && fromJSON\('\["self-hosted", "yantra-box"\]'\) \|\| fromJSON\('\["self-hosted", "pc-ci"\]'\) \}\}$/gm)?.length ?? 0;
+      jobs.match(/^ {4}runs-on: \$\{\{ matrix\.(browser|project) == 'webkit' && fromJSON\('\["self-hosted", "yantra-box"\]'\) \|\| fromJSON\('\["self-hosted", "pc-ci-heavy"\]'\) \}\}$/gm)?.length ?? 0;
     expect(jobCount).toBeGreaterThan(0);
     expect(anyFree + webkitOnBox).toBe(jobCount);
     expect(workflow).not.toContain('pull_request_target');
