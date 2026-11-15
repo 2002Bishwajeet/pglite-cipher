@@ -409,6 +409,12 @@
           "value": 1,
           "limit": "≤ 1",
           "pass": true
+        },
+        {
+          "gate": "Key operations (changeKey, verify, rotateDataKey)",
+          "value": "failed: QuotaExceededError: ",
+          "limit": "complete",
+          "pass": false
         }
       ],
       "measuredAt": "2026-11-14T02:47:25.230Z",
