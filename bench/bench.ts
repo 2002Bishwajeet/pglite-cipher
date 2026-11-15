@@ -12,7 +12,8 @@ import { runIdbRead } from './idbread.ts';
 import { judgeGates, judgeYear } from './judge.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
-const BLOCK_SIZE = 65536;
+// `&block=262144` builds the gates' encrypted store at that block size (#63); the codec must accept it.
+const BLOCK_SIZE = Number(new URLSearchParams(location.search).get('block') ?? 65536) as BlockSize;
 const MB = 1024 * 1024;
 
 const statusEl = document.getElementById('status');
@@ -29,14 +30,14 @@ const log = (msg: string) => {
 // ---- gates at one database size ---------------------------------------------------------------
 
 async function runGates(mb: number, runs: number): Promise<Json> {
-  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true });
+  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: BLOCK_SIZE });
   const result = { sizeMB: mb, blockSize: BLOCK_SIZE, plain, encrypted };
   return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
 }
 
 /** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
 async function runEncrypted(mb: number, runs: number): Promise<Json> {
-  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true });
+  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: BLOCK_SIZE });
   const result = { sizeMB: mb, blockSize: BLOCK_SIZE, encrypted };
   return { ...result, gates: judgeGates(result, 1) };
 }

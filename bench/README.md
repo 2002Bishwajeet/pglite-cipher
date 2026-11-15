@@ -46,6 +46,9 @@ What each gates part reports, per variant (`plain`, `encrypted`):
   same data, its table now densely packed) beside `g2`. `openBeforeRotation` is the same series on
   the store as G2 opened it, without a plain open in between, as after the rotation: its `readMs`
   against `openAfterRotation.readMs` is what the rewrite alone changes (#41).
+- `readsOnly` (encrypted): the store's records read as the open reads its blocks (`readRange`
+  pages, the next page in flight), nothing decrypted, once per G2 open; beside `g2.readMs` it
+  shows what the decrypts add to the open's read time (#63).
 - `ratios` and `gates`: the gate table, judged with the desktop budgets of #3 (`bench/judge.ts`).
 
 `importPlainDataDir` has no row: the package does not have it yet.
@@ -54,6 +57,11 @@ URL parameters run it without clicking: `?auto=1&parts=gates10,extras&runs=20` (
 for the year). The page sets `window.__benchResult` when it finishes; `node bench/run.mjs` uses that
 to run the page headless in Playwright's browsers and save `bench/results/<browser>.json`.
 `--throttle 4` slows Chromium's CPU 4x through CDP and saves `bench/results/chromium-throttle4.json`.
+`--block 262144` (`&block=` on the page) builds the gates' encrypted store with that block size and
+saves `bench/results/<browser>-block262144.json`; `redmi.sh` and `mac.sh` take it as their last
+argument. The codec takes 262144 only with `git apply bench/patches/block256k.patch` (bench-local,
+#63 stage A: the size in `BLOCK_SIZES`, the open's page `min(512, 32 MiB / blockSize)`);
+`bench/patches/split4.patch` is #58's four-part `readRange` (6d75d8b). Neither is committed to `src/`.
 `&post=<target>` also sends the progress and the result to the device collector
 (`bench/device/serve.mjs`, issue #11), which saves `bench/results/<target>.json`.
 

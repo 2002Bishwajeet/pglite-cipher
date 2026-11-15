@@ -1,0 +1,45 @@
+diff --git a/src/encryptedFs.ts b/src/encryptedFs.ts
+index 0bf6946..9cc0bed 100644
+--- a/src/encryptedFs.ts
++++ b/src/encryptedFs.ts
+@@ -536,15 +536,16 @@ export class EncryptedFs extends MemoryFS {
+     const total = tableIds.length + root.dataBlocks;
+     let read = 0;
+     let done = 0;
++    const pageSize = Math.min(PAGE, (32 * 1024 * 1024) / blockSize);
+     const readPage = (after: string | null) => {
+-      const next = backend.readRange(after, PAGE);
++      const next = backend.readRange(after, pageSize);
+       next.catch(() => undefined); // awaited below; not unhandled if this page's decrypt throws first
+       return next;
+     };
+     for (let next: Promise<Array<[string, Uint8Array]>> | null = readPage(null); next; ) {
+       const page: Array<[string, Uint8Array]> = await next;
+       if (page.length === 0) break;
+-      next = page.length < PAGE ? null : readPage((page[page.length - 1] as [string, Uint8Array])[0]);
++      next = page.length < pageSize ? null : readPage((page[page.length - 1] as [string, Uint8Array])[0]);
+       await pool(page, async ([id, sealed]) => {
+         if (tableSet.has(id)) return;
+         const place = map.places.get(id);
+diff --git a/src/format/codec.ts b/src/format/codec.ts
+index 9e49299..7d6b232 100644
+--- a/src/format/codec.ts
++++ b/src/format/codec.ts
+@@ -4,7 +4,7 @@
+ import type { Bytes } from './bytes.ts';
+ import { CorruptStoreError, UnsupportedFormatError } from './errors.ts';
+ 
+-export const BLOCK_SIZES = [8192, 32768, 65536] as const;
++export const BLOCK_SIZES = [8192, 32768, 65536, 262144] as const;
+ export type BlockSize = (typeof BLOCK_SIZES)[number];
+ /** The owner's choice from the spike (#3). */
+ export const DEFAULT_BLOCK_SIZE: BlockSize = 65536;
+@@ -178,7 +178,7 @@ export const encodeMeta = (meta: Meta): Bytes => {
+   w.u8(KDF_RAW, 'kdf');
+   w.u8(SUBKEY_HKDF_SESSION, 'subkey');
+   w.at = 8;
+-  if (!isBlockSize(meta.blockSize)) throw new RangeError('blockSize must be 8192, 32768 or 65536');
++  if (!isBlockSize(meta.blockSize)) throw new RangeError('blockSize must be 8192, 32768, 65536 or 262144');
+   w.u32(meta.blockSize, 'blockSize');
+   w.u32(meta.keyId, 'keyId');
+   w.raw(meta.storeId, 16, 'storeId');

@@ -4,7 +4,8 @@
 import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live } from '@electric-sql/pglite/live';
-import { EncryptedFs, IndexedDbBackend, importKek, type SyncStats } from '../src/index.ts';
+import { EncryptedFs, IndexedDbBackend, importKek, type BlockSize, type SyncStats } from '../src/index.ts';
+import { PAGE } from '../src/fs/pool.ts';
 
 export type Json = Record<string, unknown>;
 export const MB = 1024 * 1024;
@@ -348,6 +349,10 @@ export interface VariantResult {
   g9?: { syncs: number; tableBlocks: Stat; tableToDataBlocks: Stat; repacked: number };
   /** EncryptedFs: the opens of the store alone (no plain open in between), the key operations, then the same opens after the rotation. */
   keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openBeforeRotation: OpenResult; openAfterRotation: OpenResult };
+  /** EncryptedFs: the store's records read as the open reads its blocks, nothing decrypted, once per G2 open (#63), beside `g2.readMs`. */
+  readsOnly?: { ms: Stat; page: number; records: number; bytes: number };
+  /** EncryptedFs: why the key operations failed, if they did (then there is no `keys`). */
+  keysError?: string;
 }
 
 /** The opens of one variant, collected. */
@@ -400,10 +405,10 @@ interface Built {
 }
 
 /** Builds an `mb` MB database on one filesystem and measures G1, G1b and G4 (and, encrypted, G9), `runs` times each. */
-async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void, pgOptions: PgOptions): Promise<Built> {
+async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void, pgOptions: PgOptions, blockSize?: BlockSize): Promise<Built> {
   const label = `${kind} ${String(mb)} MB`;
   const key = { kek: await newKek() };
-  const make = (): AnyFs => (kind === 'plain' ? new PlainFs(name) : new TimedFs({ backend: timedBackend(name), key: key.kek, mode: 'open-or-create' }));
+  const make = (): AnyFs => (kind === 'plain' ? new PlainFs(name) : new TimedFs({ backend: timedBackend(name), key: key.kek, mode: 'open-or-create', ...(blockSize ? { blockSize } : {}) }));
   const fs = make();
   const cur = () => fs;
   log(`${label}: build`);
@@ -471,6 +476,31 @@ async function shut(v: Built): Promise<void> {
 }
 
 /**
+ * The open's blocks phase without the decrypts (#63): every record of the store named `name`, read
+ * with the open's `readRange` pages and the next page in flight, nothing decrypted or copied. The
+ * page is the open's, PAGE records, or 32 MiB of them at a larger block size (#63, stage B).
+ */
+async function readsOnly(name: string, blockSize: number): Promise<{ ms: number; page: number; records: number; bytes: number }> {
+  const pair = IndexedDbBackend.pair(name);
+  try {
+    const backend = (await pair[0].isEmpty()) ? pair[1] : pair[0];
+    const page = Math.min(PAGE, (32 * MB) / blockSize);
+    let records = 0;
+    let bytes = 0;
+    const t = now();
+    for (let next: Promise<Array<[string, Uint8Array]>> | null = backend.readRange(null, page); next; ) {
+      const got: Array<[string, Uint8Array]> = await next;
+      next = got.length < page ? null : backend.readRange((got[got.length - 1] as [string, Uint8Array])[0], page);
+      records += got.length;
+      for (const [, v] of got) bytes += v.byteLength;
+    }
+    return { ms: now() - t, page, records, bytes };
+  } finally {
+    for (const b of pair) await b.close();
+  }
+}
+
+/**
  * Builds the same `mb` MB database on plain IdbFs and on EncryptedFs and measures G1, G1b and G4
  * `runs` times each; then G2, `opens` opens per variant, plain and encrypted interleaved, so that a
  * machine that speeds up or slows down meanwhile moves both alike, and each after an untimed open of
@@ -478,10 +508,10 @@ async function shut(v: Built): Promise<void> {
  * with the other closed; and with `keys` the encrypted one's opens alone, the key operations on it,
  * then its opens after the rotation. Deletes both databases at the end.
  */
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false; pgOptions?: PgOptions }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false; pgOptions?: PgOptions; blockSize?: BlockSize }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
 /** With `onlyEncrypted` the plain database is neither built nor opened and there is no `plain`. */
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true; pgOptions?: PgOptions }): Promise<{ plain: undefined; encrypted: VariantResult }>;
-export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean; pgOptions?: PgOptions } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true; pgOptions?: PgOptions; blockSize?: BlockSize }): Promise<{ plain: undefined; encrypted: VariantResult }>;
+export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean; pgOptions?: PgOptions; blockSize?: BlockSize } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
   const id = crypto.randomUUID();
   const names = { plain: `bench-plain-${String(mb)}-${id}`, encrypted: `bench-encrypted-${String(mb)}-${id}` };
   const n = opts.opens ?? runs;
@@ -494,7 +524,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
       built.push(p);
       await shut(p);
     }
-    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log, pgOptions);
+    const e = await buildVariant('encrypted', names.encrypted, mb, runs, log, pgOptions, opts.blockSize);
     built.push(e);
     await shut(e);
 
@@ -521,33 +551,48 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     const plain: VariantResult | undefined = p && { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain, dirsAfterOpen: dirsAfterOpen.plain };
     const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted, dirsAfterOpen: dirsAfterOpen.encrypted };
 
+    await shut(e);
+    const reads: Array<Awaited<ReturnType<typeof readsOnly>>> = [];
+    for (let i = 0; i < n; i++) {
+      log(`${e.label}: reads only ${String(i + 1)} of ${String(n)}`);
+      reads.push(await readsOnly(names.encrypted, opts.blockSize ?? 65536));
+    }
+    const last = reads[reads.length - 1];
+    if (last) encrypted.readsOnly = { ms: stat(reads.map((r) => r.ms)), page: last.page, records: last.records, bytes: last.bytes };
+
     if (opts.keys && e.fs instanceof TimedFs) {
-      // The same opens as after the rotation, on the store as G2 opened it: without a plain open in
-      // between, so that beside openAfterRotation they show what the rewrite alone changes (#41).
-      const before = new Opens();
-      for (let i = 0; i < n; i++) {
-        log(`${e.label}: open before the rotation ${String(i + 1)} of ${String(n)}`);
-        await reopen(e, before);
+      // A failure here (Chromium's quota for a second 256 KiB store, #63) is recorded, not thrown, so
+      // that the part keeps G1 to G4.
+      try {
+        // The same opens as after the rotation, on the store as G2 opened it: without a plain open in
+        // between, so that beside openAfterRotation they show what the rewrite alone changes (#41).
+        const before = new Opens();
+        for (let i = 0; i < n; i++) {
+          log(`${e.label}: open before the rotation ${String(i + 1)} of ${String(n)}`);
+          await reopen(e, before);
+        }
+        const openBeforeRotation = before.result(e.fs);
+        log(`${e.label}: changeKey, verify, rotateDataKey`);
+        const next = await newKek();
+        let t = now();
+        await e.fs.changeKey(next);
+        const changeKeyMs = round(now() - t);
+        e.key.kek = next;
+        t = now();
+        const verified = await e.fs.verify();
+        const verifyMs = round(now() - t);
+        t = now();
+        await e.fs.rotateDataKey();
+        const rotateDataKeyMs = round(now() - t);
+        const after = new Opens();
+        for (let i = 0; i < n; i++) {
+          log(`${e.label}: open after the rotation ${String(i + 1)} of ${String(n)}`);
+          await reopen(e, after);
+        }
+        encrypted.keys = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openBeforeRotation, openAfterRotation: after.result(e.fs) };
+      } catch (err) {
+        encrypted.keysError = errorText(err);
       }
-      const openBeforeRotation = before.result(e.fs);
-      log(`${e.label}: changeKey, verify, rotateDataKey`);
-      const next = await newKek();
-      let t = now();
-      await e.fs.changeKey(next);
-      const changeKeyMs = round(now() - t);
-      e.key.kek = next;
-      t = now();
-      const verified = await e.fs.verify();
-      const verifyMs = round(now() - t);
-      t = now();
-      await e.fs.rotateDataKey();
-      const rotateDataKeyMs = round(now() - t);
-      const after = new Opens();
-      for (let i = 0; i < n; i++) {
-        log(`${e.label}: open after the rotation ${String(i + 1)} of ${String(n)}`);
-        await reopen(e, after);
-      }
-      encrypted.keys = { changeKeyMs, verifyMs, verifyOk: verified.ok, rotateDataKeyMs, openBeforeRotation, openAfterRotation: after.result(e.fs) };
     }
     return { plain, encrypted };
   } finally {

@@ -63,6 +63,8 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   row('G9 table blocks of a G1 sync, p50', g1Table, '0', g1Table === 0);
   const perFile = e.g1.maxTableBlocksPerChangedFile ?? NaN;
   row(`G9 table blocks per changed file, most of any G1 sync (${String(e.g1.fileChanges ?? 0)} changed a file)`, perFile, '≤ 1', perFile <= 1);
+  // Key operations that threw (#63) fail here: the part keeps G1 to G4, but never reads as passed.
+  if (e.keysError !== undefined) row('Key operations (changeKey, verify, rotateDataKey)', `failed: ${e.keysError}`, 'complete', false);
   return rows;
 }
 
