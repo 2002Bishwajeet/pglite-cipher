@@ -62,7 +62,17 @@ to run the page headless in Playwright's browsers and save `bench/results/<brows
 saves `bench/results/<browser>-block262144.json`; `redmi.sh` and `mac.sh` take it as their last
 argument. The codec takes 262144 only with `git apply bench/patches/block256k.patch` (bench-local,
 #63 stage A: the size in `BLOCK_SIZES`, the open's page `min(512, 32 MiB / blockSize)`);
-`bench/patches/split4.patch` is #58's four-part `readRange` (6d75d8b). Neither is committed to `src/`.
+`bench/patches/split4.patch` is #58's four-part `readRange` (6d75d8b).
+`bench/patches/pack.patch` (#83) stores up to N sealed blocks per IndexedDB record, without
+padding: a record holds blocks whose ids are consecutive in key order, under the smallest id, so it
+may mix files; `EncryptedFs` and the format are unchanged. A commit finds the record of each changed
+id, rewrites those records in its one transaction and splits one that outgrows N evenly; `readRange`
+and `getMany` return blocks as before, `count()` counts blocks. `&pack=N` (1, 4, 8 or 16; `--pack N`
+to `run.mjs`, saved as `<browser>-pack<N>.json`) sets N for the `gates` and `enc` parts, and fails
+them without the patch; 1 is the unpatched layout. Rebuild `bench/dist` after applying it. With the
+patch, `VITE_CIPHER_PACK=N npm test` (or `npm run test:browser`) runs the suites at N. The encrypted
+variant's `store` reports the IndexedDB records and blocks after the build and after G4: blocks ÷
+records is the fill. None of the three is committed to `src/`.
 `&post=<target>` also sends the progress and the result to the device collector
 (`bench/device/serve.mjs`, issue #11), which saves `bench/results/<target>.json`.
 

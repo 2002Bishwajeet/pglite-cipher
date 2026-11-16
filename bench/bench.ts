@@ -11,11 +11,20 @@ import { runG7 } from './g7.ts';
 import { runIdbRead } from './idbread.ts';
 import { runOpfsRead } from './opfsread.ts';
 import { judgeGates, judgeYear } from './judge.ts';
-import { parseBlockSize } from './params.ts';
+import { parseBlockSize, parsePack } from './params.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
 // `&block=N` builds the encrypted store at that block size (#63); read per part, so a bad value fails that part.
 const blockSize = (): BlockSize => parseBlockSize(new URLSearchParams(location.search).get('block'));
+// `&pack=N` stores up to N blocks per IndexedDB record (#83) in the backends made from then on. Only
+// `git apply bench/patches/pack.patch` adds IndexedDbBackend.pack; without it N > 1 fails the part.
+const pack = (): number => {
+  const n = parsePack(new URLSearchParams(location.search).get('pack'));
+  const backend = IndexedDbBackend as unknown as { pack?: number };
+  if (backend.pack !== undefined) backend.pack = n;
+  else if (n !== 1) throw new Error(`?pack=${String(n)} needs bench/patches/pack.patch`);
+  return n;
+};
 const MB = 1024 * 1024;
 
 const statusEl = document.getElementById('status');
@@ -33,16 +42,18 @@ const log = (msg: string) => {
 
 async function runGates(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
+  const packed = pack();
   const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: size });
-  const result = { sizeMB: mb, blockSize: size, plain, encrypted };
+  const result = { sizeMB: mb, blockSize: size, pack: packed, plain, encrypted };
   return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
 }
 
 /** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
 async function runEncrypted(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
+  const packed = pack();
   const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: size });
-  const result = { sizeMB: mb, blockSize: size, encrypted };
+  const result = { sizeMB: mb, blockSize: size, pack: packed, encrypted };
   return { ...result, gates: judgeGates(result, 1) };
 }
 

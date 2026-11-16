@@ -183,6 +183,43 @@ export const dropIdb = (name: string): Promise<void> => {
   });
 };
 
+/**
+ * The IndexedDB records that hold blocks in the pair named `name` (both databases), counted raw, so
+ * that with bench/patches/pack.patch it is the records, not the blocks (#83).
+ */
+async function blockRecords(name: string): Promise<number> {
+  let n = 0;
+  for (const db of [`${name}.a`, `${name}.b`]) {
+    const open = indexedDB.open(db, 1);
+    open.onupgradeneeded = () => {
+      open.result.createObjectStore('kv'); // as IndexedDbBackend makes it
+    };
+    const conn = await new Promise<IDBDatabase>((resolve, reject) => {
+      open.onsuccess = () => {
+        resolve(open.result);
+      };
+      open.onerror = () => {
+        reject(open.error ?? new Error(`open ${db} failed`));
+      };
+    });
+    try {
+      const count = conn.transaction('kv', 'readonly').objectStore('kv').count(IDBKeyRange.lowerBound(''));
+      n += await new Promise<number>((resolve, reject) => {
+        count.onsuccess = () => {
+          resolve(count.result);
+        };
+        count.onerror = () => {
+          reject(count.error ?? new Error(`count ${db} failed`));
+        };
+      });
+    } finally {
+      conn.close();
+      connections.delete(conn);
+    }
+  }
+  return n;
+}
+
 export const newKek = (): Promise<CryptoKey> => importKek(crypto.getRandomValues(new Uint8Array(32)));
 
 export type Kind = 'plain' | 'encrypted';
@@ -347,6 +384,8 @@ export interface VariantResult {
   g3: Json;
   /** EncryptedFs, G9 over every sync of the workload (build, G1, G1b, G4). */
   g9?: { syncs: number; tableBlocks: Stat; tableToDataBlocks: Stat; repacked: number };
+  /** EncryptedFs: IndexedDB records holding blocks, and the blocks (table and data), after the build and after G4 (#83: with `?pack=`, blocks ÷ records is the fill). */
+  store?: { afterBuild: { records: number; blocks: number }; afterG4: { records: number; blocks: number } };
   /** EncryptedFs: the opens of the store alone (no plain open in between), the key operations, then the same opens after the rotation. */
   keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openBeforeRotation: OpenResult; openAfterRotation: OpenResult };
   /** EncryptedFs: the store's records read as the open reads its blocks, nothing decrypted, once per G2 open (#63), beside `g2.readMs`. */
@@ -421,6 +460,12 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
   const wasmAfterBuild = wasmBytes(pg);
   const dir = nodes(pg);
   const dataDir = { nodes: dir.length, bytes: dir.reduce((n, f) => n + f.size, 0), dirs: dirBytes(pg), dirsBeforeCheckpoint };
+  const storeNow = async () => {
+    if (!(fs instanceof TimedFs)) return undefined;
+    const s = fs.stats();
+    return { records: await blockRecords(name), blocks: s.table.blocks + s.dataBlocks };
+  };
+  const afterBuild = await storeNow();
 
   log(`${label}: G1, G1b`);
   const g1 = await sample(cur, () => pg, runs, (i) => pg.query('UPDATE doc_search SET body = $2 WHERE doc_id = $1', [docs[1], `edit ${String(i)}`]));
@@ -447,6 +492,8 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
   );
   await countSwitch();
   const g4 = { ...g4s, switched };
+  const afterG4 = await storeNow();
+  const store = afterBuild && afterG4 ? { afterBuild, afterG4 } : undefined;
 
   let g9: VariantResult['g9'];
   if (fs instanceof TimedFs) {
@@ -458,7 +505,7 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
       repacked: all.filter((s) => s.repacked).length,
     };
   }
-  return { kind, label, key, make, pgOptions, fs, pg, open: true, part: { buildMs, dataDir, wasmAfterBuild, g1, g1b, g4, ...(g9 ? { g9 } : {}) } };
+  return { kind, label, key, make, pgOptions, fs, pg, open: true, part: { buildMs, dataDir, wasmAfterBuild, g1, g1b, g4, ...(g9 ? { g9 } : {}), ...(store ? { store } : {}) } };
 }
 
 /** Closes the variant's PGlite if it is open, opens the data again and records the open. */
