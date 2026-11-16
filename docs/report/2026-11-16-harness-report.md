@@ -4,7 +4,7 @@ Base: `origin/main` at 5926674 (merge of #99). Sources: the harness result rows,
 
 ## Summary
 
-Seven issues were worked: #77, #78, #80, #82, #83, #85, #91. All are closed and merged. Of those, #80, #83 and #85 stopped once on the way and were released again by owner decision; the STOP comments are in the table below. #94 (CI red on main) was an infrastructure failure and was closed without a code change. Two checkpoints ran. The full benchmark ran on `main` in Chromium, Firefox and WebKit, and every judged gate passes.
+Eight issues were worked: #76, #77, #78, #80, #82, #83, #85, #91. All except #76 are closed and merged. #76 stopped (the only lever found needs a format change) and stays open for the Redmi runs. #80, #83 and #85 stopped once on the way and were released again by owner decision; the STOP comments are in the table below. #94 (CI red on main) was an infrastructure failure and was closed without a code change. Two checkpoints ran. The full benchmark ran on `main` in Chromium, Firefox and WebKit, and every judged gate passes.
 
 Two answers to the questions that started this run:
 
