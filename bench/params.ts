@@ -1,7 +1,5 @@
 // Parsing of the bench page's query parameters (kept apart from bench.ts, which needs a browser).
-import { isBlockSize, type BlockSize } from '../src/format/codec.ts';
-
-export const DEFAULT_BLOCK_SIZE: BlockSize = 65536;
+import { DEFAULT_BLOCK_SIZE, isBlockSize, type BlockSize } from '../src/format/codec.ts';
 
 /** `?block=`: absent or empty is the default (#73); anything else must be one of BLOCK_SIZES. */
 export function parseBlockSize(raw: string | null): BlockSize {
