@@ -939,8 +939,12 @@ export class EncryptedFs extends MemoryFS {
         copy,
         async ({ id, file, index }): Promise<[RecordKey, Bytes]> => {
           const plain = blockOf(nodes.get(file.key), index, blockSize);
-          const sealed = await sealBlock(ctx, file.fileId, index, plain);
-          plain.fill(0);
+          let sealed: Bytes;
+          try {
+            sealed = await sealBlock(ctx, file.fileId, index, plain);
+          } finally {
+            plain.fill(0);
+          }
           file.tags[index] = tagOf(sealed).slice();
           return [id, sealed];
         },
@@ -1096,6 +1100,7 @@ export class EncryptedFs extends MemoryFS {
       await this.#drain?.catch(() => undefined);
       if (this.#ready && !this.#fatal && (this.hasDirty() || this.#owesStrict)) await this.syncToFs(false);
     } finally {
+      if (this.#unsettled) wipeSnapshot(this.#unsettled.snap);
       this.#wipe();
       this.#ready = false;
       this.#FS = null;
