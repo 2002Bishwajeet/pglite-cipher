@@ -29,7 +29,9 @@ jobs:
       - run: dotnet build bench/device/webview2 -c Release -o bench/device/webview2/out
       # serve.mjs exits once webview2-ci has posted (1 if the result holds an error); the host exits
       # once the page has posted. The host's output (runtime version, user agent) goes with the JSON.
+      # Bounded below the job timeout, so a hung host fails the step and the steps below still run.
       - name: bench
+        timeout-minutes: 32
         run: |
           node bench/device/serve.mjs --until webview2-ci --timeout-min 30 &
           srv=$!
@@ -42,7 +44,7 @@ jobs:
           cat bench/results/webview2-ci-host.txt >> "$GITHUB_STEP_SUMMARY"
           node bench/gates.ts --require gates10,gates100 bench/results/webview2-ci.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         with:
           name: bench-webview2-ci
           path: |
