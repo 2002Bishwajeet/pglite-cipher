@@ -25,7 +25,10 @@ if [ -f package-lock.json ]; then
 else
   prep=""
 fi
-ssh -o BatchMode=yes "$host" "$sh $(printf '%q' "cd $dir && $prep ~/.claude/bin/heavy $q")"
+# Without a tty the remote command survives a dropped ssh and sits in the heavy-lock queue for hours
+# (seen 2026-11-16: 14 orphans on yantra-box). A watchdog ends it once the sshd session (\$PPID) is gone.
+run="pp=\$PPID; S=\$(command -v setsid); \$S ~/.claude/bin/heavy $q & p=\$!; (while kill -0 \$p 2>/dev/null; do kill -0 \$pp 2>/dev/null || { [ -n \"\$S\" ] && kill -TERM -- -\$p; pkill -TERM -P \$p; kill \$p; exit; }; sleep 5; done) >/dev/null 2>&1 & wait \$p"
+ssh -o BatchMode=yes "$host" "$sh $(printf '%q' "cd $dir && $prep $run")"
 code=$?
 for d in test-results spike/results bench/results; do
   ssh -o BatchMode=yes "$host" "test -d $dir/$d" 2>/dev/null && mkdir -p "$d" && rsync -a "$host:$dir/$d/" "$d/"
