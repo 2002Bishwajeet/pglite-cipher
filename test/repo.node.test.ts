@@ -21,4 +21,11 @@ describe('repository invariants', () => {
     expect(anyFree + webkitOnBox).toBe(jobCount);
     expect(workflow).not.toContain('pull_request_target');
   });
+
+  it('gives every CI job a timeout-minutes', () => {
+    const jobs = /^jobs:\n([\s\S]*)$/m.exec(read('.github/workflows/ci.yml'))?.[1] ?? '';
+    const jobCount = jobs.match(/^ {2}[\w-]+:$/gm)?.length ?? 0;
+    expect(jobCount).toBeGreaterThan(0);
+    expect(jobs.match(/^ {4}timeout-minutes: \d+$/gm)?.length ?? 0).toBe(jobCount);
+  });
 });
