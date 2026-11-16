@@ -8,3 +8,13 @@ export function parseBlockSize(raw: string | null): BlockSize {
   if (!isBlockSize(n)) throw new Error(`?block=${raw} is not a supported block size`);
   return n;
 }
+
+const PACKS: readonly number[] = [1, 4, 8, 16];
+
+/** `?pack=`: blocks per IndexedDB record (#83, bench/patches/pack.patch); absent or empty is 1, the unpatched layout. */
+export function parsePack(raw: string | null): number {
+  if (raw === null || raw === '') return 1;
+  const n = Number(raw);
+  if (!PACKS.includes(n)) throw new Error(`?pack=${raw} is not one of ${PACKS.join(', ')}`);
+  return n;
+}

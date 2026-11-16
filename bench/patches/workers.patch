@@ -1,25 +1,28 @@
 diff --git a/bench/bench.ts b/bench/bench.ts
-index 8d0313d..4b2bf43 100644
+index 46b20f5..e4b55f9 100644
 --- a/bench/bench.ts
 +++ b/bench/bench.ts
-@@ -11,11 +11,14 @@ import { runG7 } from './g7.ts';
+@@ -11,7 +11,8 @@ import { runG7 } from './g7.ts';
  import { runIdbRead } from './idbread.ts';
  import { runOpfsRead } from './opfsread.ts';
  import { judgeGates, judgeYear } from './judge.ts';
--import { parseBlockSize } from './params.ts';
+-import { parseBlockSize, parsePack } from './params.ts';
 +import { setOpenWorkers } from '../src/fs/openWorkers.ts';
-+import { parseBlockSize, parseWorkers } from './params.ts';
++import { parseBlockSize, parsePack, parseWorkers } from './params.ts';
  import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
  
  // `&block=N` builds the encrypted store at that block size (#63); read per part, so a bad value fails that part.
- const blockSize = (): BlockSize => parseBlockSize(new URLSearchParams(location.search).get('block'));
+@@ -29,6 +30,8 @@ const pack = (): number => {
+ const unpack = (): void => {
+   if (packed.pack !== undefined) packed.pack = 1;
+ };
 +// `&workers=W` (bench patch #85): every open of the page reads its blocks in W key ranges, each in a worker.
 +setOpenWorkers(parseWorkers(new URLSearchParams(location.search).get('workers')));
  const MB = 1024 * 1024;
  
  const statusEl = document.getElementById('status');
 diff --git a/bench/measure.ts b/bench/measure.ts
-index e3510c5..cc76761 100644
+index c9b15d3..d5fee51 100644
 --- a/bench/measure.ts
 +++ b/bench/measure.ts
 @@ -5,6 +5,7 @@ import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
@@ -40,7 +43,7 @@ index e3510c5..cc76761 100644
    }
    override async syncToFs(relaxed?: boolean): Promise<void> {
      const dirty = this.hasDirty();
-@@ -488,6 +492,17 @@ async function readsOnly(name: string, blockSize: number): Promise<{ ms: number;
+@@ -535,6 +539,17 @@ async function readsOnly(name: string, blockSize: number): Promise<{ ms: number;
      let records = 0;
      let bytes = 0;
      const t = now();
@@ -59,11 +62,11 @@ index e3510c5..cc76761 100644
        const got: Array<[string, Uint8Array]> = await next;
        next = got.length < page ? null : backend.readRange((got[got.length - 1] as [string, Uint8Array])[0], page);
 diff --git a/bench/params.ts b/bench/params.ts
-index 78b4fc3..28577bc 100644
+index c1299c3..ec81cec 100644
 --- a/bench/params.ts
 +++ b/bench/params.ts
-@@ -8,3 +8,11 @@ export function parseBlockSize(raw: string | null): BlockSize {
-   if (!isBlockSize(n)) throw new Error(`?block=${raw} is not a supported block size`);
+@@ -18,3 +18,11 @@ export function parsePack(raw: string | null): number {
+   if (!PACKS.includes(n)) throw new Error(`?pack=${raw} is not one of ${PACKS.join(', ')}`);
    return n;
  }
 +
@@ -75,40 +78,40 @@ index 78b4fc3..28577bc 100644
 +  return n;
 +}
 diff --git a/bench/run.mjs b/bench/run.mjs
-index 1dcb128..9656405 100644
+index deb64ed..468e700 100644
 --- a/bench/run.mjs
 +++ b/bench/run.mjs
 @@ -1,6 +1,6 @@
  // Runs the benchmark page headless in Playwright's browsers and saves what it reports to
  // bench/results/<browser>.json (merged per part, so parts can run apart).
--// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144]
-+// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--workers 2]
+-// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8]
++// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8] [--workers 2]
  // --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
  // --block N builds the gates' encrypted store with N-byte blocks (#63) and saves to <browser>-block<N>.json.
- // Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node bench/run.mjs webkit
-@@ -18,6 +18,7 @@ const parts = opt('parts', 'gates10,gates100,extras,year').split(',');
- const runs = Number(opt('runs', '20'));
+ // --pack N stores N blocks per IndexedDB record (#83; needs bench/patches/pack.patch) and saves to <browser>-pack<N>.json.
+@@ -20,6 +20,7 @@ const runs = Number(opt('runs', '20'));
  const throttle = Number(opt('throttle', '1'));
  const block = opt('block', '');
+ const pack = opt('pack', '');
 +const workers = opt('workers', ''); // bench patch #85: &workers=W, saved to <browser>-workers<W>.json
  const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
  const config = fileURLToPath(new URL('./vite.config.ts', import.meta.url));
  const results = new URL('./results/', import.meta.url);
-@@ -32,7 +33,7 @@ let failed = false;
+@@ -34,7 +35,7 @@ let failed = false;
  try {
    for (const name of browsers) {
      const slow = throttle > 1 && name === 'chromium';
--    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}.json`, results);
-+    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${workers ? `-workers${workers}` : ''}.json`, results);
+-    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${pack ? `-pack${pack}` : ''}.json`, results);
++    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${pack ? `-pack${pack}` : ''}${workers ? `-workers${workers}` : ''}.json`, results);
      const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
      // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
      const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
-@@ -47,7 +48,7 @@ try {
+@@ -49,7 +50,7 @@ try {
          page.on('pageerror', (e) => {
            console.log(`[${name}] pageerror: ${e.message}`);
          });
--        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}`);
-+        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}${workers ? `&workers=${workers}` : ''}`);
+-        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}${pack ? `&pack=${pack}` : ''}`);
++        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}${pack ? `&pack=${pack}` : ''}${workers ? `&workers=${workers}` : ''}`);
          await page.waitForFunction(() => window.__benchResult || window.__benchError, undefined, { timeout: PART_TIMEOUT, polling: 1000 });
          const { result, error } = await page.evaluate(() => ({ result: window.__benchResult, error: window.__benchError }));
          await page.close();

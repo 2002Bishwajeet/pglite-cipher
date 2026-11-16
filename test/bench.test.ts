@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { judgeGates, judgePart, type GatesResult } from '../bench/judge.ts';
-import { parseBlockSize } from '../bench/params.ts';
+import { parseBlockSize, parsePack } from '../bench/params.ts';
 
 describe('bench: ?block= parsing', () => {
   it('falls back to the default for an absent or empty value', () => {
@@ -12,6 +12,19 @@ describe('bench: ?block= parsing', () => {
   });
   it('rejects a non-numeric value and a size outside BLOCK_SIZES', () => {
     for (const bad of ['abc', 'NaN', '12345', '0', '-8192', '8192abc']) expect(() => parseBlockSize(bad)).toThrow(/block/);
+  });
+});
+
+describe('bench: ?pack= parsing', () => {
+  it('is 1 for an absent or empty value', () => {
+    expect(parsePack(null)).toBe(1);
+    expect(parsePack('')).toBe(1);
+  });
+  it('accepts 1, 4, 8 and 16', () => {
+    for (const n of [1, 4, 8, 16]) expect(parsePack(String(n))).toBe(n);
+  });
+  it('rejects anything else', () => {
+    for (const bad of ['abc', '0', '2', '-8', '8x', '32']) expect(() => parsePack(bad)).toThrow(/pack/);
   });
 });
 
