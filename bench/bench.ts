@@ -18,12 +18,16 @@ import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ra
 const blockSize = (): BlockSize => parseBlockSize(new URLSearchParams(location.search).get('block'));
 // `&pack=N` stores up to N blocks per IndexedDB record (#83) in the backends made from then on. Only
 // `git apply bench/patches/pack.patch` adds IndexedDbBackend.pack; without it N > 1 fails the part.
+// The gates and enc parts set it and put 1 back when they end, so the parts after them run unpacked.
+const packed = IndexedDbBackend as unknown as { pack?: number };
 const pack = (): number => {
   const n = parsePack(new URLSearchParams(location.search).get('pack'));
-  const backend = IndexedDbBackend as unknown as { pack?: number };
-  if (backend.pack !== undefined) backend.pack = n;
+  if (packed.pack !== undefined) packed.pack = n;
   else if (n !== 1) throw new Error(`?pack=${String(n)} needs bench/patches/pack.patch`);
   return n;
+};
+const unpack = (): void => {
+  if (packed.pack !== undefined) packed.pack = 1;
 };
 const MB = 1024 * 1024;
 
@@ -42,19 +46,27 @@ const log = (msg: string) => {
 
 async function runGates(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
-  const packed = pack();
-  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: size });
-  const result = { sizeMB: mb, blockSize: size, pack: packed, plain, encrypted };
-  return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
+  const n = pack();
+  try {
+    const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: size });
+    const result = { sizeMB: mb, blockSize: size, pack: n, plain, encrypted };
+    return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
+  } finally {
+    unpack();
+  }
 }
 
 /** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
 async function runEncrypted(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
-  const packed = pack();
-  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: size });
-  const result = { sizeMB: mb, blockSize: size, pack: packed, encrypted };
-  return { ...result, gates: judgeGates(result, 1) };
+  const n = pack();
+  try {
+    const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: size });
+    const result = { sizeMB: mb, blockSize: size, pack: n, encrypted };
+    return { ...result, gates: judgeGates(result, 1) };
+  } finally {
+    unpack();
+  }
 }
 
 // ---- memory levers (#48): WAL sizes, shared_buffers, initialMemory ---------------------------
