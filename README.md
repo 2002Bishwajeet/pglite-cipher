@@ -20,7 +20,7 @@ Someone who gets the stored files (a copy of the browser profile, a backup, a st
 
 It does not:
 - **detect a rollback of the whole store** to an earlier full copy. That copy opens, with its older data;
-- **protect memory.** While the database is open it is plaintext in the page's memory, as it is without encryption. Keys are non-extractable `CryptoKey`s, but JavaScript cannot lock or wipe memory;
+- **protect memory.** While the database is open it is plaintext in the page's memory, as it is without encryption. Keys are non-extractable `CryptoKey`s, but JavaScript cannot lock or reliably wipe memory. Close makes a best-effort wipe of the data directory files and the wasm memory; copies the app made (query results), engine-internal copies and swap are not covered;
 - **cover exports.** `dumpTar`, `pg.dumpDataDir()` and `pg_dump` output are plaintext by design;
 - protect against software running as the same user while the database is open.
 

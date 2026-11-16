@@ -33,7 +33,7 @@ change or downgrade the version or cipher. Each fails the next open with `Corrup
 | Gap | Why |
 |---|---|
 | Whole-store rollback to an earlier full copy | That copy is valid in every byte. A counter outside the store would make a relaxed sync lost in a crash look like an attack |
-| Memory while the database is open | All of it is plaintext in the page's or worker's memory, as without encryption. Keys are non-extractable `CryptoKey`s, but JavaScript cannot lock or wipe memory. The raw KEK passes through the heap once and is zeroed by `importKek` |
+| Memory while the database is open | All of it is plaintext in the page's or worker's memory, as without encryption. Keys are non-extractable `CryptoKey`s, but JavaScript cannot lock or reliably wipe memory. Close makes a best-effort wipe: it overwrites the data directory files in memory and the wasm memory with zeros, and `src/` zeroes the plaintext buffers it owns once they are sealed or copied. Copies the app made (query results), engine-internal copies and swap are not covered. The raw KEK passes through the heap once and is zeroed by `importKek` |
 | Software running as the same user while the database is open | It can read memory, and on some platforms the key from the keychain |
 | Passphrases | There is no PBKDF2 or Argon2 in the package; the KEK must be random key material |
 | Exports | `dumpTar`, `pg.dumpDataDir()` and `pg_dump` output are plaintext by design |
