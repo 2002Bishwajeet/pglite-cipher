@@ -13,7 +13,7 @@ import { judgeGates, judgeYear } from './judge.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
 // `&block=262144` builds the gates' encrypted store at that block size (#63); the codec must accept it.
-const BLOCK_SIZE = Number(new URLSearchParams(location.search).get('block') ?? 65536) as BlockSize;
+const BLOCK_SIZE = Number(new URLSearchParams(location.search).get('block') || 65536) as BlockSize;
 const MB = 1024 * 1024;
 
 const statusEl = document.getElementById('status');

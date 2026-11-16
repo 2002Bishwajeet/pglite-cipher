@@ -551,14 +551,19 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     const plain: VariantResult | undefined = p && { ...p.part, g2: g2.plain.result(p.fs), g3: g3.plain, dirsAfterOpen: dirsAfterOpen.plain };
     const encrypted: VariantResult = { ...e.part, g2: g2.encrypted.result(e.fs), g3: g3.encrypted, dirsAfterOpen: dirsAfterOpen.encrypted };
 
-    await shut(e);
-    const reads: Array<Awaited<ReturnType<typeof readsOnly>>> = [];
-    for (let i = 0; i < n; i++) {
-      log(`${e.label}: reads only ${String(i + 1)} of ${String(n)}`);
-      reads.push(await readsOnly(names.encrypted, opts.blockSize ?? 65536));
+    // A diagnostic beside g2.readMs: a failure here is logged, it does not cost the part its gates.
+    try {
+      await shut(e);
+      const reads: Array<Awaited<ReturnType<typeof readsOnly>>> = [];
+      for (let i = 0; i < n; i++) {
+        log(`${e.label}: reads only ${String(i + 1)} of ${String(n)}`);
+        reads.push(await readsOnly(names.encrypted, opts.blockSize ?? 65536));
+      }
+      const last = reads[reads.length - 1];
+      if (last) encrypted.readsOnly = { ms: stat(reads.map((r) => r.ms)), page: last.page, records: last.records, bytes: last.bytes };
+    } catch (err) {
+      log(`${e.label}: reads only failed: ${errorText(err)}`);
     }
-    const last = reads[reads.length - 1];
-    if (last) encrypted.readsOnly = { ms: stat(reads.map((r) => r.ms)), page: last.page, records: last.records, bytes: last.bytes };
 
     if (opts.keys && e.fs instanceof TimedFs) {
       // A failure here (Chromium's quota for a second 256 KiB store, #63) is recorded, not thrown, so
