@@ -1,5 +1,5 @@
 // Reads the repository itself, so it runs in Node only.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -20,6 +20,19 @@ describe('repository invariants', () => {
     expect(jobCount).toBeGreaterThan(0);
     expect(anyFree + webkitOnBox).toBe(jobCount);
     expect(workflow).not.toContain('pull_request_target');
+  });
+
+  it('keeps every workflow on self-hosted runners except the manual WebView2 bench on windows-latest', () => {
+    const dir = new URL('../.github/workflows/', import.meta.url);
+    for (const file of readdirSync(dir)) {
+      const runsOn = read(`.github/workflows/${file}`).match(/^ +runs-on: .*$/gm) ?? [];
+      expect(runsOn.length, file).toBeGreaterThan(0);
+      if (file === 'webview2-bench.yml') expect(runsOn.map((l) => l.trim())).toEqual(['runs-on: windows-latest']);
+      else for (const line of runsOn) expect(line, file).toContain('self-hosted');
+    }
+    const webview2 = read('.github/workflows/webview2-bench.yml');
+    expect(/^on:\n {2}workflow_dispatch:\n\n/m.test(webview2)).toBe(true);
+    expect(webview2).toMatch(/^ {4}timeout-minutes: 40$/m);
   });
 
   it('gives every CI job a timeout-minutes', () => {

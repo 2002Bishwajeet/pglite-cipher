@@ -1,0 +1,51 @@
+name: webview2-bench
+
+# The WebView2 (Windows) bench run (#4) on a GitHub-hosted Windows VM, a stand-in for an owner
+# device (#80). Manual only: the repository is private and Windows minutes count double. It is the
+# one workflow not on the owner's self-hosted runners (test/repo.node.test.ts allows exactly this).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webview2:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      URL: http://127.0.0.1:47901/?auto=1&parts=gates10,gates100&runs=3&post=webview2-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run bench:build
+      - run: dotnet build bench/device/webview2 -c Release -o bench/device/webview2/out
+      # serve.mjs exits once webview2-ci has posted (1 if the result holds an error); the host exits
+      # once the page has posted. The host's output (runtime version, user agent) goes with the JSON.
+      - name: bench
+        run: |
+          node bench/device/serve.mjs --until webview2-ci --timeout-min 30 &
+          srv=$!
+          sleep 2
+          bench/device/webview2/out/WebView2Host.exe "$URL" | tee bench/results/webview2-ci-host.txt
+          wait "$srv"
+      - name: gate table
+        if: ${{ !cancelled() }}
+        run: |
+          cat bench/results/webview2-ci-host.txt >> "$GITHUB_STEP_SUMMARY"
+          node bench/gates.ts --require gates10,gates100 bench/results/webview2-ci.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: bench-webview2-ci
+          path: |
+            bench/results/webview2-ci.json
+            bench/results/webview2-ci-host.txt
+          if-no-files-found: warn
