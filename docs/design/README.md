@@ -12,6 +12,7 @@ The code in `src/` is the final word; these pages cite the files they describe.
 | [Crash safety and tamper detection](integrity.md) | Why a crash leaves a consistent store, how a failed commit is settled, what `CorruptStoreError` covers |
 | [Threat model, summarised](threat-model.md) | What an attacker with the stored files learns and cannot do; the full text is `SECURITY.md` |
 | [Performance and known limits](performance.md) | Where the time goes, the block size, the open-time cost on slow platforms |
+| [Compared to other options](comparison.md) | Other encrypted databases for the browser: what each encrypts, where the key lives, how much plaintext is in memory |
 
 Other documents in the repository:
 

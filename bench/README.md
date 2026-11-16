@@ -72,7 +72,18 @@ to `run.mjs`, saved as `<browser>-pack<N>.json`) sets N for the `gates` and `enc
 them without the patch; 1 is the unpatched layout. Rebuild `bench/dist` after applying it. With the
 patch, `VITE_CIPHER_PACK=N npm test` (or `npm run test:browser`) runs the suites at N. The encrypted
 variant's `store` reports the IndexedDB records and blocks after the build and after G4: blocks ÷
-records is the fill. None of the three is committed to `src/`.
+records is the fill.
+`git apply bench/patches/workers.patch` (#85, #76) splits the open's blocks phase into W key ranges
+on the first hex digit of the ids, each read with `readRange` (pages of 512 / W records, the next
+in flight) and decrypted in its own dedicated worker with the DEK posted by structured clone; the
+plaintext comes back transferred. WebKit cannot clone any `CryptoKey` to a worker
+(`DataCloneError`), so there the open falls back to the single-thread loader of `src/` (the key is
+never exported) and measures nothing new; `readsOnly` posts no key and still reads in W workers.
+`&workers=2` or `4` on the page (`run.mjs --workers W`, saved to `<browser>-workers<W>.json`) picks
+W; 1 or absent is the loader of `src/`. With W > 1, `g2.readMs` and `decryptMs` are the slowest
+range's. The tests take W from `CIPHER_OPEN_WORKERS` (backends other than IndexedDB, and Node, run
+the ranges on the calling thread). Run W > 1 without `--throttle`: Chromium's CDP refuses
+`Emulation.setCPUThrottlingRate` for workers, so a throttled run slows only the page and flatters W > 1. None of these patches is committed to `src/`.
 `&post=<target>` also sends the progress and the result to the device collector
 (`bench/device/serve.mjs`, issue #11), which saves `bench/results/<target>.json`.
 
