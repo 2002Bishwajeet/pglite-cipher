@@ -28,6 +28,7 @@ permissions:
 jobs:
   lint:
     runs-on: [self-hosted, pc-ci]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,6 +41,7 @@ jobs:
 
   build:
     runs-on: [self-hosted, pc-ci]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,10 +53,11 @@ jobs:
 
   test:
     runs-on: [self-hosted, pc-ci]
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [22, 24, 26]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -67,6 +70,7 @@ jobs:
 
   test-browser:
     runs-on: ${{ matrix.browser == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci-heavy"]') }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -85,6 +89,7 @@ jobs:
   # every engine opens both. Two engines that each read only their own stores is what this catches.
   compat-write:
     runs-on: ${{ matrix.browser == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci-heavy"]') }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +115,7 @@ jobs:
   compat-read:
     needs: compat-write
     runs-on: ${{ matrix.project == 'webkit' && fromJSON('["self-hosted", "yantra-box"]') || fromJSON('["self-hosted", "pc-ci-heavy"]') }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

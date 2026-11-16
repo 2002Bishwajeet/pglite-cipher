@@ -21,7 +21,7 @@ case $target in
     [ "$target" = ipad-air-m3 ] && model='iPad Air 11-inch (M3)'
     row=$(xcrun devicectl list devices 2>/dev/null | grep -F "$model" | grep -F physical)
     udid=$(sed -nE 's/.* ([0-9A-F-]+) \(UDID\).*/\1/p' <<<"$row")
-    if [ -z "$udid" ] || ! grep -qF 'available' <<<"$row" || grep -qF 'unavailable' <<<"$row"; then
+    if [ -z "$udid" ] || ! grep -qE 'available|connected' <<<"$row" || grep -qF 'unavailable' <<<"$row"; then
       echo "[device] $target is not available: ${row:-not listed}" >&2
       exit 5
     fi
