@@ -122,9 +122,10 @@ export async function runIdbRead(mb: number, runs: number, log: (msg: string) =>
     const count = Math.ceil((mb * MB) / size);
     const total = count * size;
     const name = `bench-idbread-${crypto.randomUUID()}`;
+    let db: IDBDatabase | undefined;
     try {
       log(`idbread ${String(size)} B: writing ${String(count)} records`);
-      let db = await openDb(name);
+      db = await openDb(name);
       const t = now();
       await fill(db, size, count);
       const writeMs = now() - t;
@@ -141,6 +142,7 @@ export async function runIdbRead(mb: number, runs: number, log: (msg: string) =>
         }
       }
       db.close();
+      db = undefined;
       const cells: Json = {};
       for (const [mode, xs] of Object.entries(ms)) {
         const p50 = pct(xs, 50);
@@ -148,6 +150,7 @@ export async function runIdbRead(mb: number, runs: number, log: (msg: string) =>
       }
       out[String(size)] = { records: count, writeMBps: round(total / MB / (writeMs / 1000)), ...cells };
     } finally {
+      db?.close(); // an error path leaves it open, and deleteDatabase then blocks
       await dropIdb(name);
     }
   }

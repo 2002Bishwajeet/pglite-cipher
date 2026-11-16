@@ -3,7 +3,7 @@
 // Markdown (the job summary), and exits 1 if a gate fails or a part errored or is missing.
 // Usage: node bench/gates.ts --factor 2 --require gates100,year bench/results/chromium.json ...
 import { readFileSync } from 'node:fs';
-import { judgeGates, judgeYear, table, type GatesResult, type YearResult } from './judge.ts';
+import { judgePart, table } from './judge.ts';
 
 const args = process.argv.slice(2);
 const opt = (name: string, fallback: string): string => {
@@ -31,7 +31,7 @@ for (const file of args) {
       out.push(`**FAIL**: part \`${name}\`: ${String(part.error)}`, '');
       continue;
     }
-    const rows = name.startsWith('gates') ? judgeGates(part as GatesResult, factor) : name === 'year' ? judgeYear(part as YearResult, factor) : null;
+    const rows = judgePart(name, part, factor);
     if (!rows) continue;
     if (rows.some((r) => r.pass === false)) failed = true;
     out.push(`#### ${name}`, '', table(rows), '');

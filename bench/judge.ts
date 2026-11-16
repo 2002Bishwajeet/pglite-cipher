@@ -68,6 +68,13 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   return rows;
 }
 
+/** The rows for one result part, by its name: gates* and enc* parts are gate tables, year is G8; others have none. */
+export function judgePart(name: string, part: unknown, factor: number): GateRow[] | null {
+  if (name.startsWith('gates') || name.startsWith('enc')) return judgeGates(part as GatesResult, factor);
+  if (name === 'year') return judgeYear(part as YearResult, factor);
+  return null;
+}
+
 export function judgeYear(r: YearResult, factor: number): GateRow[] {
   const ms = Math.round(r.liveSalts * r.deriveKeyP50Ms * 1000) / 1000;
   const limit = 0.1 * OPEN_BUDGET_MS * factor;

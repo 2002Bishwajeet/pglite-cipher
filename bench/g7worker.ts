@@ -11,6 +11,7 @@ const round = (x: number) => Math.round(x * 100) / 100;
 const scope = self as unknown as {
   postMessage(msg: unknown, transfer?: Transferable[]): void;
   onmessage: ((ev: MessageEvent) => void) | null;
+  onmessageerror: (() => void) | null;
 };
 
 let nextId = 0;
@@ -24,7 +25,12 @@ const relay = (cmd: string, args?: unknown, transfer: Transferable[] = []): Prom
     scope.postMessage(msg, transfer);
   });
 
-const block = (unit: number) => crypto.getRandomValues(new Uint8Array(unit));
+// getRandomValues throws QuotaExceededError above 65,536 bytes.
+const block = (unit: number) => {
+  const out = new Uint8Array(unit);
+  for (let o = 0; o < unit; o += 65536) crypto.getRandomValues(out.subarray(o, Math.min(unit, o + 65536)));
+  return out;
+};
 
 async function viaCommands(unit: number): Promise<unknown> {
   const n = TOTAL / unit;
@@ -82,6 +88,10 @@ const attempt = async (fn: () => Promise<unknown>) => {
   }
 };
 
+scope.onmessageerror = () => {
+  scope.postMessage({ fatal: 'G7 worker: a message from the page could not be deserialized' });
+};
+
 scope.onmessage = (ev: MessageEvent<{ token?: string; id?: number; value?: unknown; error?: string }>) => {
   const { token, id, value, error } = ev.data;
   if (id !== undefined) {
@@ -93,13 +103,18 @@ scope.onmessage = (ev: MessageEvent<{ token?: string; id?: number; value?: unkno
   }
   if (token === undefined) return;
   void (async () => {
-    const result: Record<string, unknown> = { available: true, ipc: await attempt(echo) };
-    for (const unit of [8192, 65536]) {
-      scope.postMessage({ log: `G7: ${String(unit / 1024)} KB blocks` });
-      result[`commands_${String(unit / 1024)}k`] = await attempt(() => viaCommands(unit));
-      result[`fetch_${String(unit / 1024)}k`] = await attempt(() => viaFetch(unit, token));
+    try {
+      const result: Record<string, unknown> = { available: true, ipc: await attempt(echo) };
+      for (const unit of [8192, 65536]) {
+        scope.postMessage({ log: `G7: ${String(unit / 1024)} KB blocks` });
+        result[`commands_${String(unit / 1024)}k`] = await attempt(() => viaCommands(unit));
+        result[`fetch_${String(unit / 1024)}k`] = await attempt(() => viaFetch(unit, token));
+      }
+      await attempt(() => relay('bench_reset'));
+      scope.postMessage({ result });
+    } catch (e) {
+      // Whatever escapes `attempt` ends the part with an error instead of leaving the page waiting.
+      scope.postMessage({ fatal: e instanceof Error ? e.message : String(e) });
     }
-    await attempt(() => relay('bench_reset'));
-    scope.postMessage({ result });
   })();
 };

@@ -21,6 +21,12 @@ const RESULTS = fileURLToPath(new URL('../results/', import.meta.url));
 const META = ['userAgent', 'crossOriginIsolated', 'hardwareConcurrency', 'deviceMemory', 'runs', 'startedAt', 'finishedAt'];
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json' };
 const HEADERS = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cache-Control': 'no-store' };
+// The ssh session that started this can end (EPIPE on stdout/stderr); the run must still save its result.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (e) => {
+    if (e.code !== 'EPIPE') throw e;
+  });
+}
 const stamp = () => new Date().toISOString().slice(11, 19);
 
 /** Merges one posted body into <dir>/<target>.json; returns whether it carries an error. */

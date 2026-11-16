@@ -26,19 +26,26 @@ export async function runG7(log: (msg: string) => void): Promise<unknown> {
       worker.onerror = (e) => {
         reject(new Error(e.message));
       };
-      worker.onmessage = (ev: MessageEvent<{ relay?: RelayRequest; result?: unknown; log?: string }>) => {
-        const { relay, result, log: line } = ev.data;
+      worker.onmessage = (ev: MessageEvent<{ relay?: RelayRequest; result?: unknown; log?: string; fatal?: string }>) => {
+        const { relay, result, log: line, fatal } = ev.data;
+        if (fatal !== undefined) reject(new Error(fatal));
         if (line !== undefined) log(line);
         if (result !== undefined) resolve(result);
         if (!relay) return;
-        tauri.invoke(relay.cmd, relay.args).then(
-          (value) => {
+        // `invoke` may throw before it returns a promise: that is a rejection too, answered to the worker.
+        new Promise((done) => {
+          done(tauri.invoke(relay.cmd, relay.args));
+        })
+          .then((value) => {
             worker.postMessage({ id: relay.id, value }, value instanceof ArrayBuffer ? [value] : []);
-          },
-          (e: unknown) => {
+          })
+          // A failed invoke and a failed postMessage (DataCloneError) are both answered, or the worker waits forever.
+          .catch((e: unknown) => {
             worker.postMessage({ id: relay.id, error: String(e) });
-          },
-        );
+          });
+      };
+      worker.onmessageerror = () => {
+        reject(new Error('G7: a message from the worker could not be deserialized'));
       };
       worker.postMessage({ token });
     });
