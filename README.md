@@ -139,6 +139,7 @@ await pg.exec('CHECKPOINT');
 - **`initialMemory`** cannot help: PGlite 0.5.10 needs at least 128 MB, its default, and `PGlite.create` with less never settles.
 
 ## Docs
+- `docs/design/`: how it works and why, starting at [`docs/design/README.md`](docs/design/README.md)
 - `FORMAT.md`: the on-disk format, version 1
 - `SECURITY.md`: the threat model, the primitives, reporting a vulnerability
 - `RELEASE-CHECKLIST.md`: what the owner checks before a release
