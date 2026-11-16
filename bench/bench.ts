@@ -10,10 +10,11 @@ import { runHandles, runOnDemand } from '../spike/on-demand/part.ts';
 import { runG7 } from './g7.ts';
 import { runIdbRead } from './idbread.ts';
 import { judgeGates, judgeYear } from './judge.ts';
+import { parseBlockSize } from './params.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
-// `&block=262144` builds the gates' encrypted store at that block size (#63); the codec must accept it.
-const BLOCK_SIZE = Number(new URLSearchParams(location.search).get('block') || 65536) as BlockSize;
+// `&block=N` builds the encrypted store at that block size (#63); read per part, so a bad value fails that part.
+const blockSize = (): BlockSize => parseBlockSize(new URLSearchParams(location.search).get('block'));
 const MB = 1024 * 1024;
 
 const statusEl = document.getElementById('status');
@@ -30,15 +31,17 @@ const log = (msg: string) => {
 // ---- gates at one database size ---------------------------------------------------------------
 
 async function runGates(mb: number, runs: number): Promise<Json> {
-  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: BLOCK_SIZE });
-  const result = { sizeMB: mb, blockSize: BLOCK_SIZE, plain, encrypted };
+  const size = blockSize();
+  const { plain, encrypted } = await runPair(mb, runs, log, { keys: true, blockSize: size });
+  const result = { sizeMB: mb, blockSize: size, plain, encrypted };
   return { ...result, ratios: ratios(plain, encrypted), gates: judgeGates(result, 1) };
 }
 
 /** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
 async function runEncrypted(mb: number, runs: number): Promise<Json> {
-  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: BLOCK_SIZE });
-  const result = { sizeMB: mb, blockSize: BLOCK_SIZE, encrypted };
+  const size = blockSize();
+  const { encrypted } = await runPair(mb, runs, log, { keys: true, onlyEncrypted: true, blockSize: size });
+  const result = { sizeMB: mb, blockSize: size, encrypted };
   return { ...result, gates: judgeGates(result, 1) };
 }
 
@@ -253,9 +256,10 @@ async function runExtras(runs: number): Promise<Json> {
 
 /** 365 open/edit/checkpoint/close sessions; then how many session salts the open derives (one per salt still stored). */
 async function runYear(sessions: number): Promise<Json> {
+  const size = blockSize();
   const name = `bench-year-${crypto.randomUUID()}`;
   const key = await newKek();
-  const open = () => new EncryptedFs({ backend: IndexedDbBackend.pair(name), key, mode: 'open-or-create' });
+  const open = () => new EncryptedFs({ backend: IndexedDbBackend.pair(name), key, mode: 'open-or-create', blockSize: size });
   const t0 = now();
   try {
     let pg = await createPg(open());
@@ -276,7 +280,7 @@ async function runYear(sessions: number): Promise<Json> {
     const { subkeys, dataBlocks, table } = fs.stats();
     await pg.close();
     const derive = await deriveKeyMs(200);
-    const result = { sessions, blockSize: BLOCK_SIZE, liveSalts: subkeys, records: 3 + table.blocks + dataBlocks, deriveKeyP50Ms: derive.p50, totalMs: round(now() - t0) };
+    const result = { sessions, blockSize: size, liveSalts: subkeys, records: 3 + table.blocks + dataBlocks, deriveKeyP50Ms: derive.p50, totalMs: round(now() - t0) };
     return { ...result, gates: judgeYear(result, 1) };
   } finally {
     for (const db of [`${name}.a`, `${name}.b`]) await dropIdb(db);

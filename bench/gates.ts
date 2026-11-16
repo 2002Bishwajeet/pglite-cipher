@@ -31,7 +31,7 @@ for (const file of args) {
       out.push(`**FAIL**: part \`${name}\`: ${String(part.error)}`, '');
       continue;
     }
-    const rows = name.startsWith('gates') ? judgeGates(part as GatesResult, factor) : name === 'year' ? judgeYear(part as YearResult, factor) : null;
+    const rows = name.startsWith('gates') || name.startsWith('enc') ? judgeGates(part as GatesResult, factor) : name === 'year' ? judgeYear(part as YearResult, factor) : null;
     if (!rows) continue;
     if (rows.some((r) => r.pass === false)) failed = true;
     out.push(`#### ${name}`, '', table(rows), '');
