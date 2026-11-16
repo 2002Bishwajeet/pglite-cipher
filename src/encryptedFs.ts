@@ -938,7 +938,9 @@ export class EncryptedFs extends MemoryFS {
         to,
         copy,
         async ({ id, file, index }): Promise<[RecordKey, Bytes]> => {
-          const sealed = await sealBlock(ctx, file.fileId, index, blockOf(nodes.get(file.key), index, blockSize));
+          const plain = blockOf(nodes.get(file.key), index, blockSize);
+          const sealed = await sealBlock(ctx, file.fileId, index, plain);
+          plain.fill(0);
           file.tags[index] = tagOf(sealed).slice();
           return [id, sealed];
         },
@@ -994,7 +996,10 @@ export class EncryptedFs extends MemoryFS {
       await commitSettled(to, { expectRoot: null, puts: [[2, root]], deletes: [], durability: 'strict' }, 2, root);
       next = { ctx, map, header: created.header, root, snap, retired };
     } catch (error) {
-      if (snap) tracker.requeue(snap);
+      if (snap) {
+        tracker.requeue(snap);
+        wipeSnapshot(snap);
+      }
       await this.#undoRotation(from, to, before, mark, single);
       if (error instanceof StaleWriterError) this.#setFatal(error);
       throw error;
