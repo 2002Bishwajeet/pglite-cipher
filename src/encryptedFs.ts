@@ -125,6 +125,17 @@ interface ModuleFS extends EmscriptenFS {
   rmdir(path: string): void;
 }
 
+/** The parts of the Emscripten module the close-time wipe reaches (`mod` in a `preRun` hook). */
+interface ModuleMemory {
+  HEAPU8?: Uint8Array;
+  wasmMemory?: WebAssembly.Memory;
+}
+
+/** Overwrites the plaintext of a snapshot's blocks (copies this filesystem owns) once it is committed or requeued. */
+function wipeSnapshot(snap: Snapshot): void {
+  for (const block of snap.blocks) block.bytes.fill(0);
+}
+
 /** A sealed sync, ready to commit. */
 interface Prepared {
   draft: Draft;
@@ -274,6 +285,7 @@ export class EncryptedFs extends MemoryFS {
   readonly #openOrigin: ((name: string) => StorageBackend) | undefined;
 
   #FS: ModuleFS | null = null;
+  #mod: ModuleMemory | null = null;
   #tracker: Tracker | null = null;
   #ctx: RecordContext | null = null;
   #map: FileMap | null = null;
@@ -324,6 +336,7 @@ export class EncryptedFs extends MemoryFS {
     // installed by initialSyncFs.
     const keepFs = (mod: { FS: unknown }) => {
       this.#FS = mod.FS as ModuleFS;
+      this.#mod = mod as ModuleMemory;
     };
     return { emscriptenOpts: { ...emscriptenOpts, preRun: [...(emscriptenOpts.preRun ?? []), keepFs] } };
   }
@@ -553,6 +566,7 @@ export class EncryptedFs extends MemoryFS {
         const plain = await openBlock(ctx, fromHex(id), file.fileId, place.index, sealed as Bytes);
         const start = place.index * blockSize;
         (buffers.get(file.key) as Uint8Array).set(plain.subarray(0, Math.min(blockSize, file.size - start)), start);
+        plain.fill(0);
         file.tags[place.index] = tagOf(sealed as Bytes).slice();
         read++;
       });
@@ -646,6 +660,7 @@ export class EncryptedFs extends MemoryFS {
       prepared = await this.#prepare(snap);
     } catch (error) {
       tracker.requeue(snap);
+      wipeSnapshot(snap);
       throw error;
     }
     const t0 = now();
@@ -740,6 +755,7 @@ export class EncryptedFs extends MemoryFS {
     const previous = this.#lastRoot;
     if (previous === null ? stored === undefined : stored !== undefined && equalBytes(stored, previous)) {
       (this.#tracker as Tracker).requeue(snap);
+      wipeSnapshot(snap);
       return false;
     }
     const error = new StaleWriterError('another writer committed to this store');
@@ -763,10 +779,12 @@ export class EncryptedFs extends MemoryFS {
     this.#headerRepair = false;
     this.#owesStrict = durability !== 'strict';
     this.#lastSync = prepared.stats;
+    wipeSnapshot(snap);
   }
 
   #stale(snap: Snapshot, error: StaleWriterError): void {
     (this.#tracker as Tracker).requeue(snap);
+    wipeSnapshot(snap);
     this.#setFatal(error);
   }
 
@@ -920,7 +938,9 @@ export class EncryptedFs extends MemoryFS {
         to,
         copy,
         async ({ id, file, index }): Promise<[RecordKey, Bytes]> => {
-          const sealed = await sealBlock(ctx, file.fileId, index, blockOf(nodes.get(file.key), index, blockSize));
+          const plain = blockOf(nodes.get(file.key), index, blockSize);
+          const sealed = await sealBlock(ctx, file.fileId, index, plain);
+          plain.fill(0);
           file.tags[index] = tagOf(sealed).slice();
           return [id, sealed];
         },
@@ -976,7 +996,10 @@ export class EncryptedFs extends MemoryFS {
       await commitSettled(to, { expectRoot: null, puts: [[2, root]], deletes: [], durability: 'strict' }, 2, root);
       next = { ctx, map, header: created.header, root, snap, retired };
     } catch (error) {
-      if (snap) tracker.requeue(snap);
+      if (snap) {
+        tracker.requeue(snap);
+        wipeSnapshot(snap);
+      }
       await this.#undoRotation(from, to, before, mark, single);
       if (error instanceof StaleWriterError) this.#setFatal(error);
       throw error;
@@ -992,6 +1015,7 @@ export class EncryptedFs extends MemoryFS {
     this.#lastRoot = next.root;
     this.#gen += 2;
     tracker.commit(next.snap);
+    wipeSnapshot(next.snap);
 
     // 8. Retire the old store, then delete it. The retiring commit keeps the old root "rotating", so
     // that a crash before the deletion finishes the rotation at the next open, and it is guarded by
@@ -1072,14 +1096,31 @@ export class EncryptedFs extends MemoryFS {
       await this.#drain?.catch(() => undefined);
       if (this.#ready && !this.#fatal && (this.hasDirty() || this.#owesStrict)) await this.syncToFs(false);
     } finally {
+      this.#wipe();
       this.#ready = false;
       this.#FS = null;
+      this.#mod = null;
       this.#tracker = null;
       this.#map = null;
       this.#unsettled = null;
       await Promise.all(this.#slots.map((backend) => backend.close()));
       await super.closeFs();
       delete this.pg;
+    }
+  }
+
+  /**
+   * Best effort: overwrites with zeros the contents of every tracked MEMFS file and the wasm
+   * memory, so plaintext does not linger after close. Copies the app made, engine-internal copies
+   * and swap are not covered. An error here never replaces the close error.
+   */
+  #wipe(): void {
+    try {
+      for (const { node } of this.#tracker?.files() ?? []) if (node.contents instanceof Uint8Array) node.contents.fill(0);
+      const mod = this.#mod;
+      if (mod) (mod.HEAPU8 ?? (mod.wasmMemory && new Uint8Array(mod.wasmMemory.buffer)))?.fill(0);
+    } catch {
+      // best effort
     }
   }
 
