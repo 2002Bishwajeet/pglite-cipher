@@ -173,4 +173,4 @@ import { EncryptedFs } from '../vendor/pglite-cipher/src/index.ts';
 The host's bundler compiles the TypeScript, and the host provides `@electric-sql/pglite` (`^0.5.10`) from its own `node_modules`. This package has no runtime dependencies.
 
 ## Licence
-To be decided before going public. MIT is the intent. Third-party notices: `THIRD_PARTY.md`.
+[Functional Source License, Version 1.1, ALv2 Future License](LICENSE) (FSL-1.1-ALv2), copyright Bishwajeet Parhi. You may use, modify and redistribute it for any purpose except a competing commercial product or service; two years after each release, that release is also available under the Apache License 2.0. Contributions are accepted under the [Contributor License Agreement](CLA.md). Third-party notices: `THIRD_PARTY.md`.
