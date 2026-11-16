@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { judgeGates, type GatesResult } from '../bench/judge.ts';
+import { judgeGates, judgePart, type GatesResult } from '../bench/judge.ts';
 import { parseBlockSize } from '../bench/params.ts';
 
 describe('bench: ?block= parsing', () => {
@@ -30,5 +30,11 @@ describe('bench: gate table of a part whose key operations threw', () => {
   it('reports the key operations as failed, not passed or skipped', () => {
     const row = judgeGates(result, 1).find((r) => r.gate.startsWith('Key operations'));
     expect(row?.pass).toBe(false);
+  });
+
+  it('is judged as a gate table when the part is named enc*, the dispatch gates.ts uses', () => {
+    const row = judgePart('enc10', result, 1)?.find((r) => r.gate.startsWith('Key operations'));
+    expect(row?.pass).toBe(false);
+    expect(judgePart('other', result, 1)).toBeNull();
   });
 });

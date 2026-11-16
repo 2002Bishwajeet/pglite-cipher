@@ -11,6 +11,7 @@ const round = (x: number) => Math.round(x * 100) / 100;
 const scope = self as unknown as {
   postMessage(msg: unknown, transfer?: Transferable[]): void;
   onmessage: ((ev: MessageEvent) => void) | null;
+  onmessageerror: (() => void) | null;
 };
 
 let nextId = 0;
@@ -85,6 +86,10 @@ const attempt = async (fn: () => Promise<unknown>) => {
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+};
+
+scope.onmessageerror = () => {
+  scope.postMessage({ fatal: 'G7 worker: a message from the page could not be deserialized' });
 };
 
 scope.onmessage = (ev: MessageEvent<{ token?: string; id?: number; value?: unknown; error?: string }>) => {
