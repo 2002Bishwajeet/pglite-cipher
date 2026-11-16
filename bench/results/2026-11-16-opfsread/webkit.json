@@ -2,8 +2,8 @@
   "browser": "webkit",
   "parts": {
     "opfsread": {
-      "error": "UnknownError: The operation failed for an unknown transient reason (e.g. out of memory).",
-      "measuredAt": "2026-11-16T07:49:31.221Z",
+      "unavailable": "navigator.storage.getDirectory() failed on the page: UnknownError: The operation failed for an unknown transient reason (e.g. out of memory).",
+      "measuredAt": "2026-11-16T08:35:37.735Z",
       "runs": 3
     }
   },

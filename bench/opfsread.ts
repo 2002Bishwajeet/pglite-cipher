@@ -74,7 +74,13 @@ async function timed(label: string, total: number, runs: number, log: (msg: stri
 export async function runOpfsRead(mb: number, runs: number, log: (msg: string) => void): Promise<Json> {
   if (typeof navigator.storage.getDirectory !== 'function') throw new Error('OPFS unavailable: navigator.storage.getDirectory is missing');
   if (typeof FileSystemFileHandle.prototype.createWritable !== 'function') throw new Error('OPFS unavailable: FileSystemFileHandle.createWritable is missing');
-  const root = await navigator.storage.getDirectory();
+  let root: FileSystemDirectoryHandle;
+  try {
+    root = await navigator.storage.getDirectory();
+  } catch (e) {
+    // Headless WebKit refuses OPFS on the page (it allows it in workers): record it, never a zero.
+    return { unavailable: `navigator.storage.getDirectory() failed on the page: ${errorText(e)}` };
+  }
   const name = `bench-opfsread-${crypto.randomUUID()}`;
   const count = Math.ceil((mb * MB) / RECORD);
   const total = count * RECORD;
