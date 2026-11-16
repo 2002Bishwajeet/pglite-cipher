@@ -28,6 +28,7 @@ printed in the `<pre>`). Parts:
 | ops | startup (fresh init, reopen) and operations (inserts, bulk insert, large text, selects, aggregate, a CRUD cycle), plain and encrypted | a few minutes |
 | G7 | Rust store throughput; only inside a Tauri shell built with `encfs-bench` | about a minute |
 | idbread (spike #58) | IndexedDB alone: 100 MB of random records (32 KiB to 1 MiB) read back with `getAll` pages of 64, 512, 2048 and all, 2 and 4 parallel streams, a page split into 2 and 4 parallel parts, and a cursor; MB/s per cell, median of `runs`. `&idbmb=` sets the size | about 3 min desktop, 6 min on the Redmi |
+| opfsread (spike #82) | OPFS alone, to set beside idbread: 300 MB of 65580 B records read back sequentially as one file per record (`getFile()` + `arrayBuffer()`), as 255-record segment files in 1 MiB `slice()` reads, and as the same segments through a `FileSystemSyncAccessHandle` in a worker; MB/s and ms (median of `runs`) plus write MB/s, and `unavailable: <reason>` for a layout the browser lacks. `&opfsmb=` sets the size | about 2 min desktop at `--runs 3` |
 
 What each gates part reports, per variant (`plain`, `encrypted`):
 

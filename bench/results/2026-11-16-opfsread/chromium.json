@@ -1,0 +1,28 @@
+{
+  "browser": "chromium",
+  "parts": {
+    "opfsread": {
+      "sizeMB": 300,
+      "recordBytes": 65580,
+      "records": 4797,
+      "segments": 19,
+      "writePerRecordMBps": 25.18,
+      "perRecordFiles": {
+        "ms": 5100.06,
+        "MBps": 58.83
+      },
+      "writeSegmentMBps": 170.95,
+      "segmentSlices": {
+        "ms": 634.41,
+        "MBps": 472.9
+      },
+      "syncHandleWorker": {
+        "ms": 676.39,
+        "MBps": 443.55
+      },
+      "measuredAt": "2026-11-16T07:46:23.461Z",
+      "runs": 3
+    }
+  },
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.8127.18 Safari/537.36"
+}
