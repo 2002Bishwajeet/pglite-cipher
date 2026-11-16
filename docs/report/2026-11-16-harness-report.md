@@ -1,26 +1,26 @@
 # pglite-cipher harness run, 2026-11-16
 
-Base: `origin/main` at 5926674 (merge of #99). Sources: the harness result rows, `gh` for issues, PRs and comments, `bench/results/2026-11-16/SUMMARY.md` and its JSON, `docs/plan/01-sqlcipher-comparison.md`. CI was not waited on. Nothing here was re-tested by this report.
+Base: `origin/main` at cd47348 (merge of #103, the final bench re-run). This replaces the earlier version of this report (PR #100), which was written at 5926674. Sources: the harness result rows, `gh` for issues, PRs and comments, `bench/results/2026-11-16/SUMMARY.md` and its JSON, the Redmi results in PR #101 (not merged), `docs/plan/01-sqlcipher-comparison.md`. CI was not waited on. Nothing here was re-tested by this report.
 
 ## Summary
 
-Eight issues were worked: #76, #77, #78, #80, #82, #83, #85, #91. All except #76 are closed and merged. #76 stopped (the only lever found needs a format change) and stays open for the Redmi runs. #80, #83 and #85 stopped once on the way and were released again by owner decision; the STOP comments are in the table below. #94 (CI red on main) was an infrastructure failure and was closed without a code change. Two checkpoints ran. The full benchmark ran on `main` in Chromium, Firefox and WebKit, and every judged gate passes.
+Eight issues were worked: #76, #77, #78, #80, #82, #83, #85, #91. All except #76 are closed and merged. #76 stays open: the Redmi run of the three fixes is in (best case 2.17x plain, against a rule of "under about 2x"), and a Fable review, with the owner unavailable, decided that #76 ships as a documented known Android limitation and is fixed in a later release. The owner can overrule. #80, #83 and #85 stopped once on the way and were released again by owner decision; the STOP comments are in the table below. #94 (CI red on main) was closed without a code change. Two checkpoints ran. The full benchmark ran twice on `main` (150e3a3, then the final re-run 332dcc8) in Chromium, Firefox and WebKit, and every judged gate passes both times. **CI on main is red at 5926674** (Firefox browser job, #102, open); the run for cd47348 was queued when this was written and not waited on.
 
 Two answers to the questions that started this run:
 
 - **Can the WebView2 bench run on GitHub CI?** Yes. `webview2-bench.yml` (#88) runs the bench page in a real WebView2 runtime on a GitHub-hosted Windows runner. It ran once (run 43842286655) and the JSON is in `bench/results/2026-11-16-webview2-ci/` (#90). The gates that fail there are G2 and G4 (see Benchmark). It is a stand-in, not a device run: the #4 WebView2 checkbox stays open.
 - **The other three agent-ready issues** (#82, #83, #85) were all built and merged as bench-only work. None changes `src/`. None answers the #76 question yet, because the answer needs the Redmi.
 
-Open issues: #4 (owner device runs) and #76 (Android encrypted open, waiting on Redmi runs). Nothing is labelled `blocked`.
+Open issues: #4 (owner device runs), #76 (Android encrypted open, documented limitation pending the owner's confirmation) and #102 (CI red on main, `test-browser (firefox)`). Open PR: #101 (Redmi #76 result files, `checkpoint/redmi-76`). Nothing is labelled `blocked`.
 
 | Item | Result |
 |---|---|
 | Issues closed this run | #77, #78, #80, #82, #83, #85, #91, #94 |
-| Issues open | #4, #76 |
+| Issues open | #4, #76, #102 |
 | `src/` changes | #91 only (best-effort plaintext wipe), plus the checkpoint-1 wipe fixes |
 | Checkpoints | 2 (checkpoint 2 findings are unverified, see below) |
-| Benchmark | 2026-11-16, `main` at f649f3d, three engines, no judged gate fails; G3 not measurable |
-| CI on main | Not green-confirmed for any commit of this run. See Risks |
+| Benchmark | 2026-11-16 final re-run, `main` at f0f47c8 (332dcc8, PR #103), three engines, no judged gate fails; G3 not measurable |
+| CI on main | Red at 5926674 (#102, Firefox). Not green-confirmed for any commit of this run. See Risks |
 
 ## What shipped
 
@@ -35,19 +35,22 @@ Open issues: #4 (owner device runs) and #76 (Android encrypted open, waiting on 
 | #83 | `bench/patches/pack.patch`: pack N sealed blocks per IndexedDB record, no padding. Bench-local, `src/` untouched | https://github.com/2002Bishwajeet/pglite-cipher/pull/98 |
 | Checkpoint 1 | Review and simplify 11f89a8..3898987 | https://github.com/2002Bishwajeet/pglite-cipher/pull/93 |
 | Checkpoint 2 | Licence and CLA (FSL-1.1-ALv2); comparison with other encrypted browser databases (`docs/design/comparison.md`) | https://github.com/2002Bishwajeet/pglite-cipher/pull/95 and https://github.com/2002Bishwajeet/pglite-cipher/pull/96 |
-| Bench | Results 2026-11-16 | https://github.com/2002Bishwajeet/pglite-cipher/pull/99 |
+| Bench | Results 2026-11-16, then the final re-run over the later merges (`src/` unchanged between them) | https://github.com/2002Bishwajeet/pglite-cipher/pull/99 and https://github.com/2002Bishwajeet/pglite-cipher/pull/103 |
+| Report | This report (first version) | https://github.com/2002Bishwajeet/pglite-cipher/pull/100 |
+| Not merged | Redmi #76 run: baseline, pack N = 4 and 8, workers W = 2 and 4, opfsread; JSON in `bench/results/2026-11-16-redmi-76/` and `bench/device/redmi-76.sh` | https://github.com/2002Bishwajeet/pglite-cipher/pull/101 (open) |
 | Harness and docs | Check-in command (#79), `remote.sh` ends the remote command when ssh drops (#86), design documentation (#89) | #79, #86, #89 |
 
 Other state changes:
 
-- **#94** (CI red on main, 3898987): run 43886201385 failed only on `test-browser (firefox)` with a runner shutdown signal at 14:39:13Z. The other 13 jobs passed. Closed without a code change. The rerun (`--failed`, attempt 2) **also failed on `test-browser (firefox)`**. The harness did not read the attempt-2 log, so the cause is unknown. See Risks.
+- **#94** (CI red on main, 3898987): run 43886201385 failed only on `test-browser (firefox)` with a runner shutdown signal at 14:39:13Z. The other 13 jobs passed. Closed without a code change. The rerun (`--failed`, attempt 2) **also failed on `test-browser (firefox)`**; its log was not read.
+- **#102** (open, `ci-failure`): run 43933416586 on 5926674 failed only in `test-browser (firefox)`. Failing tests in the log: `test/fs/release.test.ts` (6 closed instances hold at most one database: expected 2 to be at most 1), `test/fs/tamper.test.ts` (32768-byte blocks, 180 s timeout), `test/fs/open.test.ts` (4 tests), `test/fs/close-failed.test.ts` (1 test). Nobody has commented on the issue. Whether this is a real regression, a memory or timeout effect of the shared runner, or the same cause as #94 is not known. The release test asserts a memory property, so do not loosen it to get green.
 - **#80** was reported by the harness as stopped. That is superseded: the STOP (workflow not yet on main) was resolved by merging #88 first, dispatching the workflow, and committing the result in #90. The issue is closed.
 
 ## What stopped, and why
 
 | Issue | Stop condition | Resolution |
 |---|---|---|
-| #76 | The only lever found needs a format change, a new block size, or a migration | The issue stays open. Owner decision (2026-11-16): after the Redmi runs of #82, #83 and #85, implement a fix only if one option brings the Redmi encrypted open (G2, 100 MB) under about 2x plain. If none does, go public with it documented as a known Android limitation. The earlier vivo V2250 result (G2 4.55x) is on #4; vivo is dropped, Redmi only |
+| #76 | The only lever found needs a format change, a new block size, or a migration | The issue stays open. Owner rule (2026-11-16): implement a fix only if one option brings the Redmi encrypted open (G2, 100 MB) under about 2x plain; otherwise go public with a documented Android limitation. The Redmi run (comment 20:00Z) gave: baseline 3.41x (8,601 vs 2,521 ms), pack N=4 2.42x, **pack N=8 2.17x (4,833 ms)**, workers W=2 2.98x, W=4 3.19x. OPFS read, 100 MB of 65,580 B records: 12.6 MB/s one file per record, 151.9 MB/s segment slices, 28.4 MB/s sync handle in a worker; the IndexedDB reads-only open is about 15 MB/s. Fable review (20:39Z, owner unavailable): 2.17x does not meet the rule, the pack layout is unpadded and cannot ship, padding is unmeasured and likely slower, write cost rises (Redmi G4 3,598 to 4,459 ms). Decision: ship #76 as a documented known Android limitation, fix later. The vivo V2250 result (4.55x) is on #4; vivo is dropped, Redmi only. Nothing was implemented or closed on this decision |
 | #80 | Workflow not on main, so `gh workflow run` could not succeed from the branch | Merge the workflow first (#88, "Refs #80"), dispatch on main, commit the JSON (#90). Done |
 | #85 | WebKit throws `DataCloneError` posting any `CryptoKey` (HKDF, AES-GCM, extractable or not) to a worker, so two WebKit suites fail under the patch | Owner chose option 1: workers on Chromium and Firefox, fallback to today's loader on `DataCloneError`, never export key bytes. Built as #97. Bench ran unthrottled because CDP cannot throttle workers |
 | #83 | Two raw IndexedDB layout tests fail only with the patch: `test/backend/indexeddb.test.ts` "adds nothing readable" and `test/fs/plaintext.test.ts` "nothing but blocks". Both assert one record per block, which packing removes by design | Owner accepted both failures for this bench-local patch only. They stay unchanged and must pass in any production version. First run's branch name was held by a stale worktree; work was on `agent/83-bench-pack-by-id-range`, then merged as #98 after a conflict fix |
@@ -62,7 +65,7 @@ Desktop findings behind #76 (Chromium, `gates100`):
 | Pack, key rotation | `QuotaExceededError` at N = 8 and 16. Store bytes do not change (no padding) |
 | OPFS read, 300 MB of 65,580 B records, Chromium / Firefox | per-record files 58.8 / 38.4 MB/s; segment slices 473 / 481 MB/s; sync-handle worker 444 / 659 MB/s. WebKit headless: `unavailable` |
 
-If the Redmi shows a real open gain from packing, a production version needs equal-size (padded) records so both layout tests pass, a fix for the G4 cost and a fix for the rotation quota error. That is a separate issue.
+The Redmi did show a gain from packing (3.41x to 2.17x at N=8). A production version needs equal-size (padded) records so both layout tests pass, a fix for the G4 cost and a fix for the rotation quota error. Fable's conditions on the decision: the docs state the Android numbers (3.4x on the Redmi Note 5 Pro, 4.55x on the vivo, 1.37x on desktop Chromium) and the cause (a sealed block of 65,580 B is over Chromium's 64 KiB IndexedDB value threshold, so each record is unwrapped on the requesting thread at about 1.1 ms; open time only, not a security issue); before going public, confirm a later store layout can be introduced behind a version or layout marker (only the `FORMAT_V1` rejection in `src/format/codec.ts` was seen; unchecked whether it covers store layout); then file a follow-up issue, an OPFS segment backend spike first and padded packing second, with layout tests redesigned and never loosened. That follow-up issue is not filed yet. Pack plus workers together was not measured (the patches collide in `src/backend/indexeddb.ts`); Fable's rough estimate is about 2.0x on an unshippable layout.
 
 ## Checkpoint findings
 
@@ -84,39 +87,49 @@ Earlier open findings, still without an issue: the interrupted-rotation case wit
 
 ## Benchmark gates
 
-Run on `main` at f649f3d (results commit 150e3a3, PR #99): `gates10, extras, gates100, year`, 20 runs per measure, p50. The `ops` part was not run. The page needs IndexedDB and a DOM, so there is no Node row; Node behaviour is covered by the test suite.
+Final re-run on `main` at f0f47c8 (results commit 332dcc8, PR #103): `gates10, extras, gates100, year`, 20 runs per measure, p50. It repeats the run merged earlier the same day (150e3a3, PR #99); `src/` did not change between them, and the later merges touched `bench/` and docs only. The `ops` part was not run. The page needs IndexedDB and a DOM, so there is no Node row; Node behaviour is covered by the test suite.
 
-Environment: Chromium 158 and Firefox 159 headless on the ROG G14 (Ryzen 5 4600HS, 15 GiB, shared with other harness sessions, heavy lock held). WebKit ran on the Mac (M1 Pro, 16 GiB, macOS 27.0.1), Playwright WebKit build, not Safari and not WKWebView. WebKit times come from a faster machine: compare plain against encrypted within one engine, and do not compare WebKit here with the 2026-11-15 container column. Ratio is encrypted p50 over plain p50. Judged by `bench/judge.ts` at factor 1.
+Environment: Chromium 158 and Firefox 159 headless on the ROG G14 (Ryzen 5 4600HS, 15 GiB, shared with other harness sessions, heavy lock held). WebKit ran on the Mac (M1 Pro, 16 GiB, macOS 27.0.1), Playwright WebKit build, not Safari and not WKWebView. WebKit times come from a faster machine: compare plain against encrypted within one engine, not across columns. Ratio is encrypted p50 over plain p50. Judged by `bench/judge.ts` at factor 1.
 
 | Gate | Target | Chromium | Firefox | WebKit (Mac) |
 |---|---|---|---|---|
-| G1 sync, 10 MB | ratio <= 2 | 0.05 (3.97 vs 80.9 ms) pass | 0.05 (7.26 vs 139.8 ms) pass | 0.03 (2.88 vs 99.8 ms) pass |
-| G1 sync, 100 MB | ratio <= 2 | 0.07 (4.78 vs 69.2 ms) pass | 0.05 (7.22 vs 148.6 ms) pass | 0.01 (2.28 vs 171.9 ms) pass |
-| G1b insert, 10 MB | ratio <= 2; <= 1 table block | 0.05; p50 1, max 1 pass | 0.05; 1 / 1 pass | 0.03; 1 / 1 pass |
-| G1b insert, 100 MB | same | 0.01; p50 1, max 2 pass on p50 | 0.01; 1 / 2 pass on p50 | 0.02; 1 / 2 pass on p50 |
-| G2 open, 10 MB | ratio <= 2 | 1.17 (470 vs 403 ms) pass | 1.12 (704 vs 630 ms) pass | 0.57 (162 vs 281 ms) pass |
-| G2 open, 100 MB | ratio <= 2 and <= 1,500 ms | 1.37, 945 ms pass | 1.02, 1,342 ms pass | 0.80, 339 ms pass |
-| G3 memory | db + 64 MB | not measurable (487 / 449 MB, whole renderer heap) | no memory API | no memory API |
-| G4 segment switch, 10 MB | <= 500 ms; <= 10x plain sync | 89.6 ms (1.11x) pass | 266 ms (1.90x) pass | 34.5 ms (0.35x) pass |
-| G4 segment switch, 100 MB | same | 98.9 ms (1.43x) pass | 282 ms (1.90x) pass | 33.0 ms (0.19x) pass |
+| G1 sync, 10 MB | ratio <= 2 | 0.07 (4.78 vs 67.3 ms) pass | 0.04 (6.42 vs 161 ms) pass | 0.02 (2.34 vs 98.7 ms) pass |
+| G1 sync, 100 MB | ratio <= 2 | 0.07 (4.70 vs 70.1 ms) pass | 0.05 (8.48 vs 166 ms) pass | 0.01 (2.26 vs 167 ms) pass |
+| G1b insert, 10 MB | ratio <= 2; <= 1 table block | 0.05; p50 1, max 1 pass | 0.04; 1 / 1 pass | 0.03; 1 / 1 pass |
+| G1b insert, 100 MB | same | 0.01; p50 1, max 2 pass on p50 | 0.01; 1 / 2 pass on p50 | 0.01; 1 / 2 pass on p50 |
+| G2 open, 10 MB | ratio <= 2 | 1.23 (470 vs 381 ms) pass | 1.09 (687 vs 631 ms) pass | 0.54 (156 vs 286 ms) pass |
+| G2 open, 100 MB | ratio <= 2 and <= 1,500 ms | 1.24, 956 ms pass | 1.06, 1,319 ms pass | 0.76, 329 ms pass |
+| G3 memory | db + 64 MB | not measurable (514 / 860 MB, whole renderer heap) | no memory API | no memory API |
+| G4 segment switch, 10 MB | <= 500 ms; <= 10x plain sync | 91.5 ms (1.36x) pass | 271 ms (1.68x) pass | 29.5 ms (0.30x) pass |
+| G4 segment switch, 100 MB | same | 90.9 ms (1.30x) pass | 282 ms (1.70x) pass | 30.2 ms (0.18x) pass |
 | G5 unit size | smallest passing G2 | n/a, 64 KB default passes | same | same |
 | G6 support | all present | pass | pass | pass |
 | G7 Rust store | recorded only | owner (Tauri only) | owner | owner |
-| G8 subkeys, one year | <= 150 ms | 2.63 ms (263 salts) pass | 10.5 ms pass | 15.8 ms pass |
-| G9 file-table phase, 10 MB | <= 5 % of G2 budget | 9.66 ms (limit 23.5) pass | 10.9 ms (limit 35.2) pass | 4.76 ms (limit 8.1) pass |
-| G9 file-table phase, 100 MB | <= 75 ms | 12.2 ms pass | 15.7 ms pass | 5.72 ms pass |
+| G8 subkeys, one year | <= 150 ms | 1.32 ms (263 salts) pass | 10.5 ms pass | 15.8 ms pass |
+| G9 file-table phase, 10 MB | <= 5 % of G2 budget | 8.95 ms (limit 23.5) pass | 10.7 ms (limit 34.4) pass | 4.54 ms (limit 7.8) pass |
+| G9 file-table phase, 100 MB | <= 75 ms | 10.8 ms pass | 20.9 ms pass | 5.42 ms pass |
 | G9 G1 sync writes no table block | p50 0 | pass | pass | pass |
 
 Other measurements (10 MB / 100 MB):
 
 | Measure | Chromium | Firefox | WebKit (Mac) |
 |---|---|---|---|
-| `changeKey` | 6.5 / 24.1 ms | 25.0 / 28.9 ms | 6.4 / 6.7 ms |
-| `verify()` | 393 / 838 ms | 684 / 1,474 ms | 105 / 262 ms |
-| `rotateDataKey` | 1,057 / 2,392 ms | 1,983 / 5,078 ms | 303 / 739 ms |
-| Open after rotation | 474 / 970 ms | 658 / 1,326 ms | 153 / 306 ms |
+| `changeKey` | 13.7 / 14.9 ms | 22.0 / 16.8 ms | 8.8 / 9.1 ms |
+| `verify()` | 370 / 842 ms | 642 / 1,513 ms | 111 / 241 ms |
+| `rotateDataKey` | 1,052 / 2,336 ms | 2,259 / 5,011 ms | 290 / 699 ms |
+| Open after rotation | 458 / 927 ms | 655 / 1,270 ms | 145 / 299 ms |
 
-Thinnest margins: Firefox G2 at 100 MB (1,342 of 1,500 ms) and the Chromium G2 ratio at 100 MB (1.37 of 2; 1.50 on 2026-11-15, 1.34 on 2026-11-13, so noise on the shared host is plausible, unverified).
+Thinnest margins: Firefox G2 at 100 MB (1,319 of 1,500 ms) and the Chromium G2 ratio (1.23 and 1.24 of 2; the earlier run the same day gave 1.17 and 1.37, 1.50 on 2026-11-15, so noise on the shared host is plausible, unverified).
+
+**Android, Redmi Note 5 Pro** (Chrome 157, Android 10, custom ROM; PR #101, not merged; gates100, 5 runs, unthrottled, main 0ef35b3 plus the named patch). G2 at 100 MB, p50:
+
+| Config | Plain ms | Encrypted ms | Ratio | Limit |
+|---|---|---|---|---|
+| baseline | 2,521 | 8,601 | 3.41 **fail** | <= 2 and <= 3,000 ms (slowest target) |
+| pack N=4 (bench patch) | 2,547 | 6,174 | 2.42 **fail** | same |
+| pack N=8 (bench patch) | 2,228 | 4,833 | 2.17 **fail** | same |
+| workers W=2 (bench patch) | 2,275 | 6,787 | 2.98 **fail** | same |
+| workers W=4 (bench patch) | 2,171 | 6,923 | 3.19 **fail** | same |
 
 **WebView2 on the GitHub-hosted Windows VM** (run 43842286655, WebView2 runtime 156.0.4314.58, Edg/156, 2 vCPU, 8 GB, 3 runs; Chromium-based, a different machine class from the table above):
 
@@ -133,7 +146,7 @@ The G2 miss is the same read-bound open as #76 on Android. The VM is a 2 vCPU sh
 
 ## SQLCipher parity as it stands
 
-Source: `docs/plan/01-sqlcipher-comparison.md` section 2, 31 rows, last re-judged 2026-11-12. Its count: stronger 8, parity 14, n/a 2, weaker 7 (1 reduced, 6 accepted). This run changed no verdict. `src/` changed only for best-effort plaintext wipe (#91), which the table's "Memory: key material" and "Memory: data" rows already list as weaker and accepted; the narrowed wording means the wipe claim covers snapshot and block copies only.
+Source: `docs/plan/01-sqlcipher-comparison.md` section 2, 31 rows, last re-judged 2026-11-12 (the file was last changed 2026-11-13, for the open read-ahead). Its count: stronger 8, parity 14, n/a 2, weaker 7 (1 reduced, 6 accepted). This run changed no verdict. `src/` changed only for best-effort plaintext wipe (#91), which the table's "Memory: key material" and "Memory: data" rows already list as weaker and accepted; the narrowed wording means the wipe claim covers snapshot and block copies only.
 
 | Verdict | Rows |
 |---|---|
@@ -144,30 +157,30 @@ Source: `docs/plan/01-sqlcipher-comparison.md` section 2, 31 rows, last re-judge
 
 Where the table and reality differ:
 
-- Open time: the table estimated +0.5 to 4 s at 100 MB. Desktop numbers are 0.80 to 1.37x plain (339 to 1,342 ms). Android is the outlier: 3.4x on the Redmi (8.6 s at 100 MB against a 3 s phone budget), 4.55x on the vivo, and 4.14x (2.7 s) on the WebView2 CI VM.
+- Open time: the table estimated +0.5 to 4 s at 100 MB. Desktop numbers are 0.76 to 1.24x plain at 100 MB (329 to 1,319 ms). Android is the outlier: 3.41x on the Redmi (8.6 s at 100 MB against a 3 s phone budget; 2.17x at best with an unshippable bench patch), 4.55x on the vivo, and 4.14x (2.7 s) on the WebView2 CI VM.
 - Migration tooling is marked "parity once PC-10 is in". PC-10 was not filed (owner question 1 = A); treat the row as not applicable.
 - "Stronger" describes the design and is exercised by `test/format`, `test/fs`, `test/keys`. This report did not rerun them.
 - Maturity stays weaker. The package is not audited and must not be described as audited.
 
 ## What the owner must do next
 
-1. **Redmi device runs (#4, #76)**, phone unlocked. These decide #76. Needed: opfsread (#82), pack N = 1, 4, 8 (#83, `--pack`), and workers W = 1, 2, 4 (#85, `--workers`, unthrottled). Commands are in `bench/README.md` and the "Owner-only checks" comments on #4. Apply the #76 rule: implement a fix only if one option brings the Redmi G2 at 100 MB under about 2x plain; otherwise document it as a known Android limitation.
+1. **Confirm or overrule the #76 decision.** The Redmi run is done; Fable decided (owner unavailable) to ship #76 as a documented known Android limitation. If you agree: write the limitation into the docs (numbers and cause are in the stopped table), check that a later store layout can be introduced behind a version or layout marker, and file the follow-up (OPFS segment backend spike first, padded packing second). Merge or close PR #101 (the Redmi result files). Tick the Redmi boxes on #4. Pack plus workers together is optional and unmeasured.
 2. **A real WebView2 run** on a Windows machine (Tauri shell, `bench/README.md`). The CI run is a 2 vCPU stand-in that fails G2 and G4; a real machine decides whether those are VM artefacts.
 3. **Other device runs** (#4): the Tauri shell on macOS (WKWebView) at 10 and 100 MB; the oldest supported iPhone; iPad Air M3 Safari `gates100` to confirm #41; the iPhone 15 re-run for #42; Android WebView. The Journal tech article waits for these.
 4. **Owner-only boxes.** G7 (Rust store throughput; Tauri shell with `encfs-bench`; needs `docs/plan/journal/02-native-bench-endpoints.md`) and G3 on a device with a memory API (Chromium's number is the whole renderer heap, so it cannot be judged).
 5. **Triage the unverified checkpoint-2 findings.** Item 1 (the weakened memory assertion in `workers.patch`) matters most: it touches a test, and CLAUDE.md forbids loosening one. It is in a bench-local patch that is not applied to `src/`, but check it before the patch is ever promoted. Item 6 (licence before history rewrite) belongs to the prepublic plan.
-6. **Firefox CI job.** Read the `test-browser (firefox)` failure on run 43886201385 (both attempts). If it is the runner and not an assertion, say so on #94 or reopen it.
+6. **Firefox CI job (#102).** `test-browser (firefox)` failed on 5926674 (seven tests, log above) and on 3898987 (#94, both attempts, log of attempt 2 unread). Read the run for cd47348 once it finishes. If the failures repeat, this is a real problem and needs an agent or you; do not loosen `test/fs/release.test.ts` or `tamper.test.ts`.
 7. **Decide which open findings block a release** and which become issues: the damaged-new-store case at an interrupted rotation, the six minor `changeKey` items, the idbread findings, the `#unsettled` close path, and the small bench findings listed above.
 8. **Journal-side plan files** in `docs/plan/journal/` (17 files, `01` to `17`). The harness has done no Journal-side work. `07-1017-wire-encrypted-fs.md` is the one that uses this package. Others: `01` optional submodule; `02` native bench endpoints (G7); `03` query cache in PGlite; `04` to `06` native secrets, credentials, sealed device storage; `10` recovery, reset, sign-out; `11` to `14` settings, app lock, iOS Keychain, Android Keystore; `15` desktop sign-in window residue; `16` at-rest scanner and device checklist; `17` epic rewrite. `08` and `09` (native migration, plaintext sweep) are not needed under answer 1A.
 9. **Nightly workflow.** Trigger once with `workflow_dispatch` and read the first run. The 2,000-transaction crash matrices have not run to completion anywhere.
-10. **Licence and CLA** (#95) are in; the pre-public plan (#76 fix or documented limitation, history rewrite, FSL + CLA under the owner's name) is the next gate before the repository goes public.
+10. **Licence and CLA** (#95) are in; the pre-public plan (#76 documented limitation as above, #102 green, history rewrite, FSL + CLA under the owner's name) is the next gate before the repository goes public.
 11. **Clean up** stale worktrees under `.claude/worktrees/wf_*` and merged local branches.
 
 ## Risks
 
-- **Android open time.** Unfixed. Packing does not help on desktop and costs G4 and rotation; workers help desktop modestly (903 to 724 ms) and are Chromium and Firefox only, so WebKit and WKWebView get nothing. Whether either helps the Redmi is unmeasured.
+- **Android open time.** Unfixed. Packing does not help on desktop and costs G4 and rotation; workers help desktop modestly (903 to 724 ms) and are Chromium and Firefox only, so WebKit and WKWebView get nothing. On the Redmi, pack N=8 is the best (3.41x to 2.17x, an unshippable unpadded layout) and workers help little (2.98x, 3.19x). The shipped state is 3.41x on the Redmi and 4.55x on a stock vivo at 100 MB, to be documented as a known limitation.
 - **WebView2 and slow machines.** The CI VM fails G2 (4.14x, 2.7 s) and G4 (535 ms at 100 MB). If a real Windows machine behaves similarly, the 1,500 ms desktop budget is not met on Windows.
-- **CI is unverified for this run.** The last completed main run for a commit of this run is 43886201385 (3898987), which failed on `test-browser (firefox)` in both attempts, cause unread. Runs for eeefbff, f649f3d and 0ef35b3 were cancelled by newer pushes; the run for 5926674 was queued when this was written. No green result is known. Firefox and WebKit full suites ran locally for none of this run's PRs; the Firefox full suite is OOM-killed at the 8 GB heavy cap on the G14.
+- **CI on main is red.** Run 43933416586 (5926674) failed on `test-browser (firefox)` (#102, seven tests). The earlier completed run, 43886201385 (3898987), failed on the same job in both attempts (#94). Runs for d779b2e, eeefbff, f649f3d and 0ef35b3 were cancelled by newer pushes; the run for cd47348 was queued when this was written. No green result is known for any commit of this run. Firefox and WebKit full suites ran locally for none of this run's PRs; the Firefox full suite is OOM-killed at the 8 GB heavy cap on the G14.
 - **Checkpoint 2 is unverified.** Seven findings were not checked, and no build, lint or test was run in it.
 - **Bench patches are not in `src/`.** `workers.patch` and `pack.patch` are applied only on the bench box. The two `pack.patch` layout-test failures are accepted for that patch only.
 - **Open memory.** The read-ahead is about 64 MB of ciphertext on top of the database. G3 is unmeasurable headless. The whole database is held as plaintext while the app is open; the wipe on close is best-effort.
