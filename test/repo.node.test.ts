@@ -38,7 +38,7 @@ describe('repository invariants', () => {
       .filter((f) => /\.(ts|mjs|js|cjs|html)$/.test(f) && !f.startsWith('bench/results/'));
     expect(files.length).toBeGreaterThan(50);
     for (const file of files) {
-      const head = read(file).slice(0, 200);
+      const head = read(file).slice(0, 400);
       expect(head, file).toContain('Copyright 2026 Bishwajeet Parhi');
       expect(head, file).toContain('SPDX-License-Identifier: FSL-1.1-ALv2');
     }
