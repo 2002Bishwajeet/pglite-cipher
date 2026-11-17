@@ -1,0 +1,152 @@
+# pglite-cipher: integration guide for coding agents
+
+pglite-cipher adds encryption at rest to PGlite (Postgres compiled to WASM), the way SQLCipher does for SQLite. It is a PGlite filesystem, `EncryptedFs`. Postgres runs unchanged on top of it. Every file under PGDATA is encrypted with AES-256-GCM through WebCrypto and stored as blocks in IndexedDB. File names, sizes and the file count are hidden, and tampering is detected at open.
+
+Facts to keep in mind:
+- Browser and webview only (IndexedDB plus WebCrypto). Node works for tests with `MemoryBackend`.
+- `@electric-sql/pglite` `^0.5.10` is a peer dependency. pglite-cipher has no runtime dependencies.
+- The whole database is decrypted into memory at open, as with PGlite's `idb://`. While it is open, its contents are plaintext in memory.
+- Licence: FSL-1.1-ALv2 (any use except a competing commercial product; Apache 2.0 two years after each release).
+
+## Install
+
+It is not on npm yet. Add the repository as a git submodule and import from its source; the app's bundler (for example Vite) compiles the TypeScript:
+
+```sh
+git submodule add https://github.com/2002Bishwajeet/pglite-cipher vendor/pglite-cipher
+```
+
+```ts
+import { EncryptedFs, IndexedDbBackend, importKek } from '../vendor/pglite-cipher/src/index.ts';
+```
+
+The app provides `@electric-sql/pglite` from its own `node_modules`.
+
+## The integration change
+
+Before (plain PGlite in IndexedDB):
+
+```ts
+import { PGlite } from '@electric-sql/pglite';
+const pg = await PGlite.create('idb://my-app');
+```
+
+After (encrypted):
+
+```ts
+import { PGlite } from '@electric-sql/pglite';
+import { EncryptedFs, IndexedDbBackend, importKek } from 'pglite-cipher';
+
+const key = await importKek(raw32Bytes); // zeroes raw32Bytes once imported
+const fs = new EncryptedFs({ backend: IndexedDbBackend.pair('data'), key, mode: 'open-or-create' });
+const pg = await PGlite.create({ fs, relaxedDurability: true });
+
+// Queries are unchanged.
+await pg.exec('CREATE TABLE IF NOT EXISTS notes (id serial PRIMARY KEY, body text)');
+
+// PGlite does not always sync when it should: sync strictly when it matters.
+addEventListener('pagehide', () => { void fs.syncToFs(false); });
+
+await pg.close(); // waits for a running sync, then commits everything strictly
+```
+
+Notes:
+- `IndexedDbBackend.pair('data')` opens two IndexedDB databases, `data.a` and `data.b`. It is needed for `rotateDataKey`. `new IndexedDbBackend('data')` is a single store, which is enough if you never rotate.
+- Use a database name that says nothing (`data`, not `notes-encrypted`).
+- One writer per store. A second instance on the same store loses at its next sync (`StaleWriterError`).
+- Keep Postgres temp files inside PGDATA. Don't point `temp_tablespaces` or a tablespace elsewhere.
+
+## The key
+
+`EncryptedFs` takes a key-encryption key (KEK). That is a non-extractable AES-GCM `CryptoKey` with the usages `wrapKey` and `unwrapKey`. The package wraps its own random data key with it. Never log the key or put it in an error.
+
+- **From the platform keychain (recommended for apps):** get 32 random bytes from iOS Keychain, Android Keystore or the Tauri or OS secret store through the host bridge, then call `importKek(bytes)`.
+- **Browser only:** generate a non-extractable key and keep the `CryptoKey` object in IndexedDB. Structured clone stores it without exposing the bytes:
+  `await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey'])`.
+  Anyone with the browser profile then has both the store and the key, so this protects against less than a keychain does.
+- There is no passphrase API. If you need one, derive the 32 bytes yourself with WebCrypto (PBKDF2 or HKDF), outside this package.
+
+## Migrating an existing plaintext `idb://` database
+
+Dump the old data directory, load it into a new encrypted store, then delete the plaintext copy:
+
+```ts
+const old = await PGlite.create('idb://my-app');
+const tar = await old.dumpDataDir('none'); // plaintext: keep it in memory only
+await old.close();
+
+const fs = new EncryptedFs({ backend: IndexedDbBackend.pair('data'), key, mode: 'create' });
+const pg = await PGlite.create({ fs, loadDataDir: tar, relaxedDurability: true });
+await fs.syncToFs(false); // strict: the encrypted copy is durable now
+
+// Only after checking the data in `pg`:
+indexedDB.deleteDatabase('/pglite/my-app'); // PGlite's idb:// database; confirm the name in DevTools > Application > IndexedDB
+```
+
+## Open modes
+
+| `mode` | Empty storage | Existing store |
+|---|---|---|
+| `open` | `StoreMissingError` | loads it |
+| `create` | creates a store | `StoreExistsError` |
+| `open-or-create` | creates a store | loads it |
+
+Storage that holds something other than a complete store is never initialised over.
+
+## Errors, and what the app should do
+
+| Error | Meaning | What to do |
+|---|---|---|
+| `WrongKeyError` | The key does not open the store | Find the right key. Never reset; the data is intact |
+| `CorruptStoreError` | A record was changed, lost, added or replayed | Restore from a backup, or let the user choose to start over. Never reset automatically |
+| `IncompleteStoreError` | `rotation: false`: a create that never finished. `rotation: true`: an interrupted rotation on a single backend | `rotation: false`: `backend.clear()` and create again, after asking the user. `rotation: true`: reopen with `openOrigin`; never clear |
+| `UnsupportedFormatError` | A newer version wrote the store | Update the app. Never reset |
+| `StoreMissingError` | `open` found empty storage | Create it, or report the missing data |
+| `StoreExistsError` | `create` found a non-empty store | Open it instead, or use another name |
+| `StaleWriterError` | Another instance wrote the store | Close and reopen; unsynced changes are lost |
+| `StoreFullError` | A sync would pass the format's limits | Nothing was written. Report it |
+| `KeyChangeUnknownError` | `changeKey` could not tell whether the new key was written | Keep both keys; call `changeKey` again, or open with either |
+| `CryptoSelfTestError` | WebCrypto gives wrong answers on this platform | Do not use encryption here |
+
+A close whose sync fails rejects with the backend's error. Drop that PGlite instance and open the store again; it opens at the last sync.
+
+## API
+
+- `new EncryptedFs(options: EncryptedFsOptions)`, where the options are:
+  - `backend`: a `StorageBackend`, or a pair of them;
+  - `key`: `CryptoKey`;
+  - `mode`: `OpenMode`;
+  - `blockSize?`: `BlockSize` (8192, 32768 or 65536; default 65536);
+  - `onProgress?(OpenProgress)` during the open;
+  - `onFatal?(error)` when the instance stops syncing for good;
+  - `openOrigin?(name)`, to resume a rotation on a single backend.
+- `fs.syncToFs(relaxed?: boolean)`: `false` gives a strict, durable sync.
+- `fs.hasDirty()`: unsynced changes exist. Don't use it to skip a strict sync.
+- `fs.changeKey(newKek: CryptoKey)`: re-wraps the data key at once. Someone holding an old header copy and the old key can still read later copies.
+- `fs.rotateDataKey(options?: RotateOptions)`: re-encrypts into the pair's other store under a new data key. Use it after a suspected exposure: run `changeKey`, then `rotateDataKey`.
+- `fs.verify(options?: VerifyOptions)`: checks every record, and returns a `VerifyResult` (`{ ok, files, blocks, problems }`).
+- `verifyStore(backend, key)`: does the same without Postgres.
+- `fs.stats()`: returns `EncryptedFsStats` (counts and timings, never keys or contents).
+- `importKek(raw: Uint8Array)`: 32 bytes to a KEK; it zeroes the input.
+- `IndexedDbBackend` (`new IndexedDbBackend(name)`, `IndexedDbBackend.pair(name)`) and `MemoryBackend` (tests).
+- Constants: `VERSION`, `FORMAT_VERSION`.
+
+## Memory on phones
+
+The data directory is larger than the database, mostly because of WAL. To shrink it:
+
+```ts
+const pg = await PGlite.create({
+  fs,
+  relaxedDurability: true,
+  startParams: [...PGlite.defaultStartParams, '-c', 'shared_buffers=16MB', '-c', 'min_wal_size=32MB', '-c', 'max_wal_size=32MB'],
+});
+await pg.exec('CHECKPOINT'); // after bulk work
+```
+
+## Known limits
+
+- Plaintext in memory while the database is open. Copies the app makes (query results) are not wiped.
+- A rollback of the whole store to an older full copy is not detected.
+- Exports (`dumpTar`, `dumpDataDir()`, `pg_dump`) are plaintext.
+- On Android Chrome, the encrypted open is about 3.4× the plain open (100 MB: 8.6 s against 2.5 s on a Redmi Note 5 Pro). Desktop browsers are 1.6× or less.

@@ -37,6 +37,7 @@ See [`SECURITY.md`](SECURITY.md) and the [threat model](docs/design/threat-model
 - [Design](docs/design/README.md): how it works, [performance](docs/design/performance.md) (including the known Android limit), and [comparisons](docs/design/comparison.md) with SQLCipher and others
 - [`FORMAT.md`](FORMAT.md): the on-disk format, version 1
 - [`bench/README.md`](bench/README.md): the benchmark
+- [`llms.txt`](llms.txt) and [`llms-full.txt`](llms-full.txt): for coding agents that integrate it
 
 ## Develop
 
