@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Rotation crash matrix: for every k, the stores after a kill at write k open to the step-1 state before the switch commit, the catch-up snapshot after it, with one store and no orphan record.
 // Browser: every tenth k and the two around the switch. CIPHER_LONG: a 100 MB store and every k.
 import type { PGlite } from '@electric-sql/pglite';

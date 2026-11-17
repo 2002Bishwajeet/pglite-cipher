@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Side record of a killed worker's progress: an IndexedDB database written before and after each row, read by the page after the kill.
 export const progressName = (name: string) => `${name}-progress`;
 

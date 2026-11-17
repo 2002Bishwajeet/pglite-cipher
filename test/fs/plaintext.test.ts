@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Stored bytes show equal-size blocks under random ids, and no plain text, path or byte naming the format.
 import { describe, expect, it } from 'vitest';
 import type { RecordKey, StorageBackend } from '../../src/backend/backend.ts';

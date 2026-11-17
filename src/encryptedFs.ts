@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // The PGlite filesystem that encrypts below Postgres: MEMFS while running, sealed blocks plus a new
 // root committed atomically on each sync (FORMAT.md).
 import { MemoryFS, type PGlite } from '@electric-sql/pglite';

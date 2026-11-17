@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // llms-full.txt is read by coding agents: every exported name it mentions must really be exported.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Fixed binary encodings of the header meta, root body and table-block bodies (FORMAT.md sections 4, 6, 7).
 // Decoders throw only CorruptStoreError or UnsupportedFormatError; encoders throw RangeError.
 import type { Bytes } from './bytes.ts';

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // A closed instance holds no database: reachable closed instances must not grow with cycles after GC. Bound 1 in Node, Chromium, Firefox (a stale stack pointer); 2 in WebKit,
 // where plain PGlite keeps two. No engine gives a page gc(): allocation is the GC opportunity, repeated until the bound holds or a minute passes.
 import type { PGlite } from '@electric-sql/pglite';

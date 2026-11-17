@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // CIPHER_LONG=1 (`npm run test:long`, nightly): longer fuzz, property, crash and soak runs.
 import { inject } from 'vitest';
 

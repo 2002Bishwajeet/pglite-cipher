@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // A load holds at most two pages of ciphertext (the next is read while one decrypts). The counting backend zero-fills
 // every page but the latest once the next read starts, so a load using an older page or a view into it fails.
 import { PGlite } from '@electric-sql/pglite';

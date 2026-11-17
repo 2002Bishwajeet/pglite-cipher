@@ -1,3 +1,6 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { BlockBitmap } from '../../src/tracker/bitmap.ts';

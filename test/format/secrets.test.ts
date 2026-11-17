@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // No plaintext, path or key in a stored value or in an error message.
 import { describe, expect, it } from 'vitest';
 import { ascii, type Bytes } from '../../src/format/bytes.ts';

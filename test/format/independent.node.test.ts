@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Reads the vectors from FORMAT.md with node:crypto only and imports nothing from src/, so two self-agreeing implementations fail.
 import { createDecipheriv, createHash, hkdfSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';

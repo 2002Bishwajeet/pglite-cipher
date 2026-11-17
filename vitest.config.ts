@@ -1,3 +1,6 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
 import { realpathSync } from 'node:fs';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';

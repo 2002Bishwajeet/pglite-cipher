@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Cross-engine compat lock: CIPHER_COMPAT_WRITE=1 writes test-results/compat/<engine>.bin; CIPHER_COMPAT_READ=<engine>,… opens them elsewhere. Catches engines that read only their own stores.
 // Without either variable nothing runs; reference.test.ts opens the frozen v1 store on every engine.
 import { describe, expect, inject, it } from 'vitest';

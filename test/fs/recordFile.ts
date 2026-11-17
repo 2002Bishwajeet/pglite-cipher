@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // A whole store in one file for test/fixtures: per record u8 key length ‖ key (ASCII "0", "1", "2" or 32-hex id) ‖ u32 big-endian value length ‖ value.
 import type { RecordKey } from '../../src/backend/backend.ts';
 

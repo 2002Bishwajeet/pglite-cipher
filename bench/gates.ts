@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Nightly gate check: judges bench/run.mjs results against the budgets times `--factor`, prints Markdown tables, exits 1 on failure.
 // Usage: node bench/gates.ts --factor 2 --require gates100,year bench/results/chromium.json ...
 import { readFileSync } from 'node:fs';

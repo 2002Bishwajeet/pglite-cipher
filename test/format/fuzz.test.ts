@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Decoder fuzz: every decoder and assembleFiles gives a value or a documented error, never another exception or a hang.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';

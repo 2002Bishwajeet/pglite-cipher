@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 /** A set of block indexes, one bit each: 16 KB for a 1 GB file of 8 KB blocks. */
 export class BlockBitmap {
   #words = new Uint32Array(0);

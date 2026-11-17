@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Benchmark page: EncryptedFs over IndexedDbBackend vs plain IdbFs; gates G1-G9 (bench/README.md), key operations.
 // The `extras` crypto-overhead rows and the `ops` part follow davidmuggleton/pglite-encrypted-fs's bench (MIT, THIRD_PARTY.md).
 import { IdbFs, PGlite } from '@electric-sql/pglite';

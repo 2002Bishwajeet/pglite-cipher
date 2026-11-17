@@ -1,3 +1,7 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -25,6 +29,18 @@ describe('repository invariants', () => {
       const runsOn = read(`.github/workflows/${file}`).match(/^ +runs-on: .*$/gm) ?? [];
       expect(runsOn.length, file).toBeGreaterThan(0);
       for (const line of runsOn) expect(line, file).not.toContain('self-hosted');
+    }
+  });
+
+  it('puts the licence header on every code file', () => {
+    const files = execFileSync('git', ['ls-files'], { cwd: new URL('..', import.meta.url), encoding: 'utf8' })
+      .split('\n')
+      .filter((f) => /\.(ts|mjs|js|cjs|html)$/.test(f) && !f.startsWith('bench/results/'));
+    expect(files.length).toBeGreaterThan(50);
+    for (const file of files) {
+      const head = read(file).slice(0, 200);
+      expect(head, file).toContain('Copyright 2026 Bishwajeet Parhi');
+      expect(head, file).toContain('SPDX-License-Identifier: FSL-1.1-ALv2');
     }
   });
 

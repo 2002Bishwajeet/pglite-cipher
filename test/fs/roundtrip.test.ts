@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // A PGlite instance on EncryptedFs survives close and reopen with all data; pg_trgm and live work.
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live, type PGliteWithLive } from '@electric-sql/pglite/live';

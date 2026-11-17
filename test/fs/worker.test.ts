@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Worker killed mid-sync (browser only: a real Web Worker on the engine's IndexedDB) at a random moment of a write workload.
 // The next worker must open, let Postgres recover, and find an acknowledged prefix of rows: all acknowledged durable, at most one in flight.
 import { describe, expect, it } from 'vitest';

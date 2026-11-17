@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Shared by the tracker tests: PGlite's Emscripten FS, a trivially correct model store, and the check that the model holds what MEMFS holds.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';
 import type { EmscriptenFS, MemFS, MemNode, Snapshot, SnapshotInode, StoredFile } from '../../src/tracker/tracker.ts';

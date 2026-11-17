@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Known-answer check of HKDF-SHA256 → AES-256-GCM seal → open, once per process before the first operation: a webview
 // whose crypto differs must fail here, not write a store nobody can read.
 import { equalBytes, type Bytes } from './bytes.ts';

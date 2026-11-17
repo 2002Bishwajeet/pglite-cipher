@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Session subkeys (rule 4) and fresh randomness: salts, nonces and ids never repeat.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Bytes } from '../../src/format/bytes.ts';

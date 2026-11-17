@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Shared by the filesystem tests: PGlite on an EncryptedFs, backend record copies, and a reader of a store's file table using the format functions alone.
 import { MemoryFS, PGlite, type PGliteOptions } from '@electric-sql/pglite';
 import { expect } from 'vitest';

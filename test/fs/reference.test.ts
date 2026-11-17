@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // The frozen format v1 reference store (test/fixtures/v1-reference): every later version must open it with the published test key.
 import { describe, expect, it } from 'vitest';
 import { importKek } from '../../src/format/keys.ts';

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Every parameter a reader acts on is authenticated before it is acted on.
 import { describe, expect, it } from 'vitest';
 import { ascii, concat, randomBytes, type Bytes } from '../../src/format/bytes.ts';

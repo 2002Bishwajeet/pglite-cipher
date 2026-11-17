@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // The behaviour every StorageBackend must have, as one vitest suite: `runBackendConformance(name, () => new MyBackend())`.
 import { afterEach, describe, expect, it } from 'vitest';
 import { StaleWriterError } from '../format/errors.ts';

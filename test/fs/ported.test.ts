@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Scenarios ported from davidmuggleton/pglite-encrypted-fs (MIT, see THIRD_PARTY.md), adapted to a KEK and a backend.
 // Its passphrase-only cases have no counterpart.
 import type { PGlite } from '@electric-sql/pglite';

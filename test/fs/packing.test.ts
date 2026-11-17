@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Incrementally packed file table: after random file operations it still describes MEMFS exactly and stays within twice its dense size;
 // removals taking it under half full repack it once; a crash at the repack commit leaves the old table or the new.
 import { PGlite } from '@electric-sql/pglite';

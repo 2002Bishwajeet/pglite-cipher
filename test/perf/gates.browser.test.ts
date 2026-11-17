@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // PR perf gates (Chromium only): G1, G2, G4, G9 at 10 MB, as ratios against plain idb:// in the same run so they hold on any machine; absolute ms are the nightly bench's.
 // G9: a sync that changes no file writes no table block; GIN pending-list growth may, counted in `g1.fileChanges`. G2: 20 interleaved opens per variant, each timed open after an untimed one of the same variant.
 // G4's denominator is the plain normal sync; `ratios` also records the switch ratios, unasserted.

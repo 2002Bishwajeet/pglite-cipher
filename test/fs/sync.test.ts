@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Sync pipeline: serialised syncs, relaxed and strict durability, a second writer, and the three upstream PGlite bugs (issues 1191, 1065, 1063) this filesystem must not depend on.
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';

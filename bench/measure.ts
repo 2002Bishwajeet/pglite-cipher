@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Shared by the bench page and test/perf/gates.browser.test.ts: a note-taking database on plain IdbFs and on
 // EncryptedFs over IndexedDB, timed the same way (gates G1-G4, G9).
 import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // The store behind the encrypted filesystem: three fixed slots plus blocks under random ids. A backend sees keys and
 // opaque bytes only: no key, no decryption, no file ids.
 import { equalBytes } from '../format/bytes.ts';

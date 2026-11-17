@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // File table: pack, encode, decode and assemble round-trip; every defect is CorruptStoreError, the limit StoreFullError.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
