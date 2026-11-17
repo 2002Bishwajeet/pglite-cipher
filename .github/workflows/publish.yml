@@ -1,7 +1,7 @@
 name: publish
 
-# A version tag (v0.1.0) publishes that version to npm with provenance. Auth is npm trusted
-# publishing (OIDC); NPM_TOKEN is only for a first publish, before the trusted publisher exists.
+# A version tag (v0.1.0) publishes that version to npm. Auth is npm trusted publishing (OIDC):
+# no token exists anywhere, and npm attaches provenance on its own.
 on:
   push:
     tags: ['v*']
@@ -20,7 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           cache: npm
       # Trusted publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@^11.5.1
@@ -30,6 +29,4 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --access public
