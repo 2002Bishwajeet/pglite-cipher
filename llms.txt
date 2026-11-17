@@ -1,0 +1,18 @@
+# pglite-cipher
+
+> Encryption at rest for PGlite (Postgres in the browser and in webviews), like SQLCipher for SQLite. It is a PGlite filesystem (`EncryptedFs`) that encrypts every file under PGDATA with AES-256-GCM through WebCrypto, stores the blocks in IndexedDB, hides file names and sizes, and detects tampering at open. No runtime dependencies; `@electric-sql/pglite` (^0.5.10) is a peer dependency. While the database is open, its contents are plaintext in memory.
+
+To add it to an app that already uses PGlite, read llms-full.txt: it is self-contained.
+
+## Docs
+
+- [llms-full.txt](https://raw.githubusercontent.com/2002Bishwajeet/pglite-cipher/main/llms-full.txt): everything an agent needs to integrate it, in one file
+- [README](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/README.md): what it is and a quick start
+- [Usage](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/usage.md): options, syncing, open modes, errors, keys and rotation, verify(), memory on mobile
+- [Security](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/SECURITY.md): threat model and primitives
+
+## Optional
+
+- [Design](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/design/README.md): architecture, format, integrity, keys
+- [Performance](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/design/performance.md): numbers, and the known slow open on Android Chrome
+- [On-disk format](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/FORMAT.md)
