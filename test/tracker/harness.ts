@@ -10,7 +10,7 @@ export interface Stream {
 }
 
 export interface TestFS extends EmscriptenFS {
-  filesystems: { MEMFS: MemFS };
+  filesystems?: { MEMFS: MemFS };
   open(path: string, flags: number, mode?: number): Stream;
   close(stream: Stream): void;
   write(stream: Stream, buffer: Uint8Array, offset: number, length: number, position?: number, canOwn?: boolean): number;
@@ -35,9 +35,17 @@ export interface TestFS extends EmscriptenFS {
 
 export interface TestModule {
   FS: TestFS;
+  MEMFS?: MemFS;
   HEAPU8: Uint8Array;
   _free(ptr: number): void;
 }
+
+/** MEMFS from FS.filesystems (PGlite up to 0.5.14) or the module (0.5.15 and later), as EncryptedFs takes it. */
+export const memfsOf = (mod: { FS: TestFS; MEMFS?: MemFS }): MemFS => {
+  const memfs = mod.FS.filesystems?.MEMFS ?? mod.MEMFS;
+  if (!memfs) throw new Error('no MEMFS');
+  return memfs;
+};
 
 export const O_RDWR_CREAT = 0o102;
 export const PROT_RW = 3;
