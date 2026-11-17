@@ -83,7 +83,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install ${{ matrix.browser }}
-      - run: npm run test:browser -- --project ${{ matrix.browser }}
+      # Firefox keeps about three times the memory of Chromium for the same file (open.test.ts alone:
+      # 8.7 GB against 2.5 GB, measured on yantra-box 2026-11-17), and the runner unit is capped at
+      # 10 GB. Peak resident memory of the suite, summed over the process tree: 14.3 GB at the default
+      # 4 files at a time (OOM-killed or throttled into timeouts in CI), 13.6 GB at 2, 8.5 GB at 1
+      # (535 s). It does not grow across files: it falls back to 3-4 GB between them, so this is a
+      # per-file peak, not a leak. One file at a time is the only setting under the cap.
+      - run: npm run test:browser -- --project ${{ matrix.browser }} ${{ matrix.browser == 'firefox' && '--maxWorkers=1' || '' }}
 
   # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
   # every engine opens both. Two engines that each read only their own stores is what this catches.
