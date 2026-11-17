@@ -88,7 +88,7 @@ both.
 ## Reporting a vulnerability
 
 Report it privately: open a private security advisory on this repository (GitHub, **Security**,
-**Report a vulnerability**), or, if that is not available to you, contact the repository owner
-directly. Do not open a public issue. Include the version or commit, the engine and platform, and
+**Report a vulnerability**), or, if that is not available to you, email
+[mail@bishwajeetparhi.dev](mailto:mail@bishwajeetparhi.dev). Do not open a public issue. Include the version or commit, the engine and platform, and
 the steps or the store that shows the problem. Never send a real key, a passphrase or a store that
 holds personal data; a store made with a throwaway key is enough.
