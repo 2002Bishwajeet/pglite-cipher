@@ -1,5 +1,6 @@
-// The open state machine: every store state against every mode. A failed open throws its own error,
-// changes nothing in the backend, creates nothing in MEMFS, and so never lets PGlite run initdb.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Open state machine: every store state against every mode. A failed open throws its own error and changes nothing in the backend or MEMFS, so initdb never runs.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it, vi } from 'vitest';
 import type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from '../../src/backend/backend.ts';
@@ -80,7 +81,6 @@ class MidLoad implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/** Opens in `mode` and expects `type`; the backend must be byte-identical and MEMFS untouched. */
 async function expectRefused(memory: MemoryBackend, key: CryptoKey, mode: OpenMode, type: ErrorType): Promise<Error> {
   const before = await records(memory);
   const fs = new WatchedFs({ backend: shared(memory), key, mode });

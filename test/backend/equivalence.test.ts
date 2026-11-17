@@ -1,5 +1,6 @@
-// Property: the same random sequence of batches leaves MemoryBackend and IndexedDbBackend with the
-// same contents, and each batch succeeds or fails the same way on both.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Property: random batch sequences leave MemoryBackend and IndexedDbBackend identical, each batch succeeding or failing alike.
 import fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
 import type { CommitBatch, RecordKey, StorageBackend } from '../../src/backend/backend.ts';

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Session subkeys (rule 4) and fresh randomness: salts, nonces and ids never repeat.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Bytes } from '../../src/format/bytes.ts';
@@ -54,7 +56,7 @@ describe('session subkeys', () => {
   });
 
   it('never repeat a salt or a nonce across 100,000 seals', async () => {
-    // A low limit makes the writer roll through 100 salts.
+    // A low limit rolls the writer through 100 salts.
     setSubkeyMaxEncryptions(1000);
     const { dek, meta } = await newStore();
     const ctx = contextFor(dek, meta);
@@ -68,7 +70,6 @@ describe('session subkeys', () => {
       for (const s of batch) {
         const salt = saltOf(s);
         if (salt !== previous) {
-          // A salt, once left behind, never comes back.
           expect(salts.has(salt)).toBe(false);
           salts.add(salt);
           previous = salt;

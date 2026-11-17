@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // The two whole-store digests in the root (FORMAT.md section 8). Both are SHA-256 over record tags;
 // the root's own AEAD protects them, so no MAC key is needed.
 import { compareBytes, concat, u32, type Bytes } from './bytes.ts';
@@ -5,13 +7,9 @@ import { compareBytes, concat, u32, type Bytes } from './bytes.ts';
 const sha256 = async (data: Bytes): Promise<Bytes> =>
   new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', data));
 
-/** SHA-256 of the file-table blocks' tags, in the root's list order. */
 export const computeTableDigest = (tags: readonly Uint8Array[]): Promise<Bytes> => sha256(concat(tags));
 
-/**
- * SHA-256 of `fileId ‖ blocks (u32 BE) ‖ tag16 × blocks` for every regular file, in ascending
- * `fileId` byte order. `blockTags` is a file's data-block tags concatenated in index order.
- */
+// SHA-256 of `fileId ‖ blocks (u32 BE) ‖ tag16 × blocks` per regular file, ascending `fileId`; `blockTags` is in index order.
 export const computeManifest = (files: Iterable<{ fileId: Uint8Array; blockTags: Uint8Array }>): Promise<Bytes> => {
   const sorted = [...files].sort((a, b) => compareBytes(a.fileId, b.fileId));
   const parts: Uint8Array[] = [];

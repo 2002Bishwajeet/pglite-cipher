@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Sealing and opening the root, table blocks and data blocks (FORMAT.md section 5): every value is
 // `salt16 ‖ nonce12 ‖ AES-256-GCM(subkey, blockSize bytes) ‖ tag16`, `44 + blockSize` bytes.
 import { concat, randomBytes, toHex, u32, type Bytes } from './bytes.ts';
@@ -5,14 +7,12 @@ import type { Meta } from './codec.ts';
 import { CorruptStoreError } from './errors.ts';
 import type { SubkeyCache } from './keys.ts';
 
-/** `salt16 ‖ nonce12 ‖ … ‖ tag16`. */
 export const SEALED_OVERHEAD = 44;
 
-/** What sealing and opening need: the session's subkeys, the store's meta, and the counter. */
 export interface RecordContext {
   readonly subkeys: SubkeyCache;
   readonly meta: Meta;
-  /** Attempted record encryptions under this DEK; every `seal*` adds one before it encrypts. */
+  /** Attempted encryptions under this DEK; every `seal*` counts before it encrypts. */
   encryptions: number;
 }
 
@@ -42,7 +42,7 @@ const seal = async (ctx: RecordContext, body: Bytes, additionalData: Bytes): Pro
   return out;
 };
 
-/** Any failure is CorruptStoreError naming the record by its slot or block id, nothing else. */
+/** Any failure is CorruptStoreError naming the record by slot or block id only. */
 const open = async (ctx: RecordContext, sealed: Bytes, additionalData: Bytes, record: string): Promise<Bytes> => {
   if (sealed.length !== SEALED_OVERHEAD + ctx.meta.blockSize) throw new CorruptStoreError(`${record}: wrong length`);
   try {
@@ -62,7 +62,6 @@ const open = async (ctx: RecordContext, sealed: Bytes, additionalData: Bytes, re
 export const sealBlock = (ctx: RecordContext, fileId: Bytes, index: number, body: Bytes): Promise<Bytes> =>
   seal(ctx, body, aad(TYPE_BLOCK, ctx.meta, [fileId, u32(index)]));
 
-/** Opens the value stored under `blockId` as block `index` of `fileId`, as the file table says. */
 export const openBlock = (
   ctx: RecordContext,
   blockId: Bytes,
@@ -85,8 +84,7 @@ export const sealRoot = (ctx: RecordContext, body: Bytes): Promise<Bytes> =>
 export const openRoot = (ctx: RecordContext, sealed: Bytes): Promise<Bytes> =>
   open(ctx, sealed, aad(TYPE_ROOT, ctx.meta, []), 'root (slot 2)');
 
-/** 16 random bytes. The writer draws again if the id is already live. */
+/** The writer draws again if the id is already live. */
 export const newBlockId = (): Bytes => randomBytes(16);
 
-/** The last 16 bytes of a stored value: what the digests hash. */
 export const tagOf = (sealed: Bytes): Bytes => sealed.subarray(sealed.length - 16);

@@ -1,5 +1,6 @@
-// Shared by the filesystem tests: PGlite on an EncryptedFs, copies of a backend's records, and a
-// reader that opens a store's file table with the format functions alone.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Shared by the filesystem tests: PGlite on an EncryptedFs, backend record copies, and a reader of a store's file table using the format functions alone.
 import { MemoryFS, PGlite, type PGliteOptions } from '@electric-sql/pglite';
 import { expect } from 'vitest';
 import type { RecordKey, StorageBackend } from '../../src/backend/backend.ts';
@@ -18,10 +19,8 @@ export const BLOCK_SIZES: readonly BlockSize[] = [8192, 32768, 65536];
 
 export const fromHex = (s: string): Bytes => Uint8Array.from(s.match(/../g) ?? [], (h) => parseInt(h, 16));
 
-/** A KEK, and the raw bytes to import it again. */
 export const newKey = async (): Promise<CryptoKey> => importKek(crypto.getRandomValues(new Uint8Array(32)));
 
-/** The Emscripten FS calls the tests make. */
 export interface TestFS {
   analyzePath(path: string): { exists: boolean };
   readdir(path: string): string[];
@@ -48,10 +47,7 @@ export const fsOf = (pg: PGlite): TestFS => (pg.Module as unknown as { FS: TestF
 
 let templatePromise: Promise<File | Blob> | null = null;
 
-/**
- * A fresh data directory as a tarball, made once per test file with a plain MemoryFS. Loading it
- * (`loadDataDir`) skips initdb; PGlite writes it into MEMFS the way it writes initdb's output.
- */
+/** A fresh data directory tarball, made once per test file with MemoryFS; loading it skips initdb. */
 export const template = (): Promise<File | Blob> =>
   (templatePromise ??= (async () => {
     const pg = await PGlite.create({ fs: new MemoryFS() });
@@ -69,12 +65,10 @@ export interface OpenOptions extends Partial<EncryptedFsOptions> {
   backend: StorageBackend;
   key: CryptoKey;
   mode?: OpenMode;
-  /** Run initdb instead of loading the template. */
   initdb?: boolean;
   pglite?: Partial<PGliteOptions>;
 }
 
-/** PGlite on an EncryptedFs. A new store loads the template unless `initdb` is set. */
 export async function openStore(options: OpenOptions): Promise<Opened> {
   const { initdb = false, pglite = {}, mode = 'open-or-create', ...rest } = options;
   const fs = new EncryptedFs({ mode, ...rest });
@@ -84,7 +78,6 @@ export async function openStore(options: OpenOptions): Promise<Opened> {
   return { pg, fs };
 }
 
-/** Every record of a backend, keyed as the backend keys them. */
 export async function records(backend: StorageBackend): Promise<Map<RecordKey, Uint8Array>> {
   const out = new Map<RecordKey, Uint8Array>();
   for (const slot of [0, 1, 2] as const) {
@@ -100,7 +93,6 @@ export async function records(backend: StorageBackend): Promise<Map<RecordKey, U
   return out;
 }
 
-/** A MemoryBackend holding exactly these records. */
 export async function restore(recs: Map<RecordKey, Uint8Array>): Promise<MemoryBackend> {
   const backend = new MemoryBackend();
   await backend.commit({ puts: [...recs].map(([k, v]) => [k, v.slice()]), deletes: [], durability: 'relaxed' });
@@ -117,11 +109,9 @@ export interface Inspected {
   ctx: RecordContext;
   root: RootBody;
   table: FileTable;
-  /** Each table block's entries, in list order. */
   blocks: Array<{ id: string; entries: TableEntry[] }>;
 }
 
-/** Opens header, root and file table with the format functions, as a test's independent view. */
 export async function inspect(backend: StorageBackend, key: CryptoKey): Promise<Inspected> {
   const h0 = (await backend.get(0)) as Bytes | undefined;
   const h1 = (await backend.get(1)) as Bytes | undefined;
@@ -141,13 +131,11 @@ export async function inspect(backend: StorageBackend, key: CryptoKey): Promise<
   return { ctx, root, table, blocks };
 }
 
-/** The block ids of the store's file at `path` (relative to PGDATA). */
 export function idsOf(inspected: Inspected, path: string): string[] {
   for (const f of inspected.table.files.values()) if (f.path === path) return f.ids.map(toHex);
   throw new Error(`no file ${path} in the store`);
 }
 
-/** Every node under `root`, by path relative to it. */
 export function listTree(fs: TestFS, root = PGDATA): Map<string, { mode: number; size: number }> {
   const out = new Map<string, { mode: number; size: number }>();
   const visit = (dir: string, prefix: string) => {
@@ -168,11 +156,7 @@ const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => {
   return true;
 };
 
-/**
- * Checks, without the filesystem's own loader, that the store is exactly what MEMFS holds: one
- * record per listed id and nothing else, both digests as the root says, and every file's type,
- * mode, size and bytes.
- */
+/** Checks, without the filesystem's loader, that the store is exactly what MEMFS holds: records, digests, and every file's type, mode, size and bytes. */
 export async function expectStoreEquals(backend: StorageBackend, key: CryptoKey, fs: TestFS): Promise<void> {
   const ins = await inspect(backend, key);
   const { ctx, root, table } = ins;
@@ -203,7 +187,6 @@ export async function expectStoreEquals(backend: StorageBackend, key: CryptoKey,
   expect(await computeManifest(manifest)).toEqual(root.manifest);
 }
 
-/** Awaits a promise that must reject with `type`, and returns the error. */
 export async function rejection(promise: Promise<unknown>, type: abstract new (...args: never[]) => Error): Promise<Error> {
   const error = await promise.then(
     () => null,
@@ -246,7 +229,6 @@ export class WatchedFs extends EncryptedFs {
   }
 }
 
-/** Seals a changed root into slot 2, as a writer with the DEK would. */
 export async function resealRoot(backend: StorageBackend, key: CryptoKey, change: (root: RootBody) => RootBody): Promise<void> {
   const { ctx, root } = await inspect(backend, key);
   const sealed = await sealRoot(ctx, encodeRoot(change(root), ctx.meta.blockSize));

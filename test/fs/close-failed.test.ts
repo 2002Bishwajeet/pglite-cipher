@@ -1,10 +1,7 @@
-// A close whose sync fails. PGlite 0.5.10 keeps its module when closeFs rejects (it stops
-// before it drops it), so a host that keeps such an instance keeps its database: docs/usage.md says to
-// drop it. What EncryptedFs holds must not keep it too: a host that keeps only the filesystem
-// keeps none of the instance, its module, the tracker (it holds the data directory's nodes) or the
-// file map. Each cycle opens, writes, and closes on a backend that fails once the close starts;
-// the host keeps every filesystem and drops every instance. The bounds and the GC loop are those of
-// release.test.ts: one instance (two in WebKit) for a GC that finds a stale pointer.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// A failed close: PGlite 0.5.10 keeps its module when closeFs rejects, so a host keeping the instance keeps its database (docs/usage.md says drop it).
+// What EncryptedFs holds must not keep it too; bounds and GC loop are release.test.ts's (1 instance, 2 in WebKit).
 import { describe, expect, it } from 'vitest';
 import type { StorageBackend } from '../../src/backend/backend.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
@@ -20,7 +17,6 @@ async function engineBound(): Promise<number> {
   return server.browser === 'webkit' ? 2 : 1;
 }
 
-/** `backend`, whose commits and root reads reject with `fault` once `failing()` is true. */
 const failingWhen = (backend: StorageBackend, failing: () => boolean, fault: Error): StorageBackend =>
   new Proxy(backend, {
     get(target, prop, receiver) {
@@ -29,13 +25,11 @@ const failingWhen = (backend: StorageBackend, failing: () => boolean, fault: Err
     },
   });
 
-/** 32 MB of buffers and 320,000 objects, garbage on return. */
 function churn(): void {
   const junk: unknown[] = [];
   for (let i = 0; i < 32; i++) junk.push(new ArrayBuffer(1 << 20), Array.from({ length: 10_000 }, (_, j) => ({ j })));
 }
 
-/** How many of `held` still deref, once that is at most `bound` or a minute has passed. */
 async function afterGc(held: Array<Array<WeakRef<object>>>, bound: number): Promise<number> {
   const until = performance.now() + 60_000;
   for (;;) {
@@ -46,11 +40,6 @@ async function afterGc(held: Array<Array<WeakRef<object>>>, bound: number): Prom
   }
 }
 
-/**
- * One cycle: opens, writes, and closes with a failing backend. Returns the filesystem, the close's
- * rejection, and weak references to the instance, its module, the module's FS, wasm memory and data
- * directory. The instance is dropped on return.
- */
 async function cycle(memory: MemoryBackend, key: CryptoKey, i: number, fault: Error) {
   let failing = false;
   const { pg, fs } = await openStore({ backend: failingWhen(shared(memory), () => failing, fault), key });

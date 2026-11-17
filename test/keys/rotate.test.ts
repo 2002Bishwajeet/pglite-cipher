@@ -1,7 +1,7 @@
-// rotateDataKey: a new data key, every record sealed again into a fresh store, then a switch. The
-// data survives; nothing of the new store opens under the old data key or shares an id with the old
-// store; the old store is gone; writes made meanwhile are kept; and a fault at any commit loses
-// nothing.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// rotateDataKey: new data key, every record resealed into a fresh store, then a switch. Data survives; nothing of the new store opens under the old key or shares an id with the old;
+// the old store is gone; writes made meanwhile are kept; a fault at any commit loses nothing.
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
@@ -33,10 +33,7 @@ import { baseStore, databaseExists, expectOneStore, Faults, openPair, tablesOf, 
 const rowCount = async (pg: PGlite, table: string) =>
   ((await pg.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0] as { n: number }).n;
 
-/**
- * A kill, as the store shows it: a commit that puts the root (`root`), or a clear (`clear`), waits
- * until `release()` and then fails, writing nothing.
- */
+/** A kill: a commit putting the root (`root`) or a clear (`clear`) waits for `release()`, then fails writing nothing. */
 class Hang implements StorageBackend {
   hung = false;
   readonly #inner: StorageBackend;
@@ -77,7 +74,6 @@ class Hang implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/** Runs `after` once each commit of `inner` is in (and the commit waits for it). */
 class AfterCommit implements StorageBackend {
   readonly #inner: StorageBackend;
   readonly #after: (batch: CommitBatch) => Promise<void>;
@@ -101,11 +97,7 @@ class AfterCommit implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/**
- * Zero-fills the block values of every commit as soon as it is in, and every page it handed out as soon
- * as the next read starts: a rotation that used a batch or a page after that would fail. `early`
- * (the control) zero-fills a commit's block values before passing them on.
- */
+/** Zero-fills commit block values once in, and each page once the next read starts: a rotation using either later fails. `early` (control) zero-fills before passing on. */
 class Zeroing implements StorageBackend {
   maxPuts = 0;
   maxHeld = 0;
@@ -120,7 +112,7 @@ class Zeroing implements StorageBackend {
   }
 
   async commit(batch: CommitBatch): Promise<void> {
-    // Block values only: the header and root are the slots the filesystem keeps, as a sync does.
+    // Block values only: header and root are the slots the filesystem keeps.
     const blocks = batch.puts.filter(([key]) => typeof key === 'string').map(([, value]) => value);
     this.maxPuts = Math.max(this.maxPuts, blocks.length);
     if (this.#early) for (const v of blocks) v.fill(0);
@@ -154,7 +146,7 @@ class Zeroing implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/** While `writes.on`, runs `before(n)` ahead of the n-th commit or clear across the backends that share `writes`; the write waits for it. */
+/** While `writes.on`, runs `before(n)` ahead of the n-th commit or clear; the write waits for it. */
 class Before implements StorageBackend {
   readonly #inner: StorageBackend;
   readonly #writes: { n: number; on: boolean };
@@ -204,12 +196,11 @@ describe('rotateDataKey', () => {
     expect(after.ctx.meta.storeId).not.toEqual(before.ctx.meta.storeId);
     const stored = await records(b);
     for (const id of stored.keys()) if (typeof id === 'string') expect(oldIds.has(id), id).toBe(false);
-    // The counter started again with the new key: about one encryption per record.
+    // The counter restarted with the new key: about one encryption per record.
     const { encryptions } = fs.stats();
     expect(encryptions).toBeGreaterThanOrEqual(stored.size - 2);
     expect(encryptions).toBeLessThan(stored.size + 50);
 
-    // Nothing of the new store opens under the old data key, though each opens under the new one.
     const oldKey: RecordContext = { subkeys: before.ctx.subkeys, meta: after.ctx.meta, encryptions: 0 };
     await rejection(openRoot(oldKey, stored.get(2) as Bytes), CorruptStoreError);
     await openRoot(after.ctx, stored.get(2) as Bytes);
@@ -223,7 +214,6 @@ describe('rotateDataKey', () => {
         await openBlock(after.ctx, id, f.fileId, index, value);
       }
     }
-    // The table is packed: exactly the blocks packEntries gives for its files in table order.
     const inOrder = after.blocks.flatMap((block) => block.entries).filter((e) => e.kind === 'file');
     const files = inOrder.map((e) => after.table.files.get(toHex(e.fileId)) as NonNullable<ReturnType<typeof after.table.files.get>>);
     expect(packEntries(files, 8192).length).toBe(after.root.tableIds.length);
@@ -232,7 +222,6 @@ describe('rotateDataKey', () => {
     const re = await openPair([shared(a), shared(b)], key);
     expect(await tablesOf(re.pg)).toEqual(want);
     await expectOneStore([a, b], re);
-    // And back into the first slot.
     await re.fs.rotateDataKey();
     expect(await b.isEmpty()).toBe(true);
     expect((await inspect(a, key)).ctx.meta.keyId).toBe(before.ctx.meta.keyId + 2);
@@ -272,7 +261,6 @@ describe('rotateDataKey', () => {
     expect(await rowCount(reopened.pg, 't')).toBe(2001);
     await reopened.pg.close();
 
-    // Killed at the switch (the new store has no root), and killed at step 8 (both stores whole).
     for (const at of ['switch', 'delete'] as const) {
       const old = await restore(recs);
       const next = new MemoryBackend();
@@ -288,7 +276,6 @@ describe('rotateDataKey', () => {
       await rotation.catch(() => undefined);
       await run.pg.close();
 
-      // Without openOrigin the open cannot follow the rotation, and changes nothing.
       const untouched = await records(copyOld);
       await rejection(openStore({ backend: shared(copyOld), key, mode: 'open' }), IncompleteStoreError);
       expect(sameRecords(await records(copyOld), untouched)).toBe(true);
@@ -300,7 +287,6 @@ describe('rotateDataKey', () => {
       const resumed = await openStore({ backend: shared(copyOld), key, mode: 'open', openOrigin });
       expect(names).toEqual(['next']);
       expect(await rowCount(resumed.pg, 't')).toBe(2001);
-      // Before the switch the old store stays; after it, the new one.
       expect(await (at === 'switch' ? copyNext : copyOld).isEmpty(), at).toBe(true);
       await resumed.pg.close();
     }
@@ -328,7 +314,6 @@ describe('rotateDataKey', () => {
       },
     });
     expect(batches).toBeGreaterThanOrEqual(3);
-    // The new store is MEMFS as of the catch-up snapshot, which is MEMFS now.
     expect(opened.fs.hasDirty()).toBe(false);
     await expectStoreEquals(b, key, fsOf(opened.pg));
     const live = await tablesOf(opened.pg);
@@ -349,8 +334,7 @@ describe('rotateDataKey', () => {
     let finished = 0;
     const atCopy: number[] = [];
     const queries: Array<Promise<void>> = [];
-    // An app's queries arrive from events while the rotation runs: started at each of its steps and
-    // never awaited by it. (A timer loop does not do here: Chromium runs no timer until the rotation ends.)
+    // Queries start at each step and are never awaited (a timer loop fails: Chromium runs no timer until the rotation ends).
     await fs.rotateDataKey({
       onProgress: (p) => {
         if (p.phase === 'copy') atCopy.push(finished);
@@ -360,7 +344,6 @@ describe('rotateDataKey', () => {
       },
     });
     await Promise.all(queries);
-    // Queries ran, and finished, while the copy was in flight.
     expect((atCopy.at(-1) ?? 0) - (atCopy[0] ?? 0)).toBeGreaterThan(0);
     await fs.syncToFs(false);
     expect(fs.hasDirty()).toBe(false);
@@ -400,7 +383,6 @@ describe('rotateDataKey', () => {
   for (const mode of ['before', 'after'] as const) {
     it(`a fault (${mode} writing) at any commit of a rotation, on either store: nothing is lost, no orphan remains`, async () => {
       const { key, recs } = await baseStore(65536);
-      /** One rotation with commit `at` (counted from the rotation's start) failing; whether it rejected, and its commits. */
       const run = async (at: number): Promise<{ rejected: boolean; commits: number }> => {
         const a = await restore(recs);
         const b = new MemoryBackend();
@@ -427,16 +409,12 @@ describe('rotateDataKey', () => {
       };
       const { rejected, commits: total } = await run(Infinity);
       expect(rejected).toBe(false);
-      // The mark, the header copies, at least one batch of the copy, the table, the switch, and the
-      // retiring of the old store.
       expect(total).toBeGreaterThanOrEqual(6);
       const every = inBrowser ? 10 : 1;
       for (let at = 1; at <= total; at += every) {
         const outcome = await run(at);
-        // A commit before the switch that failed before writing fails the rotation. One that applied
-        // fails it too, except the mark and the switch, which a read of the root settles as applied.
-        // The last, the retiring after the switch, fails nothing: the old store stays marked, and the
-        // reopen finishes the rotation.
+        // A failed commit before the switch fails the rotation, except the mark and the switch, which a root read settles as applied.
+        // The last (retiring) fails nothing: the old store stays marked and reopen finishes.
         if (mode === 'before') expect(outcome.rejected, `commit ${String(at)}`).toBe(at !== total);
         else expect(outcome.rejected, `commit ${String(at)}`).toBe(at !== 1 && at < total - 1);
       }
@@ -445,7 +423,6 @@ describe('rotateDataKey', () => {
 
   it('a second instance that opens the pair before any write of a rotation: one of the two keeps a store, the other stops, nothing is lost', async () => {
     const { key, recs } = await baseStore(65536);
-    /** One rotation, with a second instance opening the pair before its write `at`; the rotation's writes. */
     const run = async (at: number): Promise<number> => {
       const a = await restore(recs);
       const b = new MemoryBackend();
@@ -466,8 +443,7 @@ describe('rotateDataKey', () => {
       );
       writes.on = false;
       const label = `write ${String(at)}`;
-      // The rotation fails at its read-back when the other instance deleted the new store, and at the
-      // switch or step 8 when it lost the old store's root.
+      // Fails at read-back if the other instance deleted the new store, at the switch or step 8 if it took the old root.
       if (rotation !== null) expect([StaleWriterError, CorruptStoreError].some((type) => rotation instanceof type), label).toBe(true);
       const up: Array<{ opened: Opened; id: number }> = [{ opened: first, id: -2 }];
       if (second.opening) {
@@ -505,8 +481,6 @@ describe('rotateDataKey', () => {
       return writes.n;
     };
     const total = await run(Infinity);
-    // The mark, the header copies, at least one batch of the copy, the table, the switch, and the
-    // retiring and the clear of the old store.
     expect(total).toBeGreaterThanOrEqual(7);
     for (let at = 1; at <= total; at++) await run(at);
   }, 900_000);
@@ -535,7 +509,6 @@ describe('rotateDataKey', () => {
 
   it('a rotation undone by a second instance, which then rotates the pair itself: the first fails and deletes nothing, the second’s store stays whole', async () => {
     const { key, recs } = await baseStore(65536);
-    /** The first instance's rotation, with a second one opening the pair and rotating it before the first's write `at`; the first's writes. */
     const run = async (at: number): Promise<number> => {
       const a = await restore(recs);
       const b = new MemoryBackend();
@@ -579,7 +552,6 @@ describe('rotateDataKey', () => {
       return writes.n;
     };
     const total = await run(Infinity);
-    // Every write up to the switch, which is followed by the retiring and the clear of the old store.
     expect(total).toBeGreaterThanOrEqual(7);
     for (let at = 1; at <= total - 2; at++) await run(at);
   }, 900_000);

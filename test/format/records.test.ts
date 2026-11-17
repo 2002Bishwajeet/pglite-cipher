@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Sealed records: round trips, tamper detection, binding to place and type, and the digests.
 import fc from 'fast-check';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -68,7 +70,6 @@ describe('sealed records', () => {
     const sealed = new Map<Kind, Bytes>();
     for (const kind of KINDS) sealed.set(kind, await sealAs(ctx, kind, random(100)));
     const length = (SEALED_OVERHEAD + 8192) * 8;
-    // Each region's first and last bit, then random bits.
     const edges = [0, 127, 128, 223, 224, length - 129, length - 128, length - 1];
     for (const kind of KINDS) {
       for (const bit of edges) await rejection(openAs(ctx, kind, flipBit(sealed.get(kind) as Bytes, bit)), CorruptStoreError);
@@ -153,7 +154,6 @@ describe('sealed records', () => {
     ] as const) {
       const idA = newBlockId();
       const idB = newBlockId();
-      // The table says: idA holds a, idB holds b.
       const store = new Map([
         [idA, await sealBlock(ctx, a.fileId, a.index, random(10))],
         [idB, await sealBlock(ctx, b.fileId, b.index, random(10))],
@@ -176,7 +176,6 @@ describe('sealed records', () => {
   });
 });
 
-/** Random regular files with distinct ids and random 16-byte tags. */
 const manifestFiles = fc.uniqueArray(
   fc.record({
     fileId: fc.uint8Array({ minLength: 16, maxLength: 16 }),

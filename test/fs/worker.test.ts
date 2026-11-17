@@ -1,7 +1,7 @@
-// A worker killed mid-sync (browser only: a real Web Worker on the engine's IndexedDB). The worker
-// is terminated at a random moment of a write workload; the next worker must open the store, let
-// Postgres recover, and find exactly some acknowledged prefix of the rows: every row acknowledged
-// as durable, and at most the one that was being written.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Worker killed mid-sync (browser only: a real Web Worker on the engine's IndexedDB) at a random moment of a write workload.
+// The next worker must open, let Postgres recover, and find an acknowledged prefix of rows: all acknowledged durable, at most one in flight.
 import { describe, expect, it } from 'vitest';
 import { LONG, timeout } from '../long.ts';
 import { inBrowser } from './helpers.ts';
@@ -55,7 +55,6 @@ describe.runIf(inBrowser)('a worker killed mid-sync', () => {
       for (let rep = 0; rep <= REPETITIONS; rep++) {
         const run = start(name, raw);
         const { n, max } = await run.opened;
-        // The rows are 1 … n, and between what the last worker acknowledged and what it started.
         expect(max, `repetition ${String(rep)}`).toBe(n);
         expect(n, `repetition ${String(rep)}`).toBeGreaterThanOrEqual(acked);
         expect(n, `repetition ${String(rep)}`).toBeLessThanOrEqual(started);
@@ -66,7 +65,7 @@ describe.runIf(inBrowser)('a worker killed mid-sync', () => {
         await new Promise((resolve) => setTimeout(resolve, Math.random() * 400));
         run.worker.terminate();
         expect(run.error, `repetition ${String(rep)}`).toBeNull();
-        // What the worker recorded in IndexedDB, not what its messages managed to report before it died.
+        // What the worker recorded in IndexedDB, not its messages, which may die unsent.
         const progress = await readProgress(name);
         if (progress.started > n) kills++;
         acked = Math.max(n, progress.acked);

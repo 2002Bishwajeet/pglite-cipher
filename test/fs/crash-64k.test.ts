@@ -1,4 +1,6 @@
-// The crash matrix at 65536-byte blocks (test/fs/crash.ts).
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
 import { crashMatrix } from './crash.ts';
 
 crashMatrix(65536);

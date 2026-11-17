@@ -1,7 +1,7 @@
-// A load holds at most two pages of ciphertext at a time (the next page is read
-// while one decrypts): the database, two pages and the file map. The counting
-// backend zero-fills every page but the latest it handed out as soon as the next read starts, so a
-// load that kept using an older page (or a view into it, such as a tag) would fail.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// A load holds at most two pages of ciphertext (the next is read while one decrypts). The counting backend zero-fills
+// every page but the latest once the next read starts, so a load using an older page or a view into it fails.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
@@ -11,7 +11,6 @@ import { CorruptStoreError } from '../../src/format/errors.ts';
 import { newKey, openStore, rejection, shared } from './helpers.ts';
 
 class CountingBackend implements StorageBackend {
-  /** Pages handed out and not yet dropped, at most, per phase. */
   readonly maxHeld = { table: 0, blocks: 0 };
   readonly pages = { table: 0, blocks: 0 };
   readonly #inner: StorageBackend;
@@ -82,7 +81,6 @@ describe('memory shape', () => {
       expect(counting.maxHeld).toEqual({ table: 1, blocks: 2 });
       await b.pg.close();
 
-      // Control: a page dropped before the loader is done with it fails the open.
       const fs = new EncryptedFs({ backend: new CountingBackend(shared(memory), { dropAtOnce: true }), key, mode: 'open' });
       await rejection(PGlite.create({ fs }), CorruptStoreError);
     }, 120_000);

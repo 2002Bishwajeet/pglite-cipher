@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // No plaintext, path or key in a stored value or in an error message.
 import { describe, expect, it } from 'vitest';
 import { ascii, type Bytes } from '../../src/format/bytes.ts';
@@ -89,7 +91,6 @@ describe('no plaintext and no secrets', () => {
     await collect(openHeader(kek, flipBit(header, 900), flipBit(header, 10)));
     await collect(rewrapHeader(await newKek(), kek, header));
 
-    // Decoding and assembling a table that holds the path.
     const body = await openTable(ctx, tableId, table);
     const trailing: Bytes = body.slice();
     trailing[blockSize - 1] = 1;

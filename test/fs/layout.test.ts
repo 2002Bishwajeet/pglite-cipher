@@ -1,5 +1,6 @@
-// The packed layout does what it is for: an overwrite writes blocks and the root only, a rename
-// writes table blocks only, and a block that stops existing takes its record with it.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// An overwrite writes blocks and the root only, a rename table blocks only, and a vanished block takes its record with it.
 import { describe, expect, it } from 'vitest';
 import { MemoryBackend } from '../../src/backend/memory.ts';
 import { fsOf, idsOf, inspect, newKey, openStore, PGDATA, records, shared, type Opened } from './helpers.ts';

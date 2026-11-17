@@ -1,5 +1,6 @@
-// The conformance suite on IndexedDB (fake-indexeddb in Node, the real one in the browsers), and
-// what only IndexedDB has: names, object stores, transactions, durability, versionchange.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Conformance suite on IndexedDB (fake-indexeddb in Node), plus names, object stores, transactions, durability, versionchange.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BlockId, CommitBatch } from '../../src/backend/backend.ts';
 import { runBackendConformance, testBlockId, testValue } from '../../src/backend/conformance.ts';

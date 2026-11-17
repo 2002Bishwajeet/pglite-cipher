@@ -1,10 +1,7 @@
-// The rotation crash matrix. One rotation over a pair is recorded write by write (every commit and
-// clear, on both stores, in order), with rows written between the batches of the copy, and one sync
-// after. For every k the stores as a kill after write k leaves them are opened: the database is the
-// state of step 1 before the switch commit, the catch-up snapshot after it (with the rows written
-// during the rotation), and the open leaves one store, with no record nobody owns. In the browser,
-// every tenth k and the two around the switch. Under CIPHER_LONG: a 100 MB store, and every k
-// everywhere.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Rotation crash matrix: for every k, the stores after a kill at write k open to the step-1 state before the switch commit, the catch-up snapshot after it, with one store and no orphan record.
+// Browser: every tenth k and the two around the switch. CIPHER_LONG: a 100 MB store and every k.
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { CommitBatch } from '../../src/backend/backend.ts';
@@ -24,7 +21,6 @@ describe('rotation crash matrix', () => {
     let pg: PGlite | null = null;
     let copying = true;
     let written = 0;
-    // Into the new store, between the batches of the copy: a row each.
     const between = async (batch: CommitBatch) => {
       if (!copying || batch.puts.some(([k]) => typeof k === 'number')) return;
       await (pg as PGlite).exec(`INSERT INTO r VALUES (${String(++written)})`);
@@ -48,8 +44,7 @@ describe('rotation crash matrix', () => {
     const end = journal.length;
     await pg.close();
 
-    // The switch: the root put into the new store. Then step 8 retires the old one (a root put guarded
-    // by step 2's mark) and clears it, and the sync follows.
+    // The switch: root put into the new store; step 8 then retires and clears the old one, then the sync.
     const rootOf = (e: Event | undefined) => (e !== undefined && 'batch' in e ? e.batch.puts.find(([k]) => k === 2)?.[1] : undefined);
     const switchAt = journal.findIndex((e, i) => i >= start && e.slot === 1 && rootOf(e) !== undefined) + 1;
     expect(switchAt).toBeGreaterThan(start);
@@ -57,8 +52,6 @@ describe('rotation crash matrix', () => {
     expect(rootOf(journal[switchAt])).toBeDefined();
     expect(journal[switchAt + 1]).toEqual({ slot: 0, clear: true });
     expect(end).toBe(switchAt + 4);
-    // Step 2's mark on the old store, then the header copies and the copy's batches on the new one,
-    // then at least the catch-up's table, the switch, step 8's clear and the sync.
     expect(journal[start]).toMatchObject({ slot: 0 });
     expect(journal.slice(start + 1, start + 2 + written).every((e) => e.slot === 1)).toBe(true);
     expect(end - start).toBeGreaterThanOrEqual(written + 5);

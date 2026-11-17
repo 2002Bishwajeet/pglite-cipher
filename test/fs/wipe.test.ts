@@ -1,5 +1,6 @@
-// Best-effort memory hygiene: closing a store overwrites the MEMFS file contents and the wasm
-// memory with zeros, so the plaintext of the database does not linger in RAM after close.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Best-effort hygiene: close zeroes MEMFS file contents and wasm memory, so plaintext does not linger in RAM.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import { MemoryBackend } from '../../src/backend/memory.ts';
@@ -14,7 +15,6 @@ interface ModuleView {
   FS: { lookupPath(path: string): { node: { contents?: unknown } } };
 }
 
-/** The content buffers of every regular file under `dir`, by reference. */
 function buffersUnder(mod: ModuleView, dir: string, out: Uint8Array[] = []): Uint8Array[] {
   const fs = fsOf({ Module: mod } as never);
   for (const name of fs.readdir(dir)) {

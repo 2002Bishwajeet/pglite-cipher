@@ -1,5 +1,6 @@
-// Builds the benchmark page to bench/dist and serves it cross-origin isolated (PGlite and
-// measureUserAgentSpecificMemory want it).
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Builds the bench page to bench/dist, cross-origin isolated (PGlite and measureUserAgentSpecificMemory need it).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 

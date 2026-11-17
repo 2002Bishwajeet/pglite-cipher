@@ -1,5 +1,6 @@
-// Model-based property test: random filesystem operations through the real Emscripten FS, a model
-// store fed only by snapshots, and at every quiescent sync the model must equal MEMFS.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Model-based property test: random operations through the real Emscripten FS; at every quiescent sync the model store, fed only by snapshots, equals MEMFS.
 import type { PGlite } from '@electric-sql/pglite';
 import fc from 'fast-check';
 import { afterAll, beforeAll, describe, it } from 'vitest';

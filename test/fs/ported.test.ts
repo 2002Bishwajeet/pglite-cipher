@@ -1,7 +1,8 @@
-// Scenarios ported from davidmuggleton/pglite-encrypted-fs (MIT, see THIRD_PARTY.md):
-// test/integration/pglite-basic.test.ts, pglite-failure.test.ts and pglite-pgvector.test.ts, adapted
-// to this API (a KEK and a backend in place of a passphrase and a directory). Its passphrase-only
-// cases have no counterpart.
+// Copyright 2026 Bishwajeet Parhi (modifications and additions)
+// Portions Copyright (c) 2026 David Muggleton, from https://github.com/davidmuggleton/pglite-encrypted-fs
+// SPDX-License-Identifier: FSL-1.1-ALv2 AND MIT
+// Test scenarios ported from that project and modified; its MIT licence text is in THIRD_PARTY.md.
+// Its passphrase-only cases have no counterpart.
 import type { PGlite } from '@electric-sql/pglite';
 import { vector } from '@electric-sql/pglite-pgvector';
 import { describe, expect, it } from 'vitest';
@@ -28,7 +29,6 @@ async function fresh(): Promise<Store> {
 const reopen = async ({ memory, key }: Pick<Store, 'memory' | 'key'>): Promise<PGlite> =>
   (await openStore({ backend: shared(memory), key, mode: 'open' })).pg;
 
-/** The store's records after `damage`, opened under `key`: the open must reject with `type`. */
 async function openDamaged(
   { memory, key }: Pick<Store, 'memory' | 'key'>,
   damage: (r: Map<RecordKey, Uint8Array>, controlId: string) => void,
@@ -227,7 +227,6 @@ describe('ported: pglite-failure', () => {
     await s.db.exec('CREATE TABLE corrupt_test (id INTEGER, data TEXT)');
     for (let i = 0; i < 100; i++) await s.db.exec(`INSERT INTO corrupt_test VALUES (${String(i)}, '${'x'.repeat(100)}')`);
     await s.db.close();
-    // A byte in the sealed bytes, and a byte in the nonce.
     for (const at of [100, 2]) {
       await openDamaged(s, (r, id) => {
         const v = (r.get(id) as Uint8Array).slice();

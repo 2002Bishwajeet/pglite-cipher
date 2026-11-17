@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 /** A set of block indexes, one bit each: 16 KB for a 1 GB file of 8 KB blocks. */
 export class BlockBitmap {
   #words = new Uint32Array(0);
@@ -7,7 +9,6 @@ export class BlockBitmap {
     return this.#empty;
   }
 
-  /** Adds the indexes `from … to - 1`. */
   add(from: number, to: number): void {
     if (from >= to) return;
     const need = ((to - 1) >>> 5) + 1;
@@ -27,7 +28,6 @@ export class BlockBitmap {
     this.#empty = false;
   }
 
-  /** The indexes below `limit`, ascending. */
   indexes(limit: number): number[] {
     const out: number[] = [];
     const words = this.#words;

@@ -1,7 +1,7 @@
-// The crash matrix over the 200-transaction workload (2,000 under CIPHER_LONG), for one block size. For every commit number K:
-// (a) commit K fails before writing; (b) commit K applies but reports failure; (b′) as (b), and the
-// read of the root that follows fails too; (c) the instance is dropped at commit K, and the store as
-// of K − 1 and as of K commits is opened by a fresh one. In the browser, every tenth K.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Crash matrix over the 200-transaction workload (2,000 under CIPHER_LONG), one block size. Per commit K: (a) K fails before writing; (b) K applies but reports failure;
+// (b′) as (b) and the following root read fails too; (c) the instance is dropped at K and the store as of K − 1 and K is opened fresh. Browser: every tenth K.
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
 import { FaultyBackend, InjectedFault } from '../../src/backend/faulty.ts';
@@ -17,10 +17,7 @@ const WORKLOAD = LONG ? workload(2000) : STEPS;
 
 type FaultMode = 'a' | 'b' | 'b′';
 
-/**
- * Passes everything to `inner`, except that each commit call whose number `at` accepts goes through
- * a one-shot FaultyBackend: so one run can fail many commits, each one as FaultyBackend fails it.
- */
+/** Routes each commit whose number `at` accepts through a one-shot FaultyBackend, so one run fails many commits. */
 class FaultsAt implements StorageBackend {
   readonly faulted: number[] = [];
   readonly #inner: StorageBackend;
@@ -65,7 +62,6 @@ class FaultsAt implements StorageBackend {
   close = (): Promise<void> => this.#inner.close();
 }
 
-/** After a reopen: one record per table block and per data block, and nothing else. */
 async function expectNoOrphans(memory: StorageBackend, opened: Opened): Promise<void> {
   const { table, dataBlocks } = opened.fs.stats();
   expect(await memory.count()).toBe(3 + table.blocks + dataBlocks);
@@ -74,7 +70,6 @@ async function expectNoOrphans(memory: StorageBackend, opened: Opened): Promise<
 interface Recording {
   key: CryptoKey;
   faulty: FaultyBackend;
-  /** Commits made before step i started and when it resolved, for i = 1 … 200 (index i − 1). */
   before: number[];
   after: number[];
 }
@@ -100,7 +95,6 @@ async function record(blockSize: BlockSize): Promise<Recording> {
   return { key, faulty, before, after };
 }
 
-/** One run of the workload with the commits `at` accepts failing in `mode`; then a reopen. */
 async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) => boolean): Promise<number[]> {
   const key = await newKey();
   const memory = new MemoryBackend();
@@ -109,8 +103,7 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
   try {
     opened = await openStore({ backend, key, blockSize, mode: 'create' });
   } catch (error) {
-    // A sync PGlite makes while it starts failed, and PGlite does not start (it awaits that sync).
-    // The store is empty, or holds the first commit if it applied.
+    // A sync during PGlite's start failed, so it does not start (it awaits that sync).
     expect(error).toBeInstanceOf(InjectedFault);
     expect(backend.faulted).toEqual([1]);
     if (mode === 'a') expect(await memory.isEmpty()).toBe(true);
@@ -134,7 +127,6 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
         return;
       }
       if (backend.faulted.length > checked) {
-        // The first successful sync after a fault: the store is exactly the running database.
         expect(fs.hasDirty()).toBe(false);
         await expectStoreEquals(memory, key, fsOf(pg));
         checked = backend.faulted.length;
@@ -143,7 +135,6 @@ async function faultRun(blockSize: BlockSize, mode: FaultMode, at: (n: number) =
     WORKLOAD,
   );
   await pg.close().catch((error: unknown) => {
-    // The final sync of close was one of the failed commits.
     expect(error).toBeInstanceOf(InjectedFault);
   });
   const reopened = await openStore({ backend: shared(memory), key, mode: 'open' });
@@ -169,7 +160,6 @@ export function crashMatrix(blockSize: BlockSize): void {
         await faulty.replayInto(target, s);
         const opened = await openStore({ backend: shared(target), key, mode: 'open-or-create' });
         const m = await stepsHeld(opened.pg, WORKLOAD);
-        // Every step acknowledged by commit s is in; no step that had not started is.
         const acked = lastLogging(after.filter((n) => n <= s).length, WORKLOAD);
         const started = before.filter((n) => n < s).length;
         expect(m, `state ${String(s)}`).toBeGreaterThanOrEqual(acked);

@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Pure functions over file-table entries (FORMAT.md section 7): joining them into files, and
 // packing a whole table densely into table blocks.
 import { toHex, type Bytes } from './bytes.ts';
@@ -15,7 +17,6 @@ import { CorruptStoreError, StoreFullError } from './errors.ts';
 
 export { maxTableBlocks };
 
-/** The `count` field at the start of a table-block body. */
 const COUNT_LENGTH = 2;
 const FILE_ENTRY_FIXED = 34;
 const RUN_ENTRY_FIXED = 23;
@@ -24,13 +25,11 @@ const RUN_ENTRY_FIXED = 23;
 export const maxRunIds = (blockSize: BlockSize): number =>
   Math.floor((blockSize - COUNT_LENGTH - RUN_ENTRY_FIXED) / 16);
 
-/** The encoded length of an entry in a table-block body. */
 export const entrySize = (entry: TableEntry): number =>
   entry.kind === 'file'
     ? FILE_ENTRY_FIXED + utf8Length(entry.path) + utf8Length(entry.target)
     : RUN_ENTRY_FIXED + 16 * entry.ids.length;
 
-/** A file as the table describes it: its inode and its block ids in index order. */
 export interface StoredFile {
   fileId: Bytes;
   path: string;
@@ -55,15 +54,11 @@ export interface FileTable {
 
 const corrupt = (reason: string) => new CorruptStoreError(`file table: ${reason}`);
 
-/** The number of data blocks a file of this type and size has. */
 export const blockCount = (type: FileType, size: number, blockSize: BlockSize): number =>
   type === 'file' ? Math.ceil(size / blockSize) : 0;
 
-/**
- * Joins file and run entries into files, and checks them against the root: every run has a file,
- * each regular file's runs cover its blocks exactly once, no id appears twice (data or table
- * blocks), no two files share a path, and the counts match `fileCount` and `dataBlocks`.
- */
+/** Joins entries into files and checks them against the root: runs cover each file's blocks exactly once, no id repeats,
+ * no two files share a path, counts match. */
 export const assembleFiles = (
   entries: Iterable<TableEntry>,
   root: Pick<RootBody, 'fileCount' | 'dataBlocks' | 'tableIds'>,
@@ -117,11 +112,8 @@ export const assembleFiles = (
   return { files, blocks };
 };
 
-/**
- * Packs a whole file table densely into table blocks, in the order given: each file's entry, then
- * its block ids in runs, a run split wherever a table block fills. Returns the entries of each
- * table block. StoreFullError past `maxTableBlocks`, or for an entry larger than a table block.
- */
+/** Packs the table densely into table blocks in the order given, splitting a run where a block fills. StoreFullError past
+ * `maxTableBlocks` or for an entry larger than a table block. */
 export const packEntries = (files: Iterable<StoredFile>, blockSize: BlockSize): TableEntry[][] => {
   const room = blockSize - COUNT_LENGTH;
   const limit = maxTableBlocks(blockSize);

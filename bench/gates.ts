@@ -1,6 +1,6 @@
-// The nightly gate check: reads bench/run.mjs results (bench/results/<browser>.json), judges every
-// gates and year part with the absolute budgets times `--factor`, prints the gate tables as
-// Markdown (the job summary), and exits 1 if a gate fails or a part errored or is missing.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Nightly gate check: judges bench/run.mjs results against the budgets times `--factor`, prints Markdown tables, exits 1 on failure.
 // Usage: node bench/gates.ts --factor 2 --require gates100,year bench/results/chromium.json ...
 import { readFileSync } from 'node:fs';
 import { judgePart, table } from './judge.ts';

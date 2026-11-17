@@ -1,10 +1,7 @@
-// The soak (CIPHER_LONG only): CIPHER_SOAK_MINUTES (30 by default) of a random workload on one store
-// (inserts, updates, deletes, VACUUM, checkpoints, a table created and dropped, explicit syncs, close
-// and reopen, injected commit failures), the same SQL on a shadow PGlite on MemoryFS. After every
-// reopen: every table's checksum equals the shadow's, the store holds one record per table block and
-// data block and nothing else, and the file table is at most twice as many blocks as a dense packing
-// of the same files, plus 4. `trackingGaps` stays 0 throughout. A failure prints the seed and the
-// last operations.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Soak (CIPHER_LONG only): CIPHER_SOAK_MINUTES (30 default) of a random workload on one store, the same SQL on a shadow PGlite on MemoryFS. After every reopen: table checksums equal the shadow's,
+// the store holds one record per table and data block and nothing else, the file table is at most twice a dense packing plus 4 blocks, and `trackingGaps` is 0. A failure prints the seed and last operations.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';
 import { describe, expect, inject, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../src/backend/backend.ts';
@@ -18,7 +15,6 @@ import { LONG } from './long.ts';
 const MINUTES = inject('soakMinutes');
 const SEED = inject('seed');
 
-/** mulberry32: a small seeded generator, so a seed repeats the run. */
 function generator(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -30,7 +26,6 @@ function generator(seed: number): () => number {
   };
 }
 
-/** Passes everything to `inner`; when armed, the next commit fails once, as FaultyBackend fails it. */
 class Injector implements StorageBackend {
   armed: 'before' | 'after' | null = null;
   readonly #inner: StorageBackend;
@@ -52,7 +47,6 @@ class Injector implements StorageBackend {
   isEmpty = (): Promise<boolean> => this.#inner.isEmpty();
   count = (): Promise<number> => this.#inner.count();
   clear = (): Promise<void> => this.#inner.clear();
-  // Shared by every instance of the run: closing one leaves the records.
   close = (): Promise<void> => Promise.resolve();
 }
 

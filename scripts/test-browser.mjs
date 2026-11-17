@@ -1,5 +1,6 @@
-// Runs the vitest browser projects. With no --project it runs chromium, firefox and webkit;
-// with --project it runs only those, so `npm run test:browser -- --project chromium` works.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Runs the vitest browser projects: chromium, firefox and webkit, or only the --project ones.
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);

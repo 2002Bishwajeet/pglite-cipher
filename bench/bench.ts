@@ -1,6 +1,8 @@
-// The benchmark page: the real implementation (EncryptedFs over IndexedDbBackend, 64 KB blocks)
-// against plain IdbFs, gates G1-G9 (bench/README.md), the key operations,
-// and the rows ported from davidmuggleton/pglite-encrypted-fs's bench (THIRD_PARTY.md).
+// Copyright 2026 Bishwajeet Parhi (modifications and additions)
+// Portions Copyright (c) 2026 David Muggleton, from https://github.com/davidmuggleton/pglite-encrypted-fs
+// SPDX-License-Identifier: FSL-1.1-ALv2 AND MIT
+// The `extras` crypto-overhead rows and the `ops` part follow that project's bench, modified; its MIT licence text is in THIRD_PARTY.md.
+// Benchmark page: EncryptedFs over IndexedDbBackend vs plain IdbFs; gates G1-G9 (bench/README.md), key operations.
 import { IdbFs, PGlite } from '@electric-sql/pglite';
 import { EncryptedFs, IndexedDbBackend } from '../src/index.ts';
 import type { BlockSize } from '../src/format/codec.ts';
@@ -11,11 +13,9 @@ import { judgeGates, judgeYear } from './judge.ts';
 import { parseBlockSize, parsePack } from './params.ts';
 import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
 
-// `&block=N` builds the encrypted store at that block size; read per part, so a bad value fails that part.
+// `&block=N`: encrypted store block size, read per part.
 const blockSize = (): BlockSize => parseBlockSize(new URLSearchParams(location.search).get('block'));
-// `&pack=N` stores up to N blocks per IndexedDB record in the backends made from then on. Only
-// `git apply bench/patches/pack.patch` adds IndexedDbBackend.pack; without it N > 1 fails the part.
-// The gates and enc parts set it and put 1 back when they end, so the parts after them run unpacked.
+// `&pack=N`: blocks per IndexedDB record; needs bench/patches/pack.patch, else N > 1 fails the part. Gates and enc parts reset it to 1.
 const packed = IndexedDbBackend as unknown as { pack?: number };
 const pack = (): number => {
   const n = parsePack(new URLSearchParams(location.search).get('pack'));
@@ -35,7 +35,6 @@ const log = (msg: string) => {
   console.log(`[bench] ${msg}`);
 };
 
-// ---- gates at one database size ---------------------------------------------------------------
 
 async function runGates(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
@@ -49,7 +48,7 @@ async function runGates(mb: number, runs: number): Promise<Json> {
   }
 }
 
-/** The encrypted variant alone (`enc10`, `enc100`): no plain build, no plain section, no ratios. */
+/** Encrypted variant alone: no plain build, no ratios. */
 async function runEncrypted(mb: number, runs: number): Promise<Json> {
   const size = blockSize();
   const n = pack();
@@ -62,12 +61,9 @@ async function runEncrypted(mb: number, runs: number): Promise<Json> {
   }
 }
 
-// ---- memory levers: WAL sizes, shared_buffers, initialMemory ---------------------------
 
-const SMALL_WAL = ['min_wal_size=32MB', 'max_wal_size=32MB']; // the least Postgres allows: two 16 MB segments
-// No smaller `initialMemory`: PGlite 0.5.10's wasm declares 2048 pages (128 MB) as its minimum, and
-// `PGlite.create` with less never settles (instantiate fails: "memory import has 512 pages which is
-// smaller than the declared initial of 2048").
+const SMALL_WAL = ['min_wal_size=32MB', 'max_wal_size=32MB']; // Postgres minimum
+// No smaller `initialMemory`: PGlite 0.5.10's wasm declares 2048 pages minimum; less never settles.
 const LEVERS: Record<string, string[]> = {
   default: [],
   wal: SMALL_WAL,
@@ -76,7 +72,7 @@ const LEVERS: Record<string, string[]> = {
   'wal+sb16': [...SMALL_WAL, 'shared_buffers=16MB'],
 };
 
-/** The gates pair once per lever (`&levers=a,b` picks some), with the settings Postgres reports and the wasm memory of an empty in-memory instance. */
+/** Gates once per lever (`&levers=a,b`), with Postgres' reported settings and empty-instance wasm memory. */
 async function runLevers(mb: number, runs: number): Promise<Json> {
   const only = new URLSearchParams(location.search).get('levers')?.split(',');
   const out: Json = { sizeMB: mb };
@@ -99,7 +95,6 @@ async function runLevers(mb: number, runs: number): Promise<Json> {
   return out;
 }
 
-// ---- G6 support, G8 deriveKey, AES-GCM, crypto overhead ----------------------------------------
 
 const STORE = 'kv';
 const req = <T>(r: IDBRequest<T>) =>
@@ -188,7 +183,6 @@ async function support(): Promise<Json> {
   return r;
 }
 
-/** G8's unit: one HKDF `deriveKey` of a record subkey. */
 async function deriveKeyMs(n: number): Promise<Stat> {
   const base = await hkdfBase();
   const ms: number[] = [];
@@ -201,7 +195,6 @@ async function deriveKeyMs(n: number): Promise<Stat> {
   return { ...stat(ms), p50: Math.round(pct(ms, 50) * 1000) / 1000 };
 }
 
-/** AES-GCM throughput: 100 MB at each unit, 64 calls in flight. */
 async function gcmMicro(): Promise<Json> {
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   const aad = new Uint8Array(24);
@@ -231,7 +224,6 @@ async function gcmMicro(): Promise<Json> {
   return out;
 }
 
-/** Ported shape (crypto-overhead.bench.ts): one record sealed and opened, and 100 at once, as the format does it. */
 async function cryptoOverhead(runs: number): Promise<Json> {
   const out: Json = {};
   for (const blockSize of [8192, 65536] as BlockSize[]) {
@@ -269,9 +261,8 @@ async function runExtras(runs: number): Promise<Json> {
   return { g6, g8DeriveKeyMs, aesGcm, cryptoOverhead: await cryptoOverhead(runs) };
 }
 
-// ---- G8 over a simulated year ------------------------------------------------------------------
 
-/** 365 open/edit/checkpoint/close sessions; then how many session salts the open derives (one per salt still stored). */
+/** 365 sessions, then the session salts the open derives. */
 async function runYear(sessions: number): Promise<Json> {
   const size = blockSize();
   const name = `bench-year-${crypto.randomUUID()}`;
@@ -304,9 +295,7 @@ async function runYear(sessions: number): Promise<Json> {
   }
 }
 
-// ---- ported shape: startup and operations ----------------------------------------------------
 
-/** Ported shape (startup.bench.ts, operations.bench.ts): plain and encrypted, p50 of `runs` each. */
 async function runOps(runs: number): Promise<Json> {
   const out: Json = {};
   for (const kind of ['plain', 'encrypted'] as const) {
@@ -369,7 +358,6 @@ async function runOps(runs: number): Promise<Json> {
   return out;
 }
 
-// ---- page ------------------------------------------------------------------------------------
 
 const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   gates10: (runs) => runGates(10, runs),
@@ -381,7 +369,7 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   extras: (runs) => runExtras(runs),
   year: () => runYear(Number(new URLSearchParams(location.search).get('sessions') ?? 365)),
   ops: (runs) => runOps(runs),
-  // bench/opfsread.ts: `&opfsmb=` sets the size, 300 MB by default.
+  // `&opfsmb=` sets the size (default 300 MB).
   opfsread: (runs) => runOpfsRead(Number(new URLSearchParams(location.search).get('opfsmb') ?? 300), runs, log),
 };
 

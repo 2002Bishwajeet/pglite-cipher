@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Keys and header copies: what is extractable, what each wrong input gives, and rule 5.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Bytes } from '../../src/format/bytes.ts';
@@ -47,7 +49,6 @@ describe('keys', () => {
     await openHeader(kek, header, header.slice());
     await ctx.subkeys.current();
     await ctx.subkeys.forSalt(random(16));
-    // createHeader and openHeader each derive a header key; then one writing and one reading subkey.
     expect(derive).toHaveBeenCalledTimes(4);
     for (const result of derive.mock.results) {
       const key = await (result.value as Promise<CryptoKey>);
@@ -80,7 +81,6 @@ describe('keys', () => {
     const kek2 = await newKek();
     const rewrapped = await rewrapHeader(kek, kek2, header);
     expect(rewrapped.length).toBe(HEADER_LENGTH);
-    // Fresh wrap nonce, salt and nonce: no byte range of the old header is reused.
     expect(rewrapped.subarray(0, 12)).not.toEqual(header.subarray(0, 12));
     expect(rewrapped.subarray(60, 88)).not.toEqual(header.subarray(60, 88));
 

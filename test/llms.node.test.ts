@@ -1,3 +1,5 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // llms-full.txt is read by coding agents: every exported name it mentions must really be exported.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +19,6 @@ describe('llms-full.txt', () => {
   const text = read('llms-full.txt');
 
   it('names only exports that exist', () => {
-    // Backticked identifiers that look like package exports: PascalCase names and the two functions.
     const named = new Set(
       [...text.matchAll(/`([A-Z][A-Za-z]+(?:Error|Fs|Backend|Options|Stats|Mode|Progress|Result|Size)|importKek|verifyStore|VERSION|FORMAT_VERSION)\b/g)].map(
         (m) => m[1] as string,

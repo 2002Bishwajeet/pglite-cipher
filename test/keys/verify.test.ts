@@ -1,5 +1,6 @@
-// verify() and verifyStore(): a clean store is ok; every tamper case is reported by the damaged
-// record's key and a reason, without an exception; nothing reported names a path.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// verify() and verifyStore(): every tamper is reported by the damaged record's key and a reason, without throwing and without naming a path.
 import { describe, expect, it } from 'vitest';
 import type { RecordKey } from '../../src/backend/backend.ts';
 import { MemoryBackend } from '../../src/backend/memory.ts';
@@ -34,7 +35,7 @@ describe('verify', () => {
       const live = await b.fs.verify({ onProgress: (p) => progress.push(p) });
       expect(live).toEqual({ ok: true, files: stats.files, blocks: stats.dataBlocks, problems: [] });
       expect(progress.at(-1)).toMatchObject({ phase: 'blocks' });
-      // Closing commits once more (PGlite removes a file); the closed store verifies on its own.
+      // Closing commits once more (PGlite removes a file).
       await b.pg.close();
       const recs = await records(memory);
       const closed = await verifyStore(memory, key);
@@ -69,7 +70,6 @@ describe('verify', () => {
         v[at] = (v[at] ?? 0) ^ 0x10;
         r.set(k, v);
       };
-      // Each damage, the problems it must produce, and whether the file table itself is damaged.
       const cases: Array<[string, (r: Recs) => void, VerifyProblem[], boolean]> = [
         ['a bit flipped in a data block', (r) => { flip(r, d1, 100); }, [{ key: d1, reason: 'data-block' }], false],
         ['two blocks of one file exchanged', (r) => { swap(r, m0, m1); }, [{ key: m0, reason: 'data-block' }, { key: m1, reason: 'data-block' }], false],
@@ -89,7 +89,6 @@ describe('verify', () => {
       ];
       const check = (name: string, result: VerifyResult, tableCase: boolean) => {
         expect(result.ok, name).toBe(false);
-        // A table that does not verify attributes no data block.
         if (tableCase) {
           expect(result, name).toMatchObject({ files: 0, blocks: 0 });
           expect(result.problems.some((p) => p.reason === 'data-block'), name).toBe(false);
@@ -106,10 +105,8 @@ describe('verify', () => {
         expect(result.problems, name).toEqual(expect.arrayContaining(want));
         check(name, result, tableCase);
         expect(seen.every((p) => Object.keys(p).sort().join() === 'done,phase,total'), name).toBe(true);
-        // verify reads; it writes nothing.
         expect(sameRecords(await records(backend), damaged), name).toBe(true);
       }
-      // The root replaced with its older value: an older table than the one stored.
       const rolled = new Map(recs);
       rolled.set(2, value(older, 2));
       const result = await verifyStore(await restore(rolled), key);

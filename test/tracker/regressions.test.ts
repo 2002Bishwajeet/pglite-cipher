@@ -1,5 +1,6 @@
-// Named regressions for the ways "mark blocks on write" loses data, the safety
-// net, and snapshot isolation.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Named regressions: "mark blocks on write" losing data, the safety net, and snapshot isolation.
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { installTracker, type MemNode, type Snapshot, type Tracker } from '../../src/tracker/tracker.ts';
@@ -49,9 +50,7 @@ interface Env {
   root: string;
   tracker: Tracker;
   model: ModelStore;
-  /** The MEMFS operations as they were before the tracker wrapped them. */
   original: Original;
-  /** Snapshot, apply to the model, commit, check. */
   sync(): Snapshot;
   write(path: string, pos: number, data: Uint8Array): void;
   id(path: string): string;

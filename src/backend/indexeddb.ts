@@ -1,6 +1,7 @@
-// The IndexedDB backend: one database with exactly the caller's name, one object store `kv` with
-// out-of-line keys, nothing else. Slots are the number keys 0, 1, 2; blocks are the 32-character
-// string keys. IndexedDB orders numbers before strings, so a range from "" holds the blocks only.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// The IndexedDB backend: one database named as given, one object store `kv`. Slots are number keys 0-2, blocks 32-char
+// string keys; numbers sort before strings, so a range from "" holds blocks only.
 import { StaleWriterError } from '../format/errors.ts';
 import {
   invalidKey,
@@ -13,10 +14,8 @@ import {
   type StorageBackend,
 } from './backend.ts';
 
-/** The one object store. A constant, because it has to be known before anything can be read. */
 const STORE = 'kv';
 
-/** How long a blocked deletion is waited for before destroy() returns anyway. */
 const BLOCKED_GRACE_MS = 2000;
 
 const done = <T>(request: IDBRequest<T>): Promise<T> =>
@@ -32,18 +31,14 @@ const done = <T>(request: IDBRequest<T>): Promise<T> =>
 export class IndexedDbBackend implements StorageBackend {
   readonly #name: string;
   #db: Promise<IDBDatabase> | null = null;
-  /** Why later calls are refused, once this connection is closed. */
   #closed: string | null = null;
 
-  /** `databaseName` is used as given: no prefix, no suffix, no version. Pass one that says nothing. */
+  /** `databaseName` is used as given: no prefix, suffix or version. */
   constructor(databaseName: string) {
     this.#name = databaseName;
   }
 
-  /**
-   * The two databases `<name>.a` and `<name>.b`, for `EncryptedFs`'s `backend: [a, b]`: a data-key
-   * rotation writes the new store into the empty one, so an open finds the current store by itself.
-   */
+  /** The databases `<name>.a` and `<name>.b`, for `EncryptedFs`'s `backend: [a, b]`. */
   static pair(name: string): [IndexedDbBackend, IndexedDbBackend] {
     return [new IndexedDbBackend(`${name}.a`), new IndexedDbBackend(`${name}.b`)];
   }
@@ -82,8 +77,7 @@ export class IndexedDbBackend implements StorageBackend {
 
   async commit(batch: CommitBatch): Promise<void> {
     const db = await this.#database();
-    // From opening the transaction to its last request there is no await: every value arrives
-    // already encrypted, and an await would let the transaction commit early.
+    // No await between opening the transaction and its last request: one would let it commit early.
     return new Promise((resolve, reject) => {
       const tx = this.#transaction(db, 'readwrite', batch.durability);
       const store = tx.objectStore(STORE);
@@ -106,14 +100,12 @@ export class IndexedDbBackend implements StorageBackend {
           }
           for (const [key, value] of batch.puts) {
             if (!isRecordKey(key)) throw invalidKey();
-            // A put clones the whole buffer behind a view, so a partial view is copied to its own
-            // bytes first; a SharedArrayBuffer cannot be cloned at all. `SharedArrayBuffer` itself
-            // is undefined where the page is not cross-origin isolated, hence `instanceof ArrayBuffer`.
+            // A put clones the whole buffer behind a view, so partial views are copied; SharedArrayBuffer can't be cloned and is
+            // undefined without cross-origin isolation, hence `instanceof ArrayBuffer`.
             const whole = value.byteOffset === 0 && value.byteLength === value.buffer.byteLength && value.buffer instanceof ArrayBuffer;
             store.put(whole ? value : value.slice(), key);
           }
         } catch (error) {
-          // invalidKey(), or the DOMException a put throws for a value it cannot clone.
           fail(error as Error);
         }
       };
@@ -134,10 +126,7 @@ export class IndexedDbBackend implements StorageBackend {
     await done(store.clear());
   }
 
-  /**
-   * Deletes the database. The backend stays usable: its next call creates the database again,
-   * empty. Another connection that keeps the database open delays the deletion until it closes.
-   */
+  /** Deletes the database; the next call recreates it empty. A connection open elsewhere delays the deletion. */
   async destroy(): Promise<void> {
     if (this.#closed !== null) throw new Error(this.#closed);
     const db = this.#db;
@@ -155,10 +144,8 @@ export class IndexedDbBackend implements StorageBackend {
         clearTimeout(grace);
         resolve();
       };
-      // WebKit reports a blocked deletion while the connection closed above is still closing, and
-      // deletes a moment later: wait for that. The records are gone already (EncryptedFs clears
-      // first); a connection that stays open delays the deletion past the grace period, and the
-      // database follows when it closes.
+      // WebKit reports a blocked deletion while the just-closed connection is still closing, then deletes: wait. Records
+      // are already cleared; a lingering connection delays the deletion past the grace period.
       request.onblocked = () => {
         clearTimeout(grace);
         grace = setTimeout(resolve, BLOCKED_GRACE_MS);
@@ -180,7 +167,6 @@ export class IndexedDbBackend implements StorageBackend {
     );
   }
 
-  /** The open connection, or a rejection once this backend is closed. */
   async #database(): Promise<IDBDatabase> {
     const db = await this.#open();
     if (this.#closed !== null) throw new Error(this.#closed);
@@ -192,7 +178,7 @@ export class IndexedDbBackend implements StorageBackend {
     try {
       return db.transaction(STORE, mode, { durability });
     } catch (error) {
-      // A browser that does not accept the option: open the transaction without it.
+      // A browser that rejects the option: open without it.
       if (error instanceof TypeError) return db.transaction(STORE, mode);
       throw error;
     }
@@ -207,8 +193,7 @@ export class IndexedDbBackend implements StorageBackend {
       };
       request.onsuccess = () => {
         const db = request.result;
-        // Another connection wants to delete or upgrade the database: step aside, and refuse later
-        // calls rather than open (and so recreate) it again.
+        // Another connection wants to delete or upgrade: step aside and refuse later calls rather than recreate it.
         db.onversionchange = () => {
           db.close();
           this.#closed = 'IndexedDbBackend: the database was deleted or upgraded by another connection';

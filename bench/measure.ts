@@ -1,6 +1,7 @@
-// What the benchmark page (bench.ts) and the perf gates (test/perf/gates.browser.test.ts) measure: a
-// note-taking shaped database built on plain IdbFs and on EncryptedFs over IndexedDB, timed the same
-// way, with gates G1-G4 and G9 (bench/README.md).
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Shared by the bench page and test/perf/gates.browser.test.ts: a note-taking database on plain IdbFs and on
+// EncryptedFs over IndexedDB, timed the same way (gates G1-G4, G9).
 import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live } from '@electric-sql/pglite/live';
@@ -26,10 +27,8 @@ export interface Stat {
 }
 export const stat = (xs: readonly number[]): Stat => ({ p50: round(pct(xs, 50)), p95: round(pct(xs, 95)), max: round(Math.max(...xs)), n: xs.length });
 
-// ---- the workload -------------------------------
 
 const extensions = { live, pg_trgm };
-/** PGlite settings the memory levers vary: Postgres settings through `startParams`. */
 export type PgOptions = Pick<PGliteOptions, 'relaxedDurability' | 'startParams'>;
 export const createPg = (fs: NonNullable<PGliteOptions['fs']>, opts: PgOptions = {}) => PGlite.create({ fs, extensions, ...opts });
 export type Pg = Awaited<ReturnType<typeof createPg>>;
@@ -66,7 +65,6 @@ export const randomBytes = (n: number): Uint8Array<ArrayBuffer> => {
 const walFile = async (pg: PGlite): Promise<string> =>
   (await pg.query<{ f: string }>('SELECT pg_walfile_name(pg_current_wal_insert_lsn()) AS f')).rows[0]?.f ?? '';
 
-/** The schema, 50 documents, and `mb` MB of 1 MB update blobs (the caller checkpoints). */
 async function build(pg: Pg, mb: number): Promise<string[]> {
   await pg.exec(SCHEMA);
   const docs = Array.from({ length: 50 }, () => crypto.randomUUID());
@@ -81,11 +79,9 @@ async function build(pg: Pg, mb: number): Promise<string[]> {
   return docs;
 }
 
-// ---- the two filesystems, instrumented the same way ------------------------------------------
 
 interface Sync {
   ms: number;
-  /** EncryptedFs only: `stats().lastSync` of a sync that had something to write. */
   stats?: SyncStats;
 }
 
@@ -118,7 +114,7 @@ class Busy {
   }
 }
 
-// The open's blocks phase, split (bench only): IndexedDB page reads and WebCrypto decrypts.
+// Open's blocks phase, split (bench only): IndexedDB reads and WebCrypto decrypts.
 const reading = new Busy();
 const decrypting = new Busy();
 const subtle = globalThis.crypto.subtle;
@@ -136,7 +132,6 @@ const timedBackend = (name: string): [IndexedDbBackend, IndexedDbBackend] => {
 class TimedFs extends EncryptedFs {
   readonly syncs: Sync[] = [];
   openStartedAt = 0;
-  /** IndexedDB read and decrypt time of the last open. */
   openSplit = { readMs: 0, decryptMs: 0 };
   override async initialSyncFs(): Promise<void> {
     this.openStartedAt = now();
@@ -155,8 +150,7 @@ class TimedFs extends EncryptedFs {
   }
 }
 
-// Every IndexedDB connection the page opens. A closed IdbFs PGlite leaves its IDBFS connection
-// open, and deleteDatabase then blocks forever, so leftovers are closed before deleting.
+// A closed IdbFs PGlite leaves its IDBFS connection open and deleteDatabase then blocks, so leftovers are closed first.
 const connections = new Set<IDBDatabase>();
 const idbOpen = indexedDB.open.bind(indexedDB);
 indexedDB.open = (name: string, version?: number) => {
@@ -183,10 +177,7 @@ export const dropIdb = (name: string): Promise<void> => {
   });
 };
 
-/**
- * The IndexedDB records that hold blocks in the pair named `name` (both databases), counted raw, so
- * that with bench/patches/pack.patch it is the records, not the blocks.
- */
+/** IndexedDB records holding blocks in the pair `name`, counted raw (with pack.patch: records, not blocks). */
 async function blockRecords(name: string): Promise<number> {
   let n = 0;
   for (const db of [`${name}.a`, `${name}.b`]) {
@@ -225,20 +216,14 @@ export const newKek = (): Promise<CryptoKey> => importKek(crypto.getRandomValues
 export type Kind = 'plain' | 'encrypted';
 type AnyFs = PlainFs | TimedFs;
 
-// ---- one variant ---------------------------------------------------------------------------
 
 interface Sample {
   ms: Stat;
-  /** EncryptedFs: summed over the syncs of each run. */
   tableBlocks?: Stat;
   dataBlocks?: Stat;
-  /** EncryptedFs: runs that created, grew, shrank, renamed, removed or chmodded a file under PGDATA. */
   fileChanges?: number;
-  /** EncryptedFs: runs that wrote a table block although no file changed (G9). */
   tableBlocksWithoutFileChange?: number;
-  /** EncryptedFs: the most table blocks a run wrote per file it changed (G9: at most 1). */
   maxTableBlocksPerChangedFile?: number;
-  /** EncryptedFs: the `stats().lastSync` breakdown, summed per run. */
   lastSync?: { bytes: Stat; deletes: Stat; encryptMs: Stat; commitMs: Stat; repacked: number };
 }
 
@@ -248,7 +233,6 @@ interface TreeFS {
   isDir(mode: number): boolean;
 }
 
-/** Every node under PGDATA: its path, mode and size (0 for a directory). */
 function nodes(pg: Pg): Array<{ path: string; mode: number; size: number }> {
   const FS = (pg.Module as unknown as { FS: TreeFS }).FS;
   const out: Array<{ path: string; mode: number; size: number }> = [];
@@ -266,7 +250,6 @@ function nodes(pg: Pg): Array<{ path: string; mode: number; size: number }> {
   return out;
 }
 
-/** Bytes in files per top-level entry of the data directory (`base`, `global`, `pg_wal`, ...; files at the top count as `.`). */
 const dirBytes = (pg: Pg): Record<string, number> => {
   const out: Record<string, number> = {};
   for (const n of nodes(pg)) {
@@ -278,10 +261,8 @@ const dirBytes = (pg: Pg): Record<string, number> => {
 };
 export const wasmBytes = (pg: PGlite): number => (pg.Module as unknown as { HEAPU8: Uint8Array }).HEAPU8.byteLength;
 
-/** The data directory as a file map: path to mode and size. */
 const tree = (pg: Pg): Map<string, string> => new Map(nodes(pg).map((n) => [n.path, `${String(n.mode)} ${String(n.size)}`]));
 
-/** Files created, grown, shrunk, chmodded or removed between two file maps (a rename is two). */
 const changedFiles = (before: Map<string, string>, after: Map<string, string>): number => {
   let n = 0;
   for (const [path, v] of after) if (before.get(path) !== v) n++;
@@ -289,7 +270,6 @@ const changedFiles = (before: Map<string, string>, after: Map<string, string>): 
   return n;
 };
 
-/** Runs `op` n times; the syncs each run makes are summed (one per query or exec). */
 async function sample(fs: () => AnyFs, pg: () => Pg, n: number, op: (i: number) => Promise<unknown>, prep?: () => Promise<unknown>): Promise<Sample> {
   const ms: number[] = [];
   const sums = { tableBlocks: [] as number[], dataBlocks: [] as number[], bytes: [] as number[], deletes: [] as number[], encryptMs: [] as number[], commitMs: [] as number[] };
@@ -309,7 +289,6 @@ async function sample(fs: () => AnyFs, pg: () => Pg, n: number, op: (i: number) 
       const st = syncs.flatMap((s) => (s.stats ? [s.stats] : []));
       for (const k of ['tableBlocks', 'dataBlocks', 'bytes', 'deletes', 'encryptMs', 'commitMs'] as const) sums[k].push(st.reduce((a, s) => a + s[k], 0));
       if (st.some((s) => s.repacked)) repacked++;
-      // A file change comes from the file-map diff, not from the table write.
       const changed = changedFiles(before, tree(pg()));
       const written = st.reduce((a, s) => a + s.tableBlocks, 0);
       if (changed > 0) {
@@ -351,10 +330,9 @@ async function memory(pg: Pg): Promise<Json> {
 
 export interface OpenResult {
   ms: Stat;
-  /** EncryptedFs: `stats().lastOpen` and the file table of the last open. */
   tableMs?: Stat;
   blocksMs?: Stat;
-  /** EncryptedFs, bench only: wall time of the open with an IndexedDB page read in flight, and with a decrypt in flight (they overlap). */
+  /** EncryptedFs, bench only: open time with an IndexedDB read in flight, and with a decrypt in flight (they overlap). */
   readMs?: Stat;
   decryptMs?: Stat;
   tableBlocks?: number;
@@ -366,11 +344,8 @@ export interface OpenResult {
 
 export interface VariantResult {
   buildMs: number;
-  /** The data directory after the build and its checkpoint: nodes, and bytes in files (G3's "database"); bytes per top-level directory before and after that checkpoint. */
   dataDir: { nodes: number; bytes: number; dirs: Record<string, number>; dirsBeforeCheckpoint: Record<string, number> };
-  /** The wasm memory after the build (it never shrinks while the instance lives). */
   wasmAfterBuild: number;
-  /** Bytes per top-level directory of the data directory after the last open, beside G3. */
   dirsAfterOpen: Record<string, number>;
   /** G1: the sync after a one-row UPDATE. */
   g1: Sample;
@@ -380,21 +355,15 @@ export interface VariantResult {
   g4: Sample & { switched: number };
   /** G2: the open, from initialSyncFs to Postgres ready. */
   g2: OpenResult;
-  /** G3: memory after the last open. */
   g3: Json;
-  /** EncryptedFs, G9 over every sync of the workload (build, G1, G1b, G4). */
   g9?: { syncs: number; tableBlocks: Stat; tableToDataBlocks: Stat; repacked: number };
-  /** EncryptedFs: IndexedDB records holding blocks, and the blocks (table and data), after the build and after G4 (with `?pack=`, blocks ÷ records is the fill). */
+  /** EncryptedFs: IndexedDB records and blocks after the build and after G4. */
   store?: { afterBuild: { records: number; blocks: number }; afterG4: { records: number; blocks: number } };
-  /** EncryptedFs: the opens of the store alone (no plain open in between), the key operations, then the same opens after the rotation. */
   keys?: { changeKeyMs: number; verifyMs: number; verifyOk: boolean; rotateDataKeyMs: number; openBeforeRotation: OpenResult; openAfterRotation: OpenResult };
-  /** EncryptedFs: the store's records read as the open reads its blocks, nothing decrypted, once per G2 open, beside `g2.readMs`. */
   readsOnly?: { ms: Stat; page: number; records: number; bytes: number };
-  /** EncryptedFs: why the key operations failed, if they did (then there is no `keys`). */
   keysError?: string;
 }
 
-/** The opens of one variant, collected. */
 class Opens {
   readonly ms: number[] = [];
   readonly tableMs: number[] = [];
@@ -430,7 +399,6 @@ class Opens {
   }
 }
 
-/** One variant's database after the build and the syncs; `pg` is usable while `open` is true. */
 interface Built {
   kind: Kind;
   label: string;
@@ -443,7 +411,6 @@ interface Built {
   part: Omit<VariantResult, 'g2' | 'g3' | 'dirsAfterOpen' | 'keys'>;
 }
 
-/** Builds an `mb` MB database on one filesystem and measures G1, G1b and G4 (and, encrypted, G9), `runs` times each. */
 async function buildVariant(kind: Kind, name: string, mb: number, runs: number, log: (msg: string) => void, pgOptions: PgOptions, blockSize?: BlockSize): Promise<Built> {
   const label = `${kind} ${String(mb)} MB`;
   const key = { kek: await newKek() };
@@ -472,8 +439,7 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
   const g1b = await sample(cur, () => pg, runs, () => pg.query('INSERT INTO doc_updates (doc_id, data) VALUES ($1, $2)', [docs[2], randomBytes(4096)]));
 
   log(`${label}: G4`);
-  // Untimed before each run: a CHECKPOINT (so old segments are recycled and memory stays bounded)
-  // and the current segment's name, to count the runs that really switched.
+  // Untimed before each run: a CHECKPOINT (bounds memory) and the current segment name, to count real switches.
   let switched = 0;
   let before = '';
   const countSwitch = async () => {
@@ -508,7 +474,6 @@ async function buildVariant(kind: Kind, name: string, mb: number, runs: number, 
   return { kind, label, key, make, pgOptions, fs, pg, open: true, part: { buildMs, dataDir, wasmAfterBuild, g1, g1b, g4, ...(g9 ? { g9 } : {}), ...(store ? { store } : {}) } };
 }
 
-/** Closes the variant's PGlite if it is open, opens the data again and records the open. */
 async function reopen(v: Built, into: Opens): Promise<void> {
   await shut(v);
   v.fs = v.make();
@@ -522,11 +487,7 @@ async function shut(v: Built): Promise<void> {
   v.open = false;
 }
 
-/**
- * The open's blocks phase without the decrypts: every record of the store named `name`, read
- * with the open's `readRange` pages and the next page in flight, nothing decrypted or copied. The
- * page is the open's, PAGE records, or 32 MiB of them at a larger block size.
- */
+/** The open's blocks phase without decrypts: the store's records read in the open's pages, nothing decrypted. */
 async function readsOnly(name: string, blockSize: number): Promise<{ ms: number; page: number; records: number; bytes: number }> {
   const pair = IndexedDbBackend.pair(name);
   try {
@@ -548,15 +509,10 @@ async function readsOnly(name: string, blockSize: number): Promise<{ ms: number;
 }
 
 /**
- * Builds the same `mb` MB database on plain IdbFs and on EncryptedFs and measures G1, G1b and G4
- * `runs` times each; then G2, `opens` opens per variant, plain and encrypted interleaved, so that a
- * machine that speeds up or slows down meanwhile moves both alike, and each after an untimed open of
- * the same variant, so that no timed open follows the other's; G3 after the last open of each,
- * with the other closed; and with `keys` the encrypted one's opens alone, the key operations on it,
- * then its opens after the rotation. Deletes both databases at the end.
+ * Builds the same `mb` MB database on plain and encrypted, measures G1, G1b, G4, then G2 with the variants' opens
+ * interleaved (so machine speed drift moves both alike), G3, and with `keys` the key operations. Deletes both.
  */
 export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts?: { opens?: number; keys?: boolean; onlyEncrypted?: false; pgOptions?: PgOptions; blockSize?: BlockSize }): Promise<{ plain: VariantResult; encrypted: VariantResult }>;
-/** With `onlyEncrypted` the plain database is neither built nor opened and there is no `plain`. */
 export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted: true; pgOptions?: PgOptions; blockSize?: BlockSize }): Promise<{ plain: undefined; encrypted: VariantResult }>;
 export async function runPair(mb: number, runs: number, log: (msg: string) => void, opts: { opens?: number; keys?: boolean; onlyEncrypted?: boolean; pgOptions?: PgOptions; blockSize?: BlockSize } = {}): Promise<{ plain: VariantResult | undefined; encrypted: VariantResult }> {
   const id = crypto.randomUUID();
@@ -581,9 +537,7 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     for (let i = 0; i < n; i++) {
       for (const v of p ? [p, e] : [e]) {
         log(`${v.label}: G2 open ${String(i + 1)} of ${String(n)}`);
-        // With both variants, an untimed open of this one first, so that a timed open follows an
-        // open of its own database, never the other's: a plain open just before an
-        // encrypted one can make that open much slower.
+        // Untimed open first, so no timed open follows the other variant's (that can make it much slower).
         if (p) await reopen(v, new Opens());
         await reopen(v, g2[v.kind]);
         if (i < n - 1) await shut(v);
@@ -613,11 +567,9 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
     }
 
     if (opts.keys && e.fs instanceof TimedFs) {
-      // A failure here (Chromium's quota for a second 256 KiB store) is recorded, not thrown, so
-      // that the part keeps G1 to G4.
+      // Recorded, not thrown (Chromium's quota for a second 256 KiB store), so the part keeps G1 to G4.
       try {
-        // The same opens as after the rotation, on the store as G2 opened it: without a plain open in
-        // between, so that beside openAfterRotation they show what the rewrite alone changes.
+        // The opens as after the rotation, without a plain open between, to isolate what the rewrite changes.
         const before = new Opens();
         for (let i = 0; i < n; i++) {
           log(`${e.label}: open before the rotation ${String(i + 1)} of ${String(n)}`);
@@ -655,7 +607,6 @@ export async function runPair(mb: number, runs: number, log: (msg: string) => vo
   }
 }
 
-/** The ratios the perf gates assert, all against the plain run of the same session. */
 export const ratios = (plain: VariantResult, enc: VariantResult) => ({
   /** G1: encrypted p50 ÷ plain p50 of the one-row-update sync (gate ≤ 2). */
   g1: round(enc.g1.ms.p50 / plain.g1.ms.p50),
@@ -663,10 +614,9 @@ export const ratios = (plain: VariantResult, enc: VariantResult) => ({
   g2: round(enc.g2.ms.p50 / plain.g2.ms.p50),
   /** G4: encrypted segment-switch sync p50 ÷ plain normal (one-row-update) sync p50 (gate ≤ 10). */
   g4: round(enc.g4.ms.p50 / plain.g1.ms.p50),
-  /** For the record, not asserted: the same switch ÷ the encrypted normal sync. */
+  /** Not asserted: the same switch ÷ the encrypted normal sync. */
   g4ToEncryptedSync: round(enc.g4.ms.p50 / enc.g1.ms.p50),
-  /** For the record, not asserted: the encrypted switch ÷ the plain switch. */
+  /** Not asserted: encrypted switch ÷ plain switch. */
   g4ToPlainSwitch: round(enc.g4.ms.p50 / plain.g4.ms.p50),
-  /** G9: file-table phase p50 ÷ encrypted open p50 (gate ≤ 0.05). */
   g9Open: Math.round(((enc.g2.tableMs?.p50 ?? NaN) / enc.g2.ms.p50) * 10_000) / 10_000,
 });

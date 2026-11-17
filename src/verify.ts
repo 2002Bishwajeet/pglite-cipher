@@ -1,6 +1,7 @@
-// verify(): a store checked record by record without Postgres, the equivalent of SQLCipher's
-// `PRAGMA cipher_integrity_check`. It names what it finds by slot or block id, never by path, and
-// never throws for a damaged record.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// verify(): checks a store record by record without Postgres (like `PRAGMA cipher_integrity_check`); names findings by
+// slot or block id, never path, and never throws for a damaged record.
 import type { BlockId, Slot, StorageBackend } from './backend/backend.ts';
 import { concat, equalBytes, toHex, type Bytes } from './format/bytes.ts';
 import { decodeRoot, decodeTable, type RootBody, type TableEntry } from './format/codec.ts';
@@ -23,16 +24,14 @@ export type VerifyReason =
   | 'manifest';
 
 export interface VerifyProblem {
-  /** A slot number, or a block id. */
   key: Slot | BlockId;
   reason: VerifyReason;
 }
 
 export interface VerifyResult {
   ok: boolean;
-  /** The files of the file table; 0 when the table does not verify. */
+  /** Files in the file table; 0 when it does not verify (same for `dataBlocks`). */
   files: number;
-  /** The data blocks the file table lists; 0 when the table does not verify. */
   blocks: number;
   problems: VerifyProblem[];
 }
@@ -47,7 +46,6 @@ export interface VerifyOptions {
   onProgress?: (progress: VerifyProgress) => void;
 }
 
-/** Whether `open` succeeds; false for a record that does not open or does not decode. */
 async function opens(open: () => Promise<void>): Promise<boolean> {
   try {
     await open();
@@ -58,11 +56,8 @@ async function opens(open: () => Promise<void>): Promise<boolean> {
   }
 }
 
-/**
- * Opens both header copies and the root with `kek`, then checks the table and every block (see
- * `checkBlocks`). Throws only what is not damage: WrongKeyError, UnsupportedFormatError, and a
- * backend that fails.
- */
+/** Opens both header copies and the root with `kek`, then checks the table and every block. Throws only non-damage:
+ * WrongKeyError, UnsupportedFormatError, a failing backend. */
 export async function verifyStore(backend: StorageBackend, kek: CryptoKey, { onProgress }: VerifyOptions = {}): Promise<VerifyResult> {
   const [copy0, copy1, sealedRoot] = (await Promise.all([backend.get(0), backend.get(1), backend.get(2)])) as Array<Bytes | undefined>;
   const problems: VerifyProblem[] = [];
@@ -92,13 +87,8 @@ export async function verifyStore(backend: StorageBackend, kek: CryptoKey, { onP
   return { ...checked, ok: problems.length === 0 && checked.ok, problems: [...problems, ...checked.problems] };
 }
 
-/**
- * Checks the file table and the blocks that `root` describes: the table blocks it lists, by
- * `getMany`, each opened and their tags against `tableDigest`; then every block in pages, each data
- * block opened as the file and index the table gives for its id; the tags against `manifest`; and
- * `count()` against `slots` (the slot records the store holds) and the blocks seen. A table that
- * does not verify stops the check: its blocks cannot be attributed.
- */
+// Checks the table and blocks `root` describes: digests, each block against the table's file and index, and the record
+// count. A table that does not verify stops the check: its blocks cannot be attributed.
 export async function checkBlocks(
   backend: StorageBackend,
   ctx: RecordContext,
@@ -109,7 +99,6 @@ export async function checkBlocks(
   const problems: VerifyProblem[] = [];
   const { blockSize } = ctx.meta;
 
-  // The file table.
   const tableIds = root.tableIds.map(toHex);
   const tags: Bytes[] = [];
   const entries: TableEntry[] = [];
@@ -150,7 +139,6 @@ export async function checkBlocks(
   if (table === null) return { ok: false, files: 0, blocks: 0, problems };
   const { files, blocks } = table;
 
-  // The blocks, one page at a time.
   const tableSet = new Set(tableIds);
   const blockTags = new Map<string, Array<Bytes | undefined>>();
   for (const key of files.keys()) blockTags.set(key, []);

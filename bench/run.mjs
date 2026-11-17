@@ -1,10 +1,7 @@
-// Runs the benchmark page headless in Playwright's browsers and saves what it reports to
-// bench/results/<browser>.json (merged per part, so parts can run apart).
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Runs the bench page headless in Playwright; merges results per part into bench/results/<browser>.json.
 // Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8]
-// --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
-// --block N builds the gates' encrypted store with N-byte blocks and saves to <browser>-block<N>.json.
-// --pack N stores N blocks per IndexedDB record (needs bench/patches/pack.patch) and saves to <browser>-pack<N>.json.
-// Builds bench/dist first if it is missing. WebKit needs Playwright's WebKit build (macOS, or Linux with its system libraries).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';
@@ -36,7 +33,7 @@ try {
     const slow = throttle > 1 && name === 'chromium';
     const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${pack ? `-pack${pack}` : ''}.json`, results);
     const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
-    // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
+    // Else Chromium buckets performance.memory (G3).
     const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
     const browser = await playwright[name].launch({ headless: true, args: launchArgs });
     try {

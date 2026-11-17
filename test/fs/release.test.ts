@@ -1,12 +1,7 @@
-// A closed instance holds no database. PGlite drops its module on close; EncryptedFs kept the
-// module's FS, the tracker and the file map, so a host that keeps a closed PGlite (the bench keeps
-// the last one until the next open returns) kept its wasm memory and data directory too: two
-// databases in memory during a reopen, which an iPhone tab does not survive at 100 MB. Each cycle
-// here opens, writes, closes and keeps the instance; once the GC has run, what is still reachable
-// must not grow with the cycles. The bound is one instance in Node, Chromium and Firefox, for a GC
-// that finds a stale pointer on the stack. It is two in WebKit: there plain PGlite, with none of our
-// code loaded, keeps two closed instances through a forced full GC. No engine gives a page gc(): allocation is the GC opportunity, repeated
-// until the bound holds or a minute passes.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// A closed instance holds no database: reachable closed instances must not grow with cycles after GC. Bound 1 in Node, Chromium, Firefox (a stale stack pointer); 2 in WebKit,
+// where plain PGlite keeps two. No engine gives a page gc(): allocation is the GC opportunity, repeated until the bound holds or a minute passes.
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import { MemoryBackend } from '../../src/backend/memory.ts';
@@ -14,7 +9,6 @@ import { inBrowser, newKey, type Opened, openStore, PGDATA, shared } from './hel
 
 const CYCLES = 6;
 
-/** How many closed instances may stay reachable in this engine (see above). */
 async function engineBound(): Promise<number> {
   if (!inBrowser) return 1;
   const { server } = await import('vitest/browser');
@@ -27,7 +21,6 @@ interface Held {
   dataDir: WeakRef<object>;
 }
 
-/** The instance's module, wasm memory and data directory (MEMFS keeps the tree from its root), weakly. */
 function hold(pg: PGlite): Held {
   const mod = pg.Module as unknown as { HEAPU8: Uint8Array; FS: { lookupPath(path: string): { node: object } } };
   return { module: new WeakRef(mod), wasm: new WeakRef(mod.HEAPU8.buffer), dataDir: new WeakRef(mod.FS.lookupPath(PGDATA).node) };
@@ -72,7 +65,6 @@ describe('close', () => {
     }
     expect(await afterGc(held, max)).toBeLessThanOrEqual(max);
     // The file map holds no module memory, so the count above does not see it; stats() reads it.
-    // The host holds every closed instance to here.
     expect(closed.map(({ fs }) => fs.stats().files)).toEqual(closed.map(() => 0));
   }, 240_000);
 });

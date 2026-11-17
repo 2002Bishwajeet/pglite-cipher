@@ -1,6 +1,7 @@
-// Writes test/fixtures/v1-reference/records.bin: the frozen format v1 reference store. Run once, by
-// hand (`node scripts/make-v1-reference.ts`); never again, since later
-// versions must open the bytes v1 wrote. The test key and the known row are in that folder's README.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Writes test/fixtures/v1-reference/records.bin, the frozen format v1 store. Run once by hand; later versions must open it.
+// Key and known row: that folder's README.
 import { writeFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import type { RecordKey, StorageBackend } from '../src/backend/backend.ts';
@@ -23,8 +24,7 @@ const backend: StorageBackend = {
   clear: () => memory.clear(),
   close: () => Promise.resolve(),
 };
-// The smallest block size and no template databases keep the file small; PGlite's 16 MB WAL
-// segment is most of what is left.
+// Smallest block size and no template databases keep the file small.
 const fs = new EncryptedFs({ backend, key: await importKek(TEST_KEY), mode: 'create', blockSize: 8192 });
 const pg = await PGlite.create({ fs });
 for (const sql of [

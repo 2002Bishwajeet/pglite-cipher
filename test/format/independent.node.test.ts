@@ -1,5 +1,6 @@
-// An independent reader of the known-answer vectors, written from FORMAT.md with node:crypto only.
-// It imports nothing from src/: two implementations that agree only with themselves fail here.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Reads the vectors from FORMAT.md with node:crypto only and imports nothing from src/, so two self-agreeing implementations fail.
 import { createDecipheriv, createHash, hkdfSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -35,7 +36,6 @@ const u32 = (n: number) => {
   return b;
 };
 
-/** AES-256-GCM open of `ciphertext ‖ tag16`. */
 const gcmOpen = (key: Buffer, nonce: Buffer, aad: Buffer, sealed: Buffer) => {
   const d = createDecipheriv('aes-256-gcm', key, nonce);
   d.setAAD(aad);
@@ -56,7 +56,6 @@ describe('independent decoder (node:crypto, from FORMAT.md)', () => {
     const header = hex(v.header);
     expect(header.length).toBe(168);
 
-    // Header: the wrap, then the meta under the header key.
     const dek = gcmOpen(hex(v.kek), header.subarray(0, 12), Buffer.from('pglite-cipher/wrap'), header.subarray(12, 60));
     expect(dek.toString('hex')).toBe(v.dek);
     const headerKey = hkdf(dek, header.subarray(60, 76), 'pglite-cipher/header');
@@ -78,7 +77,6 @@ describe('independent decoder (node:crypto, from FORMAT.md)', () => {
     expect(keyId).toBe(v.keyId);
     expect(storeId.toString('hex')).toBe(v.storeId);
 
-    // Root.
     const rootStored = hex(v.root.sealed);
     expect(rootStored.length).toBe(44 + blockSize);
     const root = openRecord(dek, rootStored, Buffer.concat([Buffer.from('r'), storeId, u32(keyId)]));
@@ -140,7 +138,6 @@ describe('independent decoder (node:crypto, from FORMAT.md)', () => {
     expect(allZero(table.subarray(at))).toBe(true);
     expect(entries).toEqual(v.table.entries);
 
-    // Data block: opened with the file and index the table gives for its id.
     const file = entries.find((e) => (e as { kind: string; type?: string }).type === 'file') as { fileId: string; size: number };
     const run = entries.find((e) => (e as { kind: string }).kind === 'run') as { fileId: string; first: number; ids: string[] };
     expect(run.fileId).toBe(file.fileId);

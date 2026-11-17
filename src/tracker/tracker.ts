@@ -1,8 +1,9 @@
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // Knows which blocks of the files under PGDATA changed since the last sync, by wrapping the
 // Emscripten MEMFS operations that change a file's contents or its place in the tree.
 import { BlockBitmap } from './bitmap.ts';
 
-/** The fields of an Emscripten MEMFS node the tracker reads. */
 export interface MemNode {
   name: string;
   parent: MemNode;
@@ -10,13 +11,10 @@ export interface MemNode {
   mtime: number;
   /** Files: the length. `contents` may be longer: MEMFS grows it ahead. */
   usedBytes?: number;
-  /** Files: a `Uint8Array`; directories: name → node. */
   contents?: unknown;
-  /** Symlinks: the target. */
   link?: string;
 }
 
-/** The parts of Emscripten's `FS` the tracker calls. */
 export interface EmscriptenFS {
   lookupPath(path: string): { node: MemNode };
   getPath(node: MemNode): string;
@@ -24,7 +22,6 @@ export interface EmscriptenFS {
 
 type Ops = Record<string, unknown>;
 
-/** Emscripten's `MEMFS` (`FS.filesystems.MEMFS`). */
 export interface MemFS {
   ops_table: Record<string, { node: Ops; stream: Ops }> | null;
   node_ops: Ops;
@@ -35,16 +32,12 @@ export type NodeType = 'file' | 'directory' | 'symlink';
 
 export interface SnapshotInode {
   fileId: Uint8Array;
-  /** Relative to the tracked root, `/`-separated, without a leading `/`. */
   path: string;
   type: NodeType;
   mode: number;
-  /** Bytes; 0 for a directory or a symlink. */
   size: number;
   mtime: number;
-  /** `ceil(size / blockSize)`. */
   blocks: number;
-  /** A symlink's target, else `null`. */
   target: string | null;
 }
 
@@ -55,7 +48,6 @@ export interface SnapshotBlock {
   bytes: Uint8Array;
 }
 
-/** Block indexes `start … end - 1` of a file, which the store holds and must remove. */
 export interface DeleteRange {
   fileId: Uint8Array;
   start: number;
@@ -66,11 +58,9 @@ export interface Snapshot {
   blocks: SnapshotBlock[];
   inodes: SnapshotInode[];
   deleteRanges: DeleteRange[];
-  /** Files the store holds and must remove; their blocks are in `deleteRanges`. */
   deadFiles: Uint8Array[];
 }
 
-/** A file as the store holds it, for `loadState`. */
 export interface StoredFile {
   path: string;
   fileId: Uint8Array;
@@ -79,28 +69,21 @@ export interface StoredFile {
 
 export interface Tracker {
   readonly stats: { trackingGaps: number };
-  /** What changed since the last snapshot. Commit or requeue it before the next one. */
+  /** What changed since the last snapshot; commit or requeue it before the next. */
   snapshot(): Snapshot;
-  /** The snapshot is in the store. */
   commit(snapshot: Snapshot): void;
-  /** The snapshot did not reach the store: its changes are owed again. */
+  /** Not in the store: its changes are owed again. */
   requeue(snapshot: Snapshot): void;
-  /** After the store was read into MEMFS: what the store holds, with nothing dirty. */
   loadState(files: Iterable<StoredFile>): void;
-  /** Every node under the root is owed to the store (first population, import). */
   markAllDirty(): void;
-  /** A snapshot is outstanding, or a change was seen since the last one. */
   hasDirty(): boolean;
-  /** Every tracked regular file and its node: what a rotation copies blocks from. */
   files(): Array<{ fileId: Uint8Array; node: MemNode }>;
 }
 
 interface NodeState {
   readonly node: MemNode;
   fileId: Uint8Array;
-  /** The store holds this node's file entry. */
   inStore: boolean;
-  /** How many of its blocks the store holds. */
   persistedBlocks: number;
   minSizeSinceSync: number;
   readonly dirty: BlockBitmap;
@@ -109,7 +92,6 @@ interface NodeState {
   /** (size, mtime) at the last snapshot, for the safety net. */
   shadowSize: number;
   shadowMtime: number;
-  /** The last snapshot walk that reached it. */
   seen: number;
 }
 
@@ -156,10 +138,7 @@ function patch<F>(holders: Ops[], key: string, wrap: (orig: F) => F): void {
 const isEmptySnapshot = (s: Snapshot) =>
   s.blocks.length === 0 && s.inodes.length === 0 && s.deleteRanges.length === 0 && s.deadFiles.length === 0;
 
-/**
- * Wraps `MEMFS` for the nodes under `root`; call it from a `preRun` hook. `root` need not exist
- * yet: it is recognised when it is created.
- */
+/** Wraps `MEMFS` for nodes under `root` (call from a `preRun` hook); `root` may not exist yet. */
 export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blockSize: number): Tracker {
   const B = blockSize;
   const live = new Map<MemNode, NodeState>();
@@ -177,7 +156,6 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
   };
   const tracked = (dir: MemNode) => dir === rootNode || live.has(dir);
 
-  /** Starts tracking a node, and a directory's subtree, as new to the store. */
   function adopt(node: MemNode): NodeState | undefined {
     const type = typeOf(node.mode);
     if (type === undefined) return undefined;
@@ -209,7 +187,6 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
     dead.push(st);
   }
 
-  /** A rename changes the path of the node and of everything below it. */
   function touch(node: MemNode): void {
     const st = live.get(node);
     if (!st) return;
@@ -297,7 +274,6 @@ export function installTracker(FS: EmscriptenFS, MEMFS: MemFS, root: string, blo
   }
   if (rootNode) forChildren(rootNode, adopt);
 
-  /** Every trackable node under the root, parents before children. */
   function walk(visit: (node: MemNode, type: NodeType, path: string, depth: number) => void): void {
     const descend = (dir: MemNode, prefix: string, depth: number) => {
       for (const [name, node] of Object.entries(children(dir))) {

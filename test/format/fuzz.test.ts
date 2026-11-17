@@ -1,5 +1,6 @@
-// Decoder fuzz: random and mutated buffers into every decoder and into assembleFiles. The only
-// outcomes are a value or a documented error; never another exception, never a hang.
+// Copyright 2026 Bishwajeet Parhi
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Decoder fuzz: every decoder and assembleFiles gives a value or a documented error, never another exception or a hang.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Bytes } from '../../src/format/bytes.ts';
@@ -25,7 +26,7 @@ const BUDGET_MS = 50;
 
 type ErrorType = typeof CorruptStoreError | typeof UnsupportedFormatError;
 
-/** Runs `fn`; anything but a value or one of `allowed` fails the case, as does taking over 50 ms. */
+/** Fails on any outcome but a value or one of `allowed`, or on taking over 50 ms. */
 const outcome = <T>(fn: () => T, allowed: ErrorType[]): T | null => {
   const start = performance.now();
   let value: T | null = null;
@@ -52,7 +53,6 @@ const files = (blockSize: BlockSize): StoredFile[] => [
 interface Base {
   blockSize: BlockSize;
   bytes: Bytes;
-  /** Up to the last non-zero byte: where edits are worth making. */
   used: number;
 }
 
@@ -80,7 +80,6 @@ const metaBases = BLOCK_SIZES.map((blockSize) => base(blockSize, encodeMeta({ bl
 const rootBases = BLOCK_SIZES.map((blockSize) => base(blockSize, encodeRoot(rootOf(), blockSize)));
 const tableBases = BLOCK_SIZES.map((blockSize) => base(blockSize, encodeTable(tableEntries(blockSize), blockSize)));
 
-/** A buffer: random bytes of a random or block length, or a valid encoding with a few edits. */
 const buffer = (bases: Base[]) =>
   fc.oneof(
     {
@@ -95,7 +94,7 @@ const buffer = (bases: Base[]) =>
         .record({
           base: fc.constantFrom(...bases),
           edits: fc.array(fc.record({ at: fc.nat(), value: fc.nat(255) }), { maxLength: 6 }),
-          // Mostly the base's own length, which is the one a decoder reads past the length check.
+          // Mostly the base's own length: what a decoder reads past the length check.
           resize: fc.oneof({ weight: 7, arbitrary: fc.constant(0) }, fc.integer({ min: -100, max: 100 })),
         })
         .map(({ base: b, edits, resize }) => {
@@ -135,8 +134,7 @@ describe('decoder fuzz', () => {
     );
   }, timeout(300_000, 50));
 
-  // A past counterexample (seed 905168194, path "6179"): the 64 KiB block with four edits, the
-  // one at 68 raising its first run to 25,603 ids, far past the end of the block.
+  // Past counterexample (seed 905168194, path "6179"): 64 KiB block, edit at 68 makes a first run of 25,603 ids.
   it('decodeTable, a run longer than the block', () => {
     const bytes = encodeTable(tableEntries(65536), 65536);
     for (const [at, value] of [[27, 160], [68, 100], [224, 30], [308, 61]] as const) bytes[at] = value;
