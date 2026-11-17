@@ -8,6 +8,10 @@ Encryption at rest for [PGlite](https://pglite.dev), the Postgres build that run
 
 ## Quick start
 
+```sh
+npm install pglite-cipher @electric-sql/pglite
+```
+
 ```ts
 import { PGlite } from '@electric-sql/pglite';
 import { EncryptedFs, IndexedDbBackend, importKek } from 'pglite-cipher';
@@ -21,7 +25,7 @@ await fs.syncToFs(false); // sync when it matters, e.g. when the page is hidden
 await pg.close();
 ```
 
-`@electric-sql/pglite` (`^0.5.10`) is a peer dependency.
+`@electric-sql/pglite` (`^0.5.10`) is a peer dependency. You can also use it from source as a git submodule ([Usage](docs/usage.md#use-from-another-repository-as-a-submodule)).
 
 ## What it does not protect
 

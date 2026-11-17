@@ -44,6 +44,15 @@ describe('repository invariants', () => {
     }
   });
 
+  it('publishes the version the code reports, and only the built package', async () => {
+    const pkg = JSON.parse(read('package.json')) as { version: string; private?: boolean; files: string[] };
+    const { VERSION } = await import('../src/index.ts');
+    expect(VERSION).toBe(pkg.version);
+    expect(pkg.private).toBeUndefined();
+    expect(pkg.files).toContain('dist');
+    expect(pkg.files.filter((f) => /^(test|bench|scripts|docs)\b/.test(f))).toEqual([]);
+  });
+
   it('gives every CI job a timeout-minutes', () => {
     const jobs = /^jobs:\n([\s\S]*)$/m.exec(read('.github/workflows/ci.yml'))?.[1] ?? '';
     const jobCount = jobs.match(/^ {2}[\w-]+:$/gm)?.length ?? 0;

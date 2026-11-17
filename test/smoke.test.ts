@@ -7,7 +7,7 @@ import { FORMAT_VERSION, VERSION } from '../src/index.ts';
 
 describe('smoke', () => {
   it('exports the version constants', () => {
-    expect(VERSION).toBe('0.0.0');
+    expect(VERSION).toBe('0.1.0');
     expect(FORMAT_VERSION).toBe(1);
   });
 

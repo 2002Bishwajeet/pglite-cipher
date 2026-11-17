@@ -1,20 +1,54 @@
 {
   "name": "pglite-cipher",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Encryption at rest for PGlite: AES-256-GCM through WebCrypto, blocks in IndexedDB, like SQLCipher for Postgres in the browser.",
+  "keywords": [
+    "pglite",
+    "postgres",
+    "encryption",
+    "sqlcipher",
+    "indexeddb",
+    "webcrypto",
+    "aes-gcm",
+    "browser"
+  ],
+  "homepage": "https://github.com/2002Bishwajeet/pglite-cipher#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2002Bishwajeet/pglite-cipher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/2002Bishwajeet/pglite-cipher/issues"
+  },
+  "author": "Bishwajeet Parhi",
   "type": "module",
   "license": "FSL-1.1-ALv2",
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./testing": {
-      "types": "./src/testing.ts",
-      "default": "./src/testing.ts"
-    }
+      "source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "CLA.md",
+    "FORMAT.md",
+    "SECURITY.md",
+    "THIRD_PARTY.md",
+    "llms.txt",
+    "llms-full.txt"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -26,7 +60,8 @@
     "test:browser": "node scripts/test-browser.mjs",
     "test:long": "CIPHER_LONG=1 vitest run --project node",
     "bench:build": "vite build --config bench/vite.config.ts",
-    "bench:serve": "vite preview --config bench/vite.config.ts"
+    "bench:serve": "vite preview --config bench/vite.config.ts",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "@electric-sql/pglite": "^0.5.10"

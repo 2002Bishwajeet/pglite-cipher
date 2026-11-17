@@ -13,8 +13,14 @@ release issue, with a link where there is one.
 - [ ] **The frozen fixtures open**: `test/fs/reference.test.ts` (the v1 reference store) passes in
       Node, Chromium, Firefox and WebKit, and the CI compat jobs (a store written by WebKit opened by
       Chromium and Node, and the reverse) are green.
-- [ ] **Version `0.1.0`** in `package.json` and `VERSION` in `src/index.ts`, committed, and a tag
-      `v0.1.0` on that commit for Journal to pin its submodule to.
+- [ ] **Version** in `package.json` and `VERSION` in `src/index.ts` agree (a repo test checks it),
+      merged to `main`.
+- [ ] **`npm pack --dry-run`** lists only `dist`, `src`, the docs and the licence files.
+- [ ] **Publish:** tag that commit (`git tag v0.1.0 && git push origin v0.1.0`). The `publish`
+      workflow checks the tag matches the version, runs lint, typecheck and the Node tests, and
+      publishes with provenance (npm trusted publishing; `NPM_TOKEN` only for the very first publish).
+- [ ] **Check the release:** `npm view pglite-cipher` shows the version and its provenance, and a
+      GitHub release for the tag links the changes.
 - [ ] **The limits read once more**: the README's "What it does not protect", the SQLCipher
       table in `docs/design/comparison.md` and `SECURITY.md` still match what the code does, and the date in
       `SECURITY.md` is the release date.

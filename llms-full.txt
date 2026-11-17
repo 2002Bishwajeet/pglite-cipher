@@ -10,17 +10,11 @@ Facts to keep in mind:
 
 ## Install
 
-It is not on npm yet. Add the repository as a git submodule and import from its source; the app's bundler (for example Vite) compiles the TypeScript:
-
 ```sh
-git submodule add https://github.com/2002Bishwajeet/pglite-cipher vendor/pglite-cipher
+npm install pglite-cipher @electric-sql/pglite
 ```
 
-```ts
-import { EncryptedFs, IndexedDbBackend, importKek } from '../vendor/pglite-cipher/src/index.ts';
-```
-
-The app provides `@electric-sql/pglite` from its own `node_modules`.
+It ships ES modules and TypeScript types; the test hooks are in `pglite-cipher/testing` (never for production). A bundler can take the TypeScript source instead with the `source` export condition.
 
 ## The integration change
 
