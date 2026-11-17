@@ -45,8 +45,9 @@ WebView2 also measured slow.
 
 The cause is the size of a stored record. A sealed 64 KB block is 65,580 bytes, which is over
 Chromium's 64 KiB limit for keeping an IndexedDB value inline. Chromium stores each such record as
-a blob and unwraps it on the calling thread, at about 1.1 ms per record. On the Redmi, 6.7 s of
-the 8.6 s went to reading the records, and decryption took about 1.2 s.
+a blob and unwraps it on the calling thread, at about 1.1 ms per record. On the Redmi, reading the
+records took 7.7 s of the 8.6 s open (`readMs`, median of five opens), and decryption took about
+1.2 s.
 
 What is and is not affected:
 
