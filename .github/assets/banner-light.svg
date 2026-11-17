@@ -1,0 +1,45 @@
+<!-- Copyright 2026 Bishwajeet Parhi. SPDX-License-Identifier: FSL-1.1-ALv2 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="t d">
+<title id="t">pglite-cipher</title><desc id="d">Encryption at rest for PGlite: AES-256-GCM, WebCrypto, IndexedDB.</desc>
+<rect width="1280" height="320" fill="#FAFAF9"/>
+<rect x="285" y="131" width="252" height="25" rx="4" fill="#F6F95C" transform="skewX(-8) translate(19 0)"/>
+<text x="88" y="154" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-2" fill="#336791">pglite<tspan fill="#1F3B57">-cipher</tspan></text>
+<text x="91" y="206" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="30" fill="#52525B">Encryption at rest for PGlite</text>
+<text x="91" y="250" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="19" letter-spacing="0.5" fill="#336791">AES-256-GCM · WebCrypto · IndexedDB</text>
+<rect x="740" y="62" width="150" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<rect x="754" y="77" width="48" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="810" y="77" width="26" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="844" y="77" width="30" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="1010" y="62" width="200" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<text x="1024" y="85.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#3F3F46">9f 3a c1 07 e4</text>
+<rect x="1180" y="70" width="20" height="20" rx="4" fill="#F6F95C" stroke="#336791" stroke-width="1.5"/>
+<rect x="740" y="110" width="150" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<rect x="754" y="125" width="28" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="790" y="125" width="44" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="842" y="125" width="32" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="1010" y="110" width="200" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<text x="1024" y="133.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#3F3F46">5b d2 88 1e 6c</text>
+<rect x="1180" y="118" width="20" height="20" rx="4" fill="#F6F95C" stroke="#336791" stroke-width="1.5"/>
+<rect x="740" y="158" width="150" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<rect x="754" y="173" width="40" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="802" y="173" width="22" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="832" y="173" width="46" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="1010" y="158" width="200" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<text x="1024" y="181.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#3F3F46">e0 71 4f b9 2a</text>
+<rect x="1180" y="166" width="20" height="20" rx="4" fill="#F6F95C" stroke="#336791" stroke-width="1.5"/>
+<rect x="740" y="206" width="150" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<rect x="754" y="221" width="34" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="796" y="221" width="46" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="850" y="221" width="24" height="6" rx="3" fill="#A1A1AA"/>
+<rect x="1010" y="206" width="200" height="36" rx="6" fill="#FFFFFF" stroke="#D4D4D8" stroke-width="1.5"/>
+<text x="1024" y="229.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#3F3F46">36 ac 0d f5 93</text>
+<rect x="1180" y="214" width="20" height="20" rx="4" fill="#F6F95C" stroke="#336791" stroke-width="1.5"/>
+<path d="M904 152.0H998" stroke="#336791" stroke-width="2" stroke-dasharray="4 5" stroke-linecap="round"/>
+<path d="M992 146.0l7 6-7 6" fill="none" stroke="#336791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="950" cy="152.0" r="24" fill="#FAFAF9"/>
+<path d="M942 149.0v-6a8 8 0 0 1 16 0v6" fill="none" stroke="#336791" stroke-width="3" stroke-linecap="round"/>
+<rect x="937" y="148.0" width="26" height="20" rx="4" fill="#F6F95C" stroke="#336791" stroke-width="2"/>
+<circle cx="950" cy="157.0" r="2.6" fill="#18181B"/>
+<text x="815" y="276" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#52525B">pages</text>
+<text x="1110" y="276" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace" font-size="15" fill="#52525B">sealed blocks</text>
+</svg>

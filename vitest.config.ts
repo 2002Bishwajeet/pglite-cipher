@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
@@ -54,6 +55,8 @@ const browserProject = (browser: 'chromium' | 'firefox' | 'webkit') => ({
 });
 
 export default defineConfig({
+  // examples/ import the package by name, as an app would.
+  resolve: { alias: { 'pglite-cipher': fileURLToPath(new URL('./src/index.ts', import.meta.url)) } },
   test: {
     // Each test file starts PGlite (~1 GB); one worker per core would OOM a 16 GB machine.
     maxWorkers: 4,

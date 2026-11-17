@@ -1,0 +1,112 @@
+<!doctype html>
+<!-- Copyright 2026 Bishwajeet Parhi. SPDX-License-Identifier: FSL-1.1-ALv2 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pglite-cipher demo</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@electric-sql/pglite": "https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.5.16/dist/index.js",
+          "pglite-cipher": "../../dist/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root { color-scheme: light dark; --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --card: #fff; --line: #e2e2e2; --ok: #1a7f37; --bad: #c62828; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #999; --card: #1b1b1b; --line: #333; --ok: #4ac26b; --bad: #ff6b6b; } }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+      main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-top: 16px; }
+      h2 { font-size: 16px; margin: 0 0 8px; }
+      label, button { font: inherit; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+      input, select { font: inherit; padding: 4px 8px; }
+      button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--fg); color: var(--bg); cursor: pointer; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      table { border-collapse: collapse; width: 100%; }
+      td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+      code, .hex { font-family: ui-monospace, monospace; font-size: 13px; overflow-wrap: anywhere; }
+      .ok { color: var(--ok); } .bad { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>pglite-cipher demo</h1>
+      <p>Postgres in this tab, encrypted at rest in IndexedDB. Everything runs locally; the key is generated for this page and never leaves it.</p>
+
+      <section>
+        <h2>1. Speed</h2>
+        <p>Writes rows to a plain <code>idb://</code> store and to an encrypted one, then reopens each.</p>
+        <div class="row">
+          <label>Rows <select id="rows"><option>1000</option><option selected>10000</option><option>100000</option></select></label>
+          <label>Word <input id="word" value="pineapple" size="12" /></label>
+          <button id="run">Run</button>
+        </div>
+        <div id="speed"></div>
+      </section>
+
+      <section>
+        <h2>2. Proof it is encrypted</h2>
+        <p>Searches the raw bytes IndexedDB holds for your word.</p>
+        <button id="search" disabled>Search raw storage</button>
+        <div id="proof"></div>
+      </section>
+
+      <section>
+        <h2>3. Tamper</h2>
+        <p>Flips one bit in one stored block, then opens the encrypted store again.</p>
+        <button id="tamper" disabled>Flip a bit and reopen</button>
+        <div id="tampered"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { newKey, proof, speed, tamper } from './demo.mjs';
+
+      const $ = (id) => document.getElementById(id);
+      const ms = (n) => `${Math.round(n)} ms`;
+      const key = await newKey();
+      let word = '';
+
+      async function busy(button, run) {
+        button.disabled = true;
+        try { await run(); } catch (error) { console.error(error); alert(error); } finally { button.disabled = false; }
+      }
+
+      $('run').onclick = () => busy($('run'), async () => {
+        word = $('word').value.trim() || 'pineapple';
+        $('speed').textContent = 'Running…';
+        const r = await speed(key, Number($('rows').value), word);
+        $('speed').innerHTML = `<table>
+          <tr><th></th><th>Write and close</th><th>Reopen</th><th>Rows</th></tr>
+          <tr><td>Plain idb://</td><td>${ms(r.plain.writeMs)}</td><td>${ms(r.plain.openMs)}</td><td>${r.plain.count}</td></tr>
+          <tr><td>Encrypted</td><td>${ms(r.encrypted.writeMs)}</td><td>${ms(r.encrypted.openMs)}</td><td>${r.encrypted.count}</td></tr>
+          <tr><td>Ratio</td><td>${(r.encrypted.writeMs / r.plain.writeMs).toFixed(2)}×</td><td>${(r.encrypted.openMs / r.plain.openMs).toFixed(2)}×</td><td></td></tr>
+        </table>`;
+        $('search').disabled = $('tamper').disabled = false;
+      });
+
+      $('search').onclick = () => busy($('search'), async () => {
+        const r = await proof(word);
+        const verdict = (found) => (found ? '<span class="bad">found</span>' : '<span class="ok">not found</span>');
+        $('proof').innerHTML = `<table>
+          <tr><th></th><th>Records</th><th>"${word.replace(/[<&"]/g, '')}"</th></tr>
+          <tr><td>Plain idb://</td><td>${r.plain.records}</td><td>${verdict(r.plain.found)}</td></tr>
+          <tr><td>Encrypted</td><td>${r.encrypted.records}</td><td>${verdict(r.encrypted.found)}</td></tr>
+        </table><p>A stored encrypted block starts: <span class="hex">${r.encrypted.sample} …</span></p>`;
+      });
+
+      $('tamper').onclick = () => busy($('tamper'), async () => {
+        const name = await tamper(key);
+        $('tampered').innerHTML = name === 'CorruptStoreError'
+          ? '<p class="ok">The open refused: <code>CorruptStoreError</code>. Nothing was loaded. Run step 1 again to start over.</p>'
+          : `<p class="bad">Unexpected: ${name}</p>`;
+        $('search').disabled = $('tamper').disabled = true;
+      });
+    </script>
+  </body>
+</html>
