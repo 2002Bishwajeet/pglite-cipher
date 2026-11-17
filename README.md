@@ -37,6 +37,7 @@ See [`SECURITY.md`](SECURITY.md) and the [threat model](docs/design/threat-model
 
 ## Docs
 
+- [Guides](docs/guides/README.md): quick start, adding it to an existing app, keys, rotation, errors
 - [Usage](docs/usage.md): options, open modes, errors, keys and rotation, `verify()`, and memory on mobile
 - [Design](docs/design/README.md): how it works, [performance](docs/design/performance.md) (including the known Android limit), and [comparisons](docs/design/comparison.md) with SQLCipher and others
 - [`FORMAT.md`](FORMAT.md): the on-disk format, version 1
