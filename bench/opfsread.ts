@@ -1,4 +1,4 @@
-// Spike #82 (bench only): OPFS read throughput next to IndexedDB (bench/idbread.ts) on the same
+// Spike #82 (bench only): OPFS read throughput, to set beside IndexedDB's, on the same
 // device. About `mb` MB as sealed-size records (65580 B) are written once; each run then reads all of
 // it back sequentially through three layouts: (a) one file per record, (b) segment files of 255
 // records (about 16 MiB) read in 1 MiB slices, (c) the same segments through a

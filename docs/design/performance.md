@@ -20,7 +20,7 @@ A store's block size is 8, 32 or 64 KB, chosen at creation; the default is 64 KB
 (`DEFAULT_BLOCK_SIZE` in `src/format/codec.ts`). Postgres writes 8 KB pages, so a smaller block
 would write fewer bytes per change. But each record costs a WebCrypto call and an IndexedDB value,
 and the open pays that cost once per record: a 100 MB store is eight times as many records at 8 KB
-as at 64 KB. The spike measured all three sizes (`bench/SPIKE-RESULTS.md`); 64 KB was the only
+as at 64 KB. The spike measured all three sizes; 64 KB was the only
 size that passed the 100 MB open gate in all three engines measured (Chromium, Firefox, WebKit).
 
 ## The open

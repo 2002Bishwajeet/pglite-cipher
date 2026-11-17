@@ -4,7 +4,7 @@
 // --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
 // --block N builds the gates' encrypted store with N-byte blocks (#63) and saves to <browser>-block<N>.json.
 // --pack N stores N blocks per IndexedDB record (#83; needs bench/patches/pack.patch) and saves to <browser>-pack<N>.json.
-// Builds bench/dist first if it is missing. WebKit on the Linux host: scripts/harness/webkit.sh node bench/run.mjs webkit
+// Builds bench/dist first if it is missing. WebKit needs Playwright's WebKit build (macOS, or Linux with its system libraries).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';

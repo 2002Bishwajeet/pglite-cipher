@@ -1,6 +1,6 @@
 // What the benchmark page (bench.ts) and the perf gates (test/perf/gates.browser.test.ts) measure: a
 // note-taking shaped database built on plain IdbFs and on EncryptedFs over IndexedDB, timed the same
-// way, with gates G1-G4 and G9 of docs/plan/01-sqlcipher-comparison.md 3.3.
+// way, with gates G1-G4 and G9 (bench/README.md).
 import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live } from '@electric-sql/pglite/live';

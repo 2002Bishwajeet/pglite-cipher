@@ -8,7 +8,7 @@ Run as `bench/README.md` documents: `npm run bench:build`, then `node bench/run.
 
 | | Chromium, Firefox | WebKit |
 | --- | --- | --- |
-| Machine | ROG G14, shared with other harness sessions (heavy lock held for each run) | MacBook Pro (M1 Pro), reached through `scripts/harness/webkit.sh` -> `remote.sh mac` |
+| Machine | ROG G14, shared with other jobs | MacBook Pro (M1 Pro) |
 | CPU | AMD Ryzen 5 4600HS, 12 threads | Apple M1 Pro |
 | RAM | 15 GiB | 16 GiB |
 | OS | CachyOS Linux, kernel 7.3.0-4-cachyos | macOS 27.0.1 |
@@ -19,7 +19,7 @@ WebKit absolute times are from a different, faster machine than Chromium and Fir
 
 ## Gate table G1 to G9
 
-Target = `docs/plan/01-sqlcipher-comparison.md` 3.3 with the desktop budgets of #3. "Ratio" is encrypted p50 divided by plain p50 in the same run (values in parentheses: encrypted vs plain, ms). All rows pass in every engine except G3, which cannot be measured.
+Target = the gate definitions in `bench/README.md`, with the desktop budgets. "Ratio" is encrypted p50 divided by plain p50 in the same run (values in parentheses: encrypted vs plain, ms). All rows pass in every engine except G3, which cannot be measured.
 
 | Gate | Target | Chromium | Firefox | WebKit (Mac, Playwright build) |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ Target = `docs/plan/01-sqlcipher-comparison.md` 3.3 with the desktop budgets of 
 | G4 segment switch, 100 MB | <= 500 ms; <= 10x a normal plain sync | 89.3 ms (1.31x): pass | 277 ms (1.79x): pass | 29.8 ms (0.19x): pass |
 | G5 unit size | smallest of 8/32/64 KB passing G2 | n/a: `src/` has one default unit, 64 KB; G2 passes at it | n/a: same | n/a: same |
 | G6 support | all present | all present: pass | all present: pass | all present: pass |
-| G7 Rust store throughput | recorded only | owner (Tauri only) | owner (Tauri only) | owner (Tauri only) |
+| G7 Rust store throughput | recorded only | not run | not run | not run |
 | G8 subkeys after a year (365 sessions) | live salts x deriveKey <= 150 ms | 263 salts, 1,507 records: 1.32 ms: pass | 15.8 ms: pass | 15.8 ms: pass |
 | G9 file-table phase of the open, 10 MB | <= 5 % of the G2 budget (limit 8.2 to 34.1 ms, by the run's G2) | 8.91 ms (limit 22): pass | 8.06 ms (limit 34.1): pass | 4.5 ms (limit 8.2): pass |
 | G9 file-table phase of the open, 100 MB | <= 75 ms | 11.0 ms: pass | 19.6 ms: pass | 5.52 ms: pass |
@@ -58,11 +58,11 @@ Verdict: no gate fails in any engine. Least headroom: G2 at 100 MB in Firefox (1
 | `deriveKey` median of 1,000 | 0.01 ms | 0.08 ms | 0.04 ms |
 | Year simulation duration | 197 s | 285 s | 74 s |
 
-## Not measured here: what only the owner can measure
+## Not measured here
 
-- **G7, Rust store throughput.** Only inside a Tauri shell built with `encfs-bench` (needs the `journal/02` bench endpoints).
-- **Tauri webviews.** WKWebView (macOS), WebView2 (Windows), WebKitGTK (Linux), each with the page as the shell frontend (`bench/README.md`, "Inside the Tauri shells").
-- **iPhone and iPad** (Safari and the Tauri iOS shell): memory limits and IndexedDB behaviour on a device, G2 and G4 on the slowest phone, and G3.
-- **Android** (Chrome and Android System WebView on the Redmi): G2 at 100 MB against the 3 s slowest-target budget, G3.
+- **G7, Rust store throughput.** The page no longer has a G7 part; it needs a native shell with a Rust store.
+- **App webviews.** WKWebView (macOS), WebView2 (Windows), WebKitGTK (Linux), each with the page as the frontend (`bench/README.md`, "Other browsers and devices").
+- **iPhone and iPad** (Safari and an app webview): memory limits and IndexedDB behaviour on a device, G2 and G4 on the slowest phone, and G3.
+- **Android** (Chrome and Android System WebView): G2 at 100 MB against the 3 s slowest-target budget, G3.
 - **Real Safari on macOS and Windows** (this run's WebKit was Playwright's macOS build, not Safari or WKWebView).
 - **G3** in every engine: needs a device or a headed run with a memory API.

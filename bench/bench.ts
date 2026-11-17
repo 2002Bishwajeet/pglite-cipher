@@ -1,5 +1,5 @@
 // The benchmark page: the real implementation (EncryptedFs over IndexedDbBackend, 64 KB blocks)
-// against plain IdbFs, gates G1-G9 of docs/plan/01-sqlcipher-comparison.md 3.3, the key operations,
+// against plain IdbFs, gates G1-G9 (bench/README.md), the key operations,
 // and the rows ported from davidmuggleton/pglite-encrypted-fs's bench (THIRD_PARTY.md).
 import { IdbFs, PGlite } from '@electric-sql/pglite';
 import { EncryptedFs, IndexedDbBackend } from '../src/index.ts';
@@ -7,8 +7,6 @@ import type { BlockSize } from '../src/format/codec.ts';
 import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
 import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
 import { runHandles, runOnDemand } from '../spike/on-demand/part.ts';
-import { runG7 } from './g7.ts';
-import { runIdbRead } from './idbread.ts';
 import { runOpfsRead } from './opfsread.ts';
 import { judgeGates, judgeYear } from './judge.ts';
 import { parseBlockSize, parsePack } from './params.ts';
@@ -33,13 +31,9 @@ const MB = 1024 * 1024;
 
 const statusEl = document.getElementById('status');
 const outEl = document.getElementById('out');
-// Device runs: with `&post=<target>` the page reports progress and its result to the collector of
-// bench/device/serve.mjs, which saves the result as bench/results/<target>.json.
-const postTarget = new URLSearchParams(location.search).get('post');
 const log = (msg: string) => {
   if (statusEl) statusEl.textContent = msg;
   console.log(`[bench] ${msg}`);
-  if (postTarget) void fetch('./log', { method: 'POST', body: `${postTarget} ${msg}` }).catch(() => undefined);
 };
 
 // ---- gates at one database size ---------------------------------------------------------------
@@ -208,7 +202,7 @@ async function deriveKeyMs(n: number): Promise<Stat> {
   return { ...stat(ms), p50: Math.round(pct(ms, 50) * 1000) / 1000 };
 }
 
-/** The browser version of docs/plan/gcmbench.mjs: 100 MB at each unit, 64 calls in flight. */
+/** AES-GCM throughput: 100 MB at each unit, 64 calls in flight. */
 async function gcmMicro(): Promise<Json> {
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   const aad = new Uint8Array(24);
@@ -390,19 +384,16 @@ const PARTS: Record<string, (runs: number) => Promise<unknown>> = {
   extras: (runs) => runExtras(runs),
   year: () => runYear(Number(new URLSearchParams(location.search).get('sessions') ?? 365)),
   ops: (runs) => runOps(runs),
-  g7: () => runG7(log),
   // Spike #47 (spike/on-demand/): `&odmb=` sets the database size, 100 MB by default.
   ondemand: () => runOnDemand('plain', odMb(), log),
   'ondemand-aes': () => runOnDemand('aes', odMb(), log),
   'ondemand-idb': () => runOnDemand('idb', odMb(), log),
   'ondemand-handles': () => runHandles(1100),
-  // Spike #58 (bench/idbread.ts): `&idbmb=` sets the store size, 100 MB by default.
-  idbread: (runs) => runIdbRead(Number(new URLSearchParams(location.search).get('idbmb') ?? 100), runs, log),
   // Spike #82 (bench/opfsread.ts): `&opfsmb=` sets the size, 300 MB by default.
   opfsread: (runs) => runOpfsRead(Number(new URLSearchParams(location.search).get('opfsmb') ?? 300), runs, log),
 };
 
-async function run(parts: string[], runs: number, onPart: (result: Json) => Promise<void>): Promise<Json> {
+async function run(parts: string[], runs: number): Promise<Json> {
   const nav = navigator as Navigator & { deviceMemory?: number };
   const result: Json = {
     userAgent: navigator.userAgent,
@@ -420,8 +411,6 @@ async function run(parts: string[], runs: number, onPart: (result: Json) => Prom
     } catch (e) {
       result[part] = { error: errorText(e) };
     }
-    // A later part may crash the tab: send this one now (serve.mjs merges per part).
-    await onPart({ partial: true, userAgent: result.userAgent, runs, finishedAt: new Date().toISOString(), [part]: result[part] });
   }
   result.finishedAt = new Date().toISOString();
   return result;
@@ -433,30 +422,11 @@ const show = (result: Json) => {
   log('done');
 };
 
-/** Sends a result to the collector; the final one (not a `partial` per-part post) sets `window.__benchPosted` (what the device drivers wait for). */
-const post = async (body: Json, final = true) => {
-  if (!postTarget) return;
-  try {
-    const r = await fetch('./result', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: postTarget, ...body }) });
-    log(r.ok ? `posted as ${postTarget}` : `collector answered ${String(r.status)}`);
-  } catch (e) {
-    log(`post failed: ${errorText(e)}`);
-  }
-  if (final) (window as unknown as { __benchPosted?: boolean }).__benchPosted = true;
-};
-
 const start = (parts: string[], runs: number) => {
-  void run(parts, runs, (body) => post(body, false)).then(
-    (result) => {
-      show(result);
-      return post(result);
-    },
-    (e: unknown) => {
-      (window as unknown as { __benchError?: string }).__benchError = errorText(e);
-      log(`failed: ${errorText(e)}`);
-      return post({ error: errorText(e) });
-    },
-  );
+  void run(parts, runs).then(show, (e: unknown) => {
+    (window as unknown as { __benchError?: string }).__benchError = errorText(e);
+    log(`failed: ${errorText(e)}`);
+  });
 };
 
 document.getElementById('run')?.addEventListener('click', () => {

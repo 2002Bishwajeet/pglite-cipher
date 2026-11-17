@@ -2,8 +2,8 @@ diff --git a/bench/bench.ts b/bench/bench.ts
 index 46b20f5..e4b55f9 100644
 --- a/bench/bench.ts
 +++ b/bench/bench.ts
-@@ -11,7 +11,8 @@ import { runG7 } from './g7.ts';
- import { runIdbRead } from './idbread.ts';
+@@ -9,7 +9,8 @@ import { EncryptedFs, IndexedDbBackend } from '../src/index.ts';
+ import { runHandles, runOnDemand } from '../spike/on-demand/part.ts';
  import { runOpfsRead } from './opfsread.ts';
  import { judgeGates, judgeYear } from './judge.ts';
 -import { parseBlockSize, parsePack } from './params.ts';

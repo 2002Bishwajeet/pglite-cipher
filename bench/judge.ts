@@ -46,7 +46,7 @@ export function judgeGates(r: GatesResult, factor: number): GateRow[] {
   if (big) row('G2 open, p50 ms', e.g2.ms.p50, `≤ ${String(openBudget)}`, e.g2.ms.p50 <= openBudget);
   // G3 is recorded, never asserted in CI, and judged only from measureUserAgentSpecificMemory
   // (headed, cross-origin isolated). Headless, the page has only performance.memory plus the wasm
-  // heap, which fails for plain idb:// too (SPIKE-RESULTS.md, G3): that is "not measurable".
+  // heap, which fails for plain idb:// too: that is "not measurable".
   const bytes = e.g3.bytes;
   const db = e.dataDir.bytes;
   const measured = e.g3.source === 'measureUserAgentSpecificMemory' && typeof bytes === 'number';
