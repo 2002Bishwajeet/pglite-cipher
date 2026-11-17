@@ -11,7 +11,8 @@
 
 The benchmark page and its gates are described in `bench/README.md`. The gates compare against
 plain `idb://` in the same run, and the open budget is 100 MB in 1.5 s on desktop and 3 s on the
-slowest phone (`README.md`, "Compared to SQLCipher").
+slowest phone (`README.md`, "Compared to SQLCipher"). Android Chrome misses the phone budget
+(see [the known limit](#known-limit-slow-encrypted-open-on-android-chrome)).
 
 ## The block size
 
@@ -33,16 +34,30 @@ cheap for IndexedDB, and only the copy into memory is scattered.
 `stats().lastOpen` reports `tableMs` (header, root and file table) and `blocksMs` (every block);
 `onProgress` reports the `table` and `blocks` phases for a splash screen.
 
-## Known limit: open time on some platforms
+## Known limit: slow encrypted open on Android Chrome
 
-On Android (Chrome) and on Windows WebView2, the encrypted open of a large database measured slow.
-On Android the time is in the IndexedDB reads of many 64 KB records, not in
-decryption: an open that reads the records without decrypting them takes most of the same time.
+On Android Chrome, opening a large encrypted database is much slower than opening a plain one.
+Opening a 100 MB database took **3.4 times** the plain open on a Redmi Note 5 Pro (8.6 s against
+2.5 s) and **4.55 times** on a stock vivo V2250 (8.1 s against 1.8 s). On desktop the same open
+takes 1.2 to 1.6 times plain in Chromium, about the same in Firefox, and less than plain in
+WebKit. The Android open therefore misses the 3 s budget above. The encrypted open on Windows
+WebView2 also measured slow.
 
-This is being investigated as issue #76: measuring where the read time goes and which changes to
-the read path help (for example how records are fetched per transaction). A change to the open's
-read path, the storage layout or the backend may follow from it. None is promised, and none is
-decided.
+The cause is the size of a stored record. A sealed 64 KB block is 65,580 bytes, which is over
+Chromium's 64 KiB limit for keeping an IndexedDB value inline. Chromium stores each such record as
+a blob and unwraps it on the calling thread, at about 1.1 ms per record. On the Redmi, 6.7 s of
+the 8.6 s went to reading the records, and decryption took about 1.2 s.
+
+What is and is not affected:
+
+- Only the open is affected, and its time grows with the size of the database.
+- Sync, writes and queries are not affected.
+- Security is not affected: the records are the same, and they are sealed and checked in the same
+  way.
+
+A later release will change the store layout to fix this, with a migration for existing stores.
+Until then, plan for a splash screen on Android: `onProgress` reports the `blocks` phase, and
+`stats().lastOpen` shows where an open spent its time.
 
 ## Other limits
 
