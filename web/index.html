@@ -1,0 +1,105 @@
+<!doctype html>
+<!-- Copyright 2026 Bishwajeet Parhi. SPDX-License-Identifier: FSL-1.1-ALv2 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pglite-cipher: encryption at rest for PGlite (SQLCipher for Postgres in the browser)</title>
+    <meta name="description" content="pglite-cipher encrypts a PGlite database at rest: AES-256-GCM through WebCrypto, blocks stored in IndexedDB, file names and sizes hidden, tampering detected at open. Like SQLCipher, for Postgres in the browser and in webviews." />
+    <link rel="canonical" href="https://2002bishwajeet.github.io/pglite-cipher/" />
+    <link rel="alternate" type="text/plain" title="llms.txt" href="https://2002bishwajeet.github.io/pglite-cipher/llms.txt" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="pglite-cipher" />
+    <meta property="og:title" content="pglite-cipher: encryption at rest for PGlite" />
+    <meta property="og:description" content="Like SQLCipher, for Postgres in the browser: AES-256-GCM through WebCrypto, blocks in IndexedDB, tamper detection, no runtime dependencies." />
+    <meta property="og:url" content="https://2002bishwajeet.github.io/pglite-cipher/" />
+    <meta property="og:image" content="https://2002bishwajeet.github.io/pglite-cipher/og.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "pglite-cipher",
+        "description": "Encryption at rest for PGlite: AES-256-GCM through WebCrypto, blocks in IndexedDB, like SQLCipher for Postgres in the browser.",
+        "url": "https://2002bishwajeet.github.io/pglite-cipher/",
+        "codeRepository": "https://github.com/2002Bishwajeet/pglite-cipher",
+        "programmingLanguage": "TypeScript",
+        "runtimePlatform": "Web browser",
+        "license": "https://github.com/2002Bishwajeet/pglite-cipher/blob/main/LICENSE",
+        "keywords": "PGlite, Postgres, encryption at rest, SQLCipher, IndexedDB, WebCrypto, AES-GCM, local-first",
+        "author": { "@type": "Person", "name": "Bishwajeet Parhi" }
+      }
+    </script>
+    <style>
+      :root { color-scheme: light dark; --bg: #fafafa; --fg: #1a1a1a; --muted: #555; --card: #fff; --line: #e2e2e2; --accent: #336791; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #aaa; --card: #1b1b1b; --line: #333; --accent: #6ca0d4; } }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, sans-serif; }
+      main { max-width: 760px; margin: 0 auto; padding: 32px 16px 56px; }
+      h1 { font-size: 28px; margin: 0 0 8px; line-height: 1.25; }
+      h2 { font-size: 19px; margin: 32px 0 8px; }
+      h3 { font-size: 16px; margin: 20px 0 4px; }
+      p, li { color: var(--muted); }
+      a { color: var(--accent); }
+      pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      nav { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 16px 0 0; }
+      nav a { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>pglite-cipher: encryption at rest for PGlite</h1>
+      <p>
+        <strong>pglite-cipher</strong> encrypts a <a href="https://pglite.dev">PGlite</a> database, the Postgres build that runs in
+        the browser, the way SQLCipher encrypts SQLite. It is a PGlite filesystem (<code>EncryptedFs</code>) that seals every file
+        under PGDATA with AES-256-GCM through WebCrypto and stores the blocks in IndexedDB. It has no runtime dependencies.
+      </p>
+      <nav>
+        <a href="examples/demo/">Try the demo</a>
+        <a href="https://github.com/2002Bishwajeet/pglite-cipher">GitHub</a>
+        <a href="https://www.npmjs.com/package/pglite-cipher">npm</a>
+        <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/guides/README.md">Guides</a>
+        <a href="llms-full.txt">llms-full.txt</a>
+      </nav>
+
+      <h2>What it does</h2>
+      <ul>
+        <li><strong>Encrypts below Postgres.</strong> Every file under PGDATA is encrypted, including catalogs, WAL and <code>pg_control</code>. File names, sizes and the file count are hidden.</li>
+        <li><strong>Detects tampering.</strong> A changed, moved, replayed or missing block fails the open with <code>CorruptStoreError</code>.</li>
+        <li><strong>Two-tier keys.</strong> You supply a key-encryption key and the package wraps its own data key, so you can change the key instantly or rotate the data key.</li>
+        <li><strong>Runs where PGlite runs in a page:</strong> desktop and mobile browsers, and app webviews, with IndexedDB and WebCrypto.</li>
+      </ul>
+
+      <h2>Install and quick start</h2>
+      <pre><code>npm install pglite-cipher @electric-sql/pglite</code></pre>
+      <pre><code>import { PGlite } from '@electric-sql/pglite';
+import { EncryptedFs, IndexedDbBackend, importKek } from 'pglite-cipher';
+
+const key = await importKek(rawKey); // 32 random bytes, e.g. from the OS keychain
+const fs = new EncryptedFs({ backend: new IndexedDbBackend('data'), key, mode: 'open-or-create' });
+const pg = await PGlite.create({ fs, relaxedDurability: true });
+
+await pg.exec('CREATE TABLE IF NOT EXISTS notes (id serial PRIMARY KEY, body text)');
+await fs.syncToFs(false); // sync when it matters, e.g. when the page is hidden
+await pg.close();</code></pre>
+      <p><code>@electric-sql/pglite</code> (<code>^0.5.10</code>) is a peer dependency.</p>
+
+      <h2>Questions</h2>
+      <h3>How do I encrypt a PGlite database?</h3>
+      <p>Pass an <code>EncryptedFs</code> from pglite-cipher as PGlite's <code>fs</code> option, as above. Moving an existing <code>idb://</code> database over is covered in the <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/guides/existing-app.md">existing-app guide</a>.</p>
+      <h3>Is there a SQLCipher for Postgres in the browser?</h3>
+      <p>pglite-cipher fills that role for PGlite. The <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/design/comparison.md">comparison</a> sets it against SQLCipher and other options.</p>
+      <h3>Where should the key come from?</h3>
+      <p>In an app, 32 random bytes from the iOS Keychain, Android Keystore or the OS secret store. On the web, derive one from a passphrase in your app. See the <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/guides/keys.md">keys guide</a>.</p>
+      <h3>What does it not protect?</h3>
+      <p>While the database is open its contents are plaintext in memory, and exports such as <code>dumpDataDir()</code> are plaintext. A rollback of the whole store to an older full copy opens. See <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+      <h3>How fast is it?</h3>
+      <p>The <a href="examples/demo/">demo</a> times plain and encrypted stores in your own browser. Device measurements are in <a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/design/performance.md">performance.md</a>.</p>
+
+      <h2>Licence</h2>
+      <p><a href="https://github.com/2002Bishwajeet/pglite-cipher/blob/main/LICENSE">FSL-1.1-ALv2</a>, © Bishwajeet Parhi. Each release becomes Apache 2.0 two years after it ships.</p>
+    </main>
+  </body>
+</html>

@@ -6,7 +6,9 @@ To add it to an app that already uses PGlite, read llms-full.txt: it is self-con
 
 ## Docs
 
-- [llms-full.txt](https://raw.githubusercontent.com/2002Bishwajeet/pglite-cipher/main/llms-full.txt): everything an agent needs to integrate it, in one file
+- [Website](https://2002bishwajeet.github.io/pglite-cipher/): what it is, install, quick start, common questions
+- [Live demo](https://2002bishwajeet.github.io/pglite-cipher/examples/demo/): verify the encryption in a browser
+- [llms-full.txt](https://2002bishwajeet.github.io/pglite-cipher/llms-full.txt): everything an agent needs to integrate it, in one file
 - [README](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/README.md): what it is and a quick start
 - [Guides](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/guides/README.md): quick start, migrating an existing app, where to keep the key, rotation, errors and recovery
 - [Usage](https://github.com/2002Bishwajeet/pglite-cipher/blob/main/docs/usage.md): options, syncing, open modes, errors, keys and rotation, verify(), memory on mobile
