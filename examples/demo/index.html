@@ -39,6 +39,15 @@
       td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
       code, .hex { font-family: ui-monospace, monospace; font-size: 13px; overflow-wrap: anywhere; }
       .ok { color: var(--ok); } .bad { color: var(--bad); }
+      .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+      .pair > div { min-width: 0; }
+      .pair h3 { font-size: 14px; margin: 0 0 4px; }
+      .key { font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; color: var(--muted); margin: 0 0 6px; }
+      .dump { margin: 0; padding: 8px; overflow-x: auto; font: 12px/1.5 ui-monospace, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+      .dump .off { color: var(--muted); }
+      mark { background: var(--bad); color: var(--bg); }
+      ul.keys { margin: 0; padding-left: 18px; font: 12px/1.6 ui-monospace, monospace; overflow-wrap: anywhere; }
+      .alert { border: 1px solid var(--bad); color: var(--bad); border-radius: 6px; padding: 8px 12px; margin-top: 8px; }
     </style>
   </head>
   <body>
@@ -59,7 +68,7 @@
 
       <section>
         <h2>2. Proof it is encrypted</h2>
-        <p>Searches the raw bytes IndexedDB holds for your word.</p>
+        <p>Searches the raw bytes IndexedDB holds for your word and shows them: around the first match in the plain store, the start of a block in the encrypted one.</p>
         <button id="search" disabled>Search raw storage</button>
         <div id="proof"></div>
       </section>
@@ -73,10 +82,12 @@
     </main>
 
     <script type="module">
-      import { newKey, proof, speed, tamper } from './demo.mjs';
+      import { newKey, proof, speed, storeKeys, tamper } from './demo.mjs';
 
       const $ = (id) => document.getElementById(id);
       const ms = (n) => `${Math.round(n)} ms`;
+      const esc = (text) => String(text).replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
+      const h2 = (b) => b.toString(16).padStart(2, '0');
       const key = await newKey();
       let word = '';
 
@@ -85,34 +96,57 @@
         try { await run(); } catch (error) { console.error(error); alert(error); } finally { button.disabled = false; }
       }
 
+      // A hex and ASCII dump, 8 bytes a row, with the bytes in [from, to) marked.
+      function dump({ start, bytes, match }) {
+        const [from, to] = match ?? [-1, -1];
+        const marked = (offset, text) => (offset >= from && offset < to ? `<mark>${text}</mark>` : text);
+        const rows = [];
+        for (let i = 0; i < bytes.length; i += 8) {
+          const row = [...bytes.subarray(i, i + 8)];
+          const hex = row.map((b, j) => marked(start + i + j, h2(b))).join(' ') + '   '.repeat(8 - row.length);
+          const text = row.map((b, j) => marked(start + i + j, b >= 0x20 && b < 0x7f ? esc(String.fromCharCode(b)) : '.')).join('');
+          rows.push(`<span class="off">${(start + i).toString(16).padStart(6, '0')}</span>  ${hex}  ${text}`);
+        }
+        return `<pre class="dump">${rows.join('\n')}</pre>`;
+      }
+
+      const viewer = (title, v) => `<div>
+        <h3>${title}: ${v.records} records</h3>
+        <p class="key">record ${esc(v.key)}, ${v.size} bytes${v.found ? `, "${esc(word)}" at byte ${v.match[0]}` : ''}</p>
+        ${dump(v)}
+        <p>${v.found ? `<span class="bad">"${esc(word)}" found</span>` : `<span class="ok">no match in ${v.records} records</span>`}</p>
+      </div>`;
+
+      const keyList = (title, keys) => `<div><h3>${title}</h3><ul class="keys">${keys.map((k) => `<li>${esc(k)}</li>`).join('')}</ul></div>`;
+
       $('run').onclick = () => busy($('run'), async () => {
         word = $('word').value.trim() || 'pineapple';
         $('speed').textContent = 'Running…';
         const r = await speed(key, Number($('rows').value), word);
+        const keys = await storeKeys();
         $('speed').innerHTML = `<table>
           <tr><th></th><th>Write and close</th><th>Reopen</th><th>Rows</th></tr>
           <tr><td>Plain idb://</td><td>${ms(r.plain.writeMs)}</td><td>${ms(r.plain.openMs)}</td><td>${r.plain.count}</td></tr>
           <tr><td>Encrypted</td><td>${ms(r.encrypted.writeMs)}</td><td>${ms(r.encrypted.openMs)}</td><td>${r.encrypted.count}</td></tr>
           <tr><td>Ratio</td><td>${(r.encrypted.writeMs / r.plain.writeMs).toFixed(2)}×</td><td>${(r.encrypted.openMs / r.plain.openMs).toFixed(2)}×</td><td></td></tr>
-        </table>`;
+        </table>
+        <p style="margin-top:12px">The first record keys in IndexedDB. The plain store names every file; the encrypted one holds the header (0, 1), the root (2) and random block ids.</p>
+        <div class="pair">${keyList('Plain idb://', keys.plain)}${keyList('Encrypted', keys.encrypted)}</div>`;
         $('search').disabled = $('tamper').disabled = false;
       });
 
       $('search').onclick = () => busy($('search'), async () => {
         const r = await proof(word);
-        const verdict = (found) => (found ? '<span class="bad">found</span>' : '<span class="ok">not found</span>');
-        $('proof').innerHTML = `<table>
-          <tr><th></th><th>Records</th><th>"${word.replace(/[<&"]/g, '')}"</th></tr>
-          <tr><td>Plain idb://</td><td>${r.plain.records}</td><td>${verdict(r.plain.found)}</td></tr>
-          <tr><td>Encrypted</td><td>${r.encrypted.records}</td><td>${verdict(r.encrypted.found)}</td></tr>
-        </table><p>A stored encrypted block starts: <span class="hex">${r.encrypted.sample} …</span></p>`;
+        $('proof').innerHTML = `<div class="pair">${viewer('Plain idb://', r.plain)}${viewer('Encrypted', r.encrypted)}</div>`;
       });
 
       $('tamper').onclick = () => busy($('tamper'), async () => {
-        const name = await tamper(key);
-        $('tampered').innerHTML = name === 'CorruptStoreError'
-          ? '<p class="ok">The open refused: <code>CorruptStoreError</code>. Nothing was loaded. Run step 1 again to start over.</p>'
-          : `<p class="bad">Unexpected: ${name}</p>`;
+        const t = await tamper(key);
+        const byte = (b) => `0x${h2(b)} (${b})`;
+        $('tampered').innerHTML = `<p class="key">record ${esc(t.key)}, ${t.size} bytes: byte ${t.offset} changed from ${byte(t.before)} to ${byte(t.after)}</p>
+          ${t.error === 'CorruptStoreError'
+            ? '<div class="alert">The open refused: <code>CorruptStoreError</code>. Nothing was loaded.</div><p style="margin-top:8px">Run step 1 again to start over.</p>'
+            : `<div class="alert">Unexpected: ${esc(t.error)}</div>`}`;
         $('search').disabled = $('tamper').disabled = true;
       });
     </script>
