@@ -1,9 +1,9 @@
 diff --git a/src/backend/indexeddb.ts b/src/backend/indexeddb.ts
-index f9ec033..03158b2 100644
+index e838a4f..d6849ec 100644
 --- a/src/backend/indexeddb.ts
 +++ b/src/backend/indexeddb.ts
-@@ -19,6 +19,17 @@ const STORE = 'kv';
- /** How long a blocked deletion is waited for before destroy() returns anyway. */
+@@ -18,6 +18,17 @@ const STORE = 'kv';
+ 
  const BLOCKED_GRACE_MS = 2000;
  
 +/**
@@ -20,7 +20,7 @@ index f9ec033..03158b2 100644
  const done = <T>(request: IDBRequest<T>): Promise<T> =>
    new Promise((resolve, reject) => {
      request.onsuccess = () => {
-@@ -30,7 +41,15 @@ const done = <T>(request: IDBRequest<T>): Promise<T> =>
+@@ -29,7 +40,15 @@ const done = <T>(request: IDBRequest<T>): Promise<T> =>
    });
  
  export class IndexedDbBackend implements StorageBackend {
@@ -34,9 +34,9 @@ index f9ec033..03158b2 100644
    readonly #name: string;
 +  readonly #pack = IndexedDbBackend.pack;
    #db: Promise<IDBDatabase> | null = null;
-   /** Why later calls are refused, once this connection is closed. */
    #closed: string | null = null;
-@@ -49,11 +68,17 @@ export class IndexedDbBackend implements StorageBackend {
+ 
+@@ -44,11 +63,17 @@ export class IndexedDbBackend implements StorageBackend {
    }
  
    async isEmpty(): Promise<boolean> {
@@ -54,7 +54,7 @@ index f9ec033..03158b2 100644
      return done(store.count());
    }
  
-@@ -65,6 +90,14 @@ export class IndexedDbBackend implements StorageBackend {
+@@ -60,6 +85,14 @@ export class IndexedDbBackend implements StorageBackend {
    async getMany(ids: BlockId[]): Promise<Array<Uint8Array | undefined>> {
      if (ids.length === 0) return [];
      const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
@@ -69,7 +69,7 @@ index f9ec033..03158b2 100644
      return Promise.all(ids.map((id) => done(store.get(id) as IDBRequest<Uint8Array | undefined>)));
    }
  
-@@ -72,6 +105,7 @@ export class IndexedDbBackend implements StorageBackend {
+@@ -67,6 +100,7 @@ export class IndexedDbBackend implements StorageBackend {
      // getAll treats a count of 0 as "no limit".
      if (limit < 1) return [];
      const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
@@ -77,7 +77,7 @@ index f9ec033..03158b2 100644
      const range = IDBKeyRange.lowerBound(after ?? '', after !== null);
      const [keys, values] = await Promise.all([
        done(store.getAllKeys(range, limit) as IDBRequest<BlockId[]>),
-@@ -80,6 +114,48 @@ export class IndexedDbBackend implements StorageBackend {
+@@ -75,6 +109,48 @@ export class IndexedDbBackend implements StorageBackend {
      return keys.map((key, i): [BlockId, Uint8Array] => [key, values[i] as Uint8Array]);
    }
  
@@ -125,8 +125,8 @@ index f9ec033..03158b2 100644
 +
    async commit(batch: CommitBatch): Promise<void> {
      const db = await this.#database();
-     // From opening the transaction to its last request there is no await: every value arrives
-@@ -99,6 +175,10 @@ export class IndexedDbBackend implements StorageBackend {
+     // No await between opening the transaction and its last request: one would let it commit early.
+@@ -93,6 +169,10 @@ export class IndexedDbBackend implements StorageBackend {
          reject(failure ?? tx.error ?? new Error('IndexedDbBackend: the commit was aborted'));
        };
        const write = () => {
@@ -137,7 +137,7 @@ index f9ec033..03158b2 100644
          try {
            for (const key of batch.deletes) {
              if (!isRecordKey(key)) throw invalidKey();
-@@ -129,6 +209,94 @@ export class IndexedDbBackend implements StorageBackend {
+@@ -121,6 +201,94 @@ export class IndexedDbBackend implements StorageBackend {
      });
    }
  
