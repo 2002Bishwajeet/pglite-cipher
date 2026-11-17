@@ -40,7 +40,7 @@ The same idea, encryption underneath the database engine, adapted to Postgres in
 | What is detected | modified or swapped pages | also truncation, a replayed older block, a deleted file; every open checks every record. Neither detects a rollback of the whole store | stronger |
 | Rekey | `PRAGMA rekey` re-encrypts every page | `changeKey` re-wraps the data key at once; `rotateDataKey` re-encrypts into a fresh store | stronger, but only `rotateDataKey` defeats a copied old header |
 | Memory | page cache only; keys `mlock`ed and wiped | the whole database in memory, plus two pages of ciphertext while opening (about 64 MB at 64 KB blocks); JavaScript cannot lock or wipe keys | weaker, accepted |
-| Open cost | random access, opens at once | decrypts everything at open (budget: 100 MB in 1.5 s on desktop, 3 s on the slowest phone) | weaker, accepted |
+| Open cost | random access, opens at once | decrypts everything at open (budget: 100 MB in 1.5 s on desktop, 3 s on the slowest phone; missed on Android Chrome: a 100 MB open took 8.6 s on a Redmi Note 5 Pro, see [the known limit](docs/design/performance.md#known-limit-slow-encrypted-open-on-android-chrome)) | weaker, accepted |
 | Passphrase | PBKDF2-HMAC-SHA512 | none: the key is 32 random bytes from the keychain | weaker if a passphrase is ever wanted |
 | Compliance, maturity | FIPS-validated enterprise builds; in wide use since 2008 | not FIPS validated; new code, no external review yet | weaker |
 
