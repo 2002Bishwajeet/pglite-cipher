@@ -61,7 +61,7 @@
     "test:long": "CIPHER_LONG=1 vitest run --project node",
     "bench:build": "vite build --config bench/vite.config.ts",
     "bench:serve": "vite preview --config bench/vite.config.ts",
-    "prepack": "npm run build"
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "@electric-sql/pglite": "^0.5.10"
