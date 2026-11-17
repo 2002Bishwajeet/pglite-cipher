@@ -1,18 +1,6 @@
-// The perf gates on every PR (Chromium only; vitest.config.ts): G1, G2, G4 and G9 at 10 MB, as
-// ratios against plain idb:// measured in the same run, so that they hold on any machine. No
-// absolute milliseconds: those are the nightly bench's (bench/gates.ts). Prints the JSON.
-//
-// G9's count: a sync that creates, grows, shrinks, renames or removes
-// no file writes no file-table block (the file change is read from a file-map diff). A one-row
-// UPDATE now and then grows a GIN index (its pending list); that sync may write one table block per
-// changed file, and `g1.fileChanges` counts those runs. The median G1 sync writes none.
-//
-// G4's denominator is the plain normal sync (every ratio is against plain idb://). `ratios` also
-// records, unasserted, the switch ÷ the encrypted sync and ÷ the plain switch.
-//
-// G2 is 20 opens per variant, plain and encrypted interleaved, so that a machine that
-// speeds up or slows down during the run moves both medians alike. Each timed open follows an
-// untimed open of the same variant, never the other's.
+// PR perf gates (Chromium only): G1, G2, G4, G9 at 10 MB, as ratios against plain idb:// in the same run so they hold on any machine; absolute ms are the nightly bench's.
+// G9: a sync that changes no file writes no table block; GIN pending-list growth may, counted in `g1.fileChanges`. G2: 20 interleaved opens per variant, each timed open after an untimed one of the same variant.
+// G4's denominator is the plain normal sync; `ratios` also records the switch ratios, unasserted.
 import { describe, expect, it } from 'vitest';
 import { ratios, runPair } from '../../bench/measure.ts';
 

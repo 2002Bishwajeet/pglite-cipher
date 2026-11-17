@@ -89,7 +89,6 @@ describe('no plaintext and no secrets', () => {
     await collect(openHeader(kek, flipBit(header, 900), flipBit(header, 10)));
     await collect(rewrapHeader(await newKek(), kek, header));
 
-    // Decoding and assembling a table that holds the path.
     const body = await openTable(ctx, tableId, table);
     const trailing: Bytes = body.slice();
     trailing[blockSize - 1] = 1;

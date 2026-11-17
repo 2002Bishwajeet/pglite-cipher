@@ -17,7 +17,6 @@ const SCHEMA = `
   INSERT INTO notes (title, body) SELECT 'note title ' || i, repeat('lorem ipsum ', 50) || i FROM generate_series(1, 300) i;
 `;
 
-/** Each kind of store, as a function that makes a fresh one and returns how to connect to it. */
 const stores: Array<[string, () => () => StorageBackend]> = [
   [
     'MemoryBackend',
@@ -74,7 +73,6 @@ describe('round trip', () => {
       const progress: OpenProgress[] = [];
       const b = await openStore({ backend: shared(memory), key, mode: 'open', onProgress: (p) => progress.push(p) });
       expect((await b.pg.query('SELECT md5(string_agg(v, \',\' ORDER BY id)) AS h FROM t')).rows[0]).toEqual(before);
-      // The open reported the table phase, then the blocks phase up to every record.
       expect([...new Set(progress.map((p) => p.phase))]).toEqual(['table', 'blocks']);
       const last = progress.at(-1) as OpenProgress;
       expect(last.done).toBe(last.total);

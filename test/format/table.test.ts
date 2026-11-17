@@ -1,5 +1,4 @@
-// The file table: packing, encoding, decoding and assembling come back to the same files; every
-// defect is CorruptStoreError; the limit is StoreFullError.
+// File table: pack, encode, decode and assemble round-trip; every defect is CorruptStoreError, the limit StoreFullError.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { u32, type Bytes } from '../../src/format/bytes.ts';
@@ -26,7 +25,6 @@ import {
 import { hex, seeded } from './helpers.ts';
 import { runs, timeout } from '../long.ts';
 
-/** A unique 16-byte id: a tag byte, a counter and a seed. */
 const idOf = (tag: number, n: number, seed: number): Bytes => {
   const out = seeded(seed ^ n, 16);
   out[0] = tag;
@@ -79,7 +77,6 @@ const rootFor = (files: StoredFile[], tableIds: Bytes[]) => ({
 
 const tableIdsFor = (count: number) => Array.from({ length: count }, (_, i) => idOf(0x7a, i, 1));
 
-/** Encode each group as a table block, decode it, and assemble. */
 const roundTrip = (groups: TableEntry[][], files: StoredFile[], blockSize: BlockSize): FileTable => {
   const entries = groups.flatMap((g) => decodeTable(encodeTable(g, blockSize)));
   return assembleFiles(entries, rootFor(files, tableIdsFor(groups.length)), blockSize);
@@ -138,7 +135,6 @@ describe('file table', () => {
     fc.assert(
       fc.property(filesArb, fc.integer(), ({ blockSize, files }, seed) => {
         const entries = packEntries(files, blockSize).flat();
-        // Shuffle (Fisher–Yates on a seeded stream), then regroup greedily in the new order.
         const r = seeded(seed, entries.length * 4);
         for (let i = entries.length - 1; i > 0; i--) {
           const j = (((r[i * 4] ?? 0) << 8) | (r[i * 4 + 1] ?? 0)) % (i + 1);

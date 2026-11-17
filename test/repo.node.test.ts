@@ -1,4 +1,3 @@
-// Reads the repository itself, so it runs in Node only.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 

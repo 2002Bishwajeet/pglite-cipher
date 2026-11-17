@@ -1,6 +1,4 @@
-// Shared by the key tests: a base store, PGlite on a pair of backends, a backend whose commits can
-// fail by number (through FaultyBackend), a journal of every write to a pair, and a database's
-// tables by content.
+// Shared by the key tests: store, fault, journal and table-content helpers.
 import { PGlite } from '@electric-sql/pglite';
 import { expect } from 'vitest';
 import type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from '../../src/backend/backend.ts';
@@ -15,7 +13,6 @@ export interface Base {
   recs: Map<RecordKey, Uint8Array>;
 }
 
-/** A store with a table `t` of `rows` rows (each `md5` repeated `pad` times), as records. */
 export async function baseStore(blockSize: BlockSize, rows = 2000, pad = 1): Promise<Base> {
   const key = await newKey();
   const memory = new MemoryBackend();
@@ -27,10 +24,7 @@ export async function baseStore(blockSize: BlockSize, rows = 2000, pad = 1): Pro
   return { key, recs: await records(memory) };
 }
 
-/**
- * PGlite on an EncryptedFs over a pair. Durability is relaxed, so queries do not wait for a sync a
- * rotation holds back. Two empty backends get a new store from the template.
- */
+/** PGlite on an EncryptedFs over a pair; durability relaxed so queries don't wait on a sync a rotation holds back. */
 export async function openPair(
   pair: readonly [StorageBackend, StorageBackend],
   key: CryptoKey,
@@ -42,7 +36,6 @@ export async function openPair(
   return { pg, fs };
 }
 
-/** Every table of the public schema, by name, with a hash of its rows. */
 export async function tablesOf(pg: PGlite): Promise<Record<string, string>> {
   const { rows } = await pg.query<{ name: string }>(`SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' ORDER BY 1`);
   const out: Record<string, string> = {};
@@ -63,7 +56,6 @@ export async function expectOneStore(pair: readonly [StorageBackend, StorageBack
   return store;
 }
 
-/** Commits counted across every backend that shares one counter; commit number `at` fails in `mode`. */
 export interface FaultCounter {
   commits: number;
   at: number;
@@ -97,7 +89,6 @@ export class Faults implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/** A write to one slot of a pair: a commit, or a clear. */
 export type Event = { slot: 0 | 1; batch: CommitBatch } | { slot: 0 | 1; clear: true };
 
 const copyBatch = (batch: CommitBatch): CommitBatch => ({
@@ -107,7 +98,6 @@ const copyBatch = (batch: CommitBatch): CommitBatch => ({
   deletes: [...batch.deletes],
 });
 
-/** Logs every commit and clear that reaches `inner` into `journal`, in order; `after` runs once each commit is in. */
 export class Logged implements StorageBackend {
   readonly #inner: StorageBackend;
   readonly #slot: 0 | 1;
@@ -144,7 +134,6 @@ export class Logged implements StorageBackend {
   close = () => this.#inner.close();
 }
 
-/** Applies the first `k` events of a journal to `pair`: the stores as a kill after event `k` leaves them. */
 export async function replay(journal: readonly Event[], k: number, pair: readonly [StorageBackend, StorageBackend]): Promise<void> {
   for (const event of journal.slice(0, k)) {
     const target = pair[event.slot];
@@ -153,7 +142,6 @@ export async function replay(journal: readonly Event[], k: number, pair: readonl
   }
 }
 
-/** Whether an IndexedDB database of this name exists. */
 export async function databaseExists(name: string): Promise<boolean> {
   return (await indexedDB.databases()).some((d) => d.name === name);
 }

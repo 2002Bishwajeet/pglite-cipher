@@ -1,6 +1,5 @@
-// An in-memory backend with the semantics of the IndexedDB one: a sorted map of blocks beside the
-// three slots, the expectRoot check, atomic commits. Values are copied in and out, as structured
-// clone does for IndexedDB.
+// In-memory backend with IndexedDB semantics: sorted blocks beside three slots, expectRoot check, atomic commits,
+// values copied in and out.
 import { StaleWriterError } from '../format/errors.ts';
 import {
   invalidKey,
@@ -17,7 +16,6 @@ import {
 export class MemoryBackend implements StorageBackend {
   readonly #slots: Array<Uint8Array | undefined> = [undefined, undefined, undefined];
   readonly #blocks = new Map<BlockId, Uint8Array>();
-  /** The keys of `#blocks`, ascending. */
   #ids: BlockId[] = [];
   #closed = false;
 
@@ -48,7 +46,7 @@ export class MemoryBackend implements StorageBackend {
 
   commit(batch: CommitBatch): Promise<void> {
     return this.#run(() => {
-      // Every check runs before the first change, so a refused batch changes nothing.
+      // Every check runs before the first change.
       if (!rootMatches(this.#slots[ROOT], batch.expectRoot)) {
         throw new StaleWriterError('commit: the root changed since this writer read it');
       }
@@ -72,7 +70,6 @@ export class MemoryBackend implements StorageBackend {
     return Promise.resolve();
   }
 
-  /** Runs `fn` as an async call: a throw becomes a rejection. */
   #run<T>(fn: () => T): Promise<T> {
     return new Promise((resolve) => {
       if (this.#closed) throw new Error('MemoryBackend: the backend is closed');
@@ -101,7 +98,6 @@ export class MemoryBackend implements StorageBackend {
     if (this.#blocks.delete(key)) this.#ids.splice(this.#firstAbove(key) - 1, 1);
   }
 
-  /** The index of the first id greater than `id`. */
   #firstAbove(id: BlockId): number {
     let lo = 0;
     let hi = this.#ids.length;

@@ -14,7 +14,7 @@ const hkdf = (dek: CryptoKey, salt: Bytes, info: string) =>
     'encrypt',
   ]);
 
-/** Test helper: seals `metaPlain` correctly into `header` (as a writer of that meta would). */
+/** Seals `metaPlain` into `header`, as a writer of that meta would. */
 const resealMeta = async (dek: CryptoKey, header: Bytes, metaPlain: Bytes): Promise<Bytes> => {
   const key = await hkdf(dek, header.subarray(60, 76), 'pglite-cipher/header');
   const sealed = await subtle.encrypt(
@@ -36,7 +36,7 @@ describe('downgrade and splicing fail', () => {
     const { kek, header } = await newStore();
     for (let bit = 0; bit < HEADER_LENGTH * 8; bit++) {
       const damaged = flipBit(header, bit);
-      // Bytes 0–59 are the wrap: it no longer unwraps. Bytes 60–167 are the meta: it no longer opens.
+      // Bytes 0–59 are the wrap, 60–167 the meta.
       await rejection(openHeader(kek, damaged, damaged.slice()), bit < 60 * 8 ? WrongKeyError : CorruptStoreError);
     }
   }, 120_000);
@@ -57,7 +57,6 @@ describe('downgrade and splicing fail', () => {
       const forged = await resealMeta(dek, header, withMetaByte(meta, at, value));
       await rejection(openHeader(kek, forged, forged.slice()), type);
     }
-    // The helper itself is right: the unchanged meta opens.
     const same = await resealMeta(dek, header, encodeMeta(meta));
     expect((await openHeader(kek, same, same.slice())).meta).toEqual(meta);
   });
@@ -89,7 +88,6 @@ describe('downgrade and splicing fail', () => {
     const { kek, header: before } = await newStore();
     const kek2 = await newKek();
     const after = await rewrapHeader(kek, kek2, before);
-    // Both wraps hold the same DEK, so each unwraps under its key; the meta is bound to its wrap.
     const newWrapOldMeta = concat([after.subarray(0, 60), before.subarray(60)]);
     await rejection(openHeader(kek2, newWrapOldMeta, newWrapOldMeta.slice()), CorruptStoreError);
     const oldWrapNewMeta = concat([before.subarray(0, 60), after.subarray(60)]);
@@ -122,7 +120,6 @@ describe('downgrade and splicing fail', () => {
     };
     expect(await openRoot(ctx, await sealUnder('pglite-cipher/v1/record'))).toEqual(body);
     await rejection(openRoot(ctx, await sealUnder('pglite-cipher/v2/record')), CorruptStoreError);
-    // And the package's own seal opens, as a control.
     expect(await openRoot(ctx, await sealRoot(ctx, body))).toEqual(body);
   });
 });

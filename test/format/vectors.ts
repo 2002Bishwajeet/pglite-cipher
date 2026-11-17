@@ -1,9 +1,5 @@
-// Builds the known-answer vectors from fixed inputs, injecting every salt, nonce and id the code
-// draws. `vectors.json` is its committed output and the regression lock: `vectors.test.ts`
-// rebuilds it in every engine and compares byte for byte. Never regenerate it to make a test pass.
-// It was written once with:
-//   node -e "import('./test/format/vectors.ts').then(async (m) =>
-//     console.log(JSON.stringify(await m.buildVectors(), null, 2)))" > test/format/vectors.json
+// Known-answer vectors from fixed inputs; vectors.json is the committed output and regression lock. Never regenerate it to pass a test.
+// Written once: node -e "import('./test/format/vectors.ts').then(async (m) => console.log(JSON.stringify(await m.buildVectors(), null, 2)))" > test/format/vectors.json
 import { setRandomSource } from '../../src/testing.ts';
 import { toHex, type Bytes } from '../../src/format/bytes.ts';
 import { encodeRoot, encodeTable, type RootBody, type TableEntry } from '../../src/format/codec.ts';
@@ -36,8 +32,7 @@ export const INPUTS = {
 
 export const buildVectors = async () => {
   const v = INPUTS;
-  // The order the code draws them: createHeader (storeId, DEK, wrapNonce, metaSalt, metaNonce),
-  // then the session salt at the first seal, then one nonce per seal.
+  // Draw order: createHeader (storeId, DEK, wrapNonce, metaSalt, metaNonce), session salt at first seal, one nonce per seal.
   const queue = [v.storeId, v.dek, v.wrapNonce, v.metaSalt, v.metaNonce, v.sessionSalt, v.tableNonce, v.blockNonce, v.rootNonce];
   setRandomSource((n) => {
     const next = queue.shift();

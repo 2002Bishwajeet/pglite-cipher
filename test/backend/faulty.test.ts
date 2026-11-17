@@ -43,7 +43,6 @@ describe('FaultyBackend', () => {
     await expect(b.commit(sync(2))).rejects.toBeInstanceOf(InjectedFault);
     expect(await contents(inner)).toEqual({ root: testValue(1), blocks: [[testBlockId(1), testValue(1)]], count: 2 });
     expect(b.committed).toHaveLength(1);
-    // Later commits go through.
     await b.commit(sync(2));
     expect(await inner.get(2)).toEqual(testValue(2));
   });
@@ -62,7 +61,6 @@ describe('FaultyBackend', () => {
     const b = new FaultyBackend(new IndexedDbBackend(name), { commit: { n: 2, mode: 'hang' } });
     await b.commit(sync(1));
     expect(await settled(b.commit(sync(2)))).toBe('pending');
-    // The test drops the instance and reopens the store.
     const reopened = new IndexedDbBackend(name);
     expect(await contents(reopened)).toEqual({ root: testValue(1), blocks: [[testBlockId(1), testValue(1)]], count: 2 });
     await b.close();

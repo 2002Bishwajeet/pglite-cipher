@@ -1,6 +1,5 @@
-// The incrementally packed file table: after many random file operations it still describes MEMFS
-// exactly and stays within twice its dense size; a run of removals that takes it under half full
-// repacks it once; and a crash at that repack commit leaves the old table or the new one.
+// Incrementally packed file table: after random file operations it still describes MEMFS exactly and stays within twice its dense size;
+// removals taking it under half full repack it once; a crash at the repack commit leaves the old table or the new.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { StorageBackend } from '../../src/backend/backend.ts';
@@ -29,7 +28,7 @@ const FUZZ = `${PGDATA}/fuzz`;
 const MANY = `${PGDATA}/many`;
 const FILES = 4000;
 
-/** xorshift32 from a seed: the same operations on every run. */
+/** xorshift32 from a seed, so every run does the same operations. */
 function prng(seed: number) {
   let x = seed | 0 || 1;
   const next = () => {
@@ -44,13 +43,9 @@ function prng(seed: number) {
   };
 }
 
-/** Every node under `dir`, by absolute path. */
 const entries = (FS: TestFS, dir: string) => [...listTree(FS, dir)].map(([p, s]) => ({ path: `${dir}/${p}`, ...s }));
 
-/**
- * The tree under PGDATA: each node's mode, and the SHA-256 of its bytes or its symlink target.
- * A digest, not the bytes in hex: hex strings of the whole data directory take gigabytes of heap.
- */
+/** The tree under PGDATA: modes and SHA-256 of contents or symlink targets (hex of the whole directory takes gigabytes of heap). */
 async function treeOf(FS: TestFS): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (const [path, { mode }] of listTree(FS)) {
@@ -65,7 +60,6 @@ async function treeOf(FS: TestFS): Promise<Map<string, string>> {
   return out;
 }
 
-/** An EncryptedFs that keeps a copy of PGDATA as the load left it, before Postgres starts. */
 class LoadSnapshotFs extends EncryptedFs {
   loaded: Map<string, string> | null = null;
   #moduleFs: TestFS | null = null;
@@ -84,7 +78,6 @@ class LoadSnapshotFs extends EncryptedFs {
   }
 }
 
-/** One random operation under FUZZ: create, grow, truncate, rename (also over a file, also a directory), mkdir or unlink. */
 function randomOp(FS: TestFS, rnd: ReturnType<typeof prng>, n: number): void {
   const all = entries(FS, FUZZ);
   const files = all.filter((e) => !FS.isDir(e.mode));
@@ -107,7 +100,6 @@ function randomOp(FS: TestFS, rnd: ReturnType<typeof prng>, n: number): void {
     const target = rnd.int(4) === 0 ? pick(files).path : `${pick(dirs)}/r${String(n)}`;
     if (target !== f.path) FS.rename(f.path, target);
   } else if (op < 84) {
-    // A directory moves: the path of everything below it changes.
     const d = pick(dirs);
     if (d !== FUZZ) FS.rename(d, `${FUZZ}/m${String(n)}`);
   } else if (op < 86) {
@@ -117,7 +109,6 @@ function randomOp(FS: TestFS, rnd: ReturnType<typeof prng>, n: number): void {
   }
 }
 
-/** FILES small files under MANY, in one sync. */
 async function createMany({ pg, fs }: Opened): Promise<void> {
   const FS = fsOf(pg);
   FS.mkdir(MANY);
@@ -125,10 +116,7 @@ async function createMany({ pg, fs }: Opened): Promise<void> {
   await fs.syncToFs(false);
 }
 
-/**
- * Removes three files of every four, so that no table block empties, calling `sync` after every
- * hundred removals and once at the end; `sync` returning false ends the run.
- */
+/** Removes three files of every four so no table block empties; `sync` every hundred removals and at the end, false ends the run. */
 async function removeMost({ pg }: Opened, sync: () => Promise<boolean>): Promise<void> {
   const FS = fsOf(pg);
   let removed = 0;
@@ -140,7 +128,6 @@ async function removeMost({ pg }: Opened, sync: () => Promise<boolean>): Promise
   await sync();
 }
 
-/** A backend that counts commit calls. */
 function counting(inner: StorageBackend): { backend: StorageBackend; commits: () => number } {
   let n = 0;
   const backend = new Proxy(inner, {
@@ -204,7 +191,6 @@ describe('file-table packing', () => {
   for (const mode of ['before', 'after', 'hang'] as const) {
     it(`a crash at the repack commit (${mode}) leaves the old table or the new one`, async () => {
       const key = await newKey();
-      // A clean run finds the number of the repack commit.
       const clean = counting(new MemoryBackend());
       const a = await openStore({ backend: clean.backend, key, blockSize: B });
       await createMany(a);
@@ -217,7 +203,6 @@ describe('file-table packing', () => {
       expect(repackCommit).toBeGreaterThan(0);
       await a.pg.close();
 
-      // The same run, with that commit failed; the store is taken as it is right after the attempt.
       const memory = new MemoryBackend();
       const faulted = counting(new FaultyBackend(shared(memory), { commit: { n: repackCommit, mode } }));
       const b = await openStore({ backend: faulted.backend, key, blockSize: B });

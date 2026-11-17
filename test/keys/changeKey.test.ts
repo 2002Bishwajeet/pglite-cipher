@@ -1,7 +1,5 @@
-// changeKey: the same data key wrapped under a new KEK, in both header copies at once. The new key
-// opens, the old does not; a failed commit leaves one key or the other, never a copy of each, and
-// changeKey tells which, or that it cannot; and, documented, a copy of the old header still opens
-// later copies of the store with the old key.
+// changeKey: the data key wrapped under a new KEK in both header copies. After a failed commit exactly one key opens, and changeKey says which or that it cannot.
+// Documented: a copy of the old header still opens later copies of the store with the old key.
 import { describe, expect, it } from 'vitest';
 import type { Slot, StorageBackend } from '../../src/backend/backend.ts';
 import { InjectedFault } from '../../src/backend/faulty.ts';
@@ -13,13 +11,11 @@ import { newKey, openStore, records, rejection, resealRoot, restore, sameRecords
 import { baseStore, Faults, openPair, tablesOf, type Base, type FaultCounter } from './helpers.ts';
 
 let stored: Promise<Base> | null = null;
-/** One store for every test of this file, made on first use. */
 const base = (): Promise<Base> => (stored ??= baseStore(65536, 500));
 
 const rowsOf = async (pg: Awaited<ReturnType<typeof openStore>>['pg']) =>
   ((await pg.query<{ n: number }>('SELECT count(*)::int AS n FROM t')).rows[0] as { n: number }).n;
 
-/** A KEK, and the forms its bytes would take in a message. */
 const keyAndBytes = async (): Promise<{ kek: CryptoKey; bytes: string[] }> => {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   return { bytes: [toHex(raw), raw.join(',')], kek: await importKek(raw.slice()) };
@@ -35,7 +31,6 @@ const headerReadsFail = (backend: StorageBackend, counter: FaultCounter): Storag
     },
   });
 
-/** An error's name and message, and its cause's. */
 const textOf = (e: unknown): string =>
   e instanceof Error ? `${e.name} ${e.message} ${e.cause === undefined ? '' : textOf(e.cause)}` : String(e);
 
@@ -54,7 +49,6 @@ describe('changeKey', () => {
     const changed = [...after.keys()].filter((k) => !(before.get(k) as Uint8Array).every((x, i) => x === after.get(k)?.[i]));
     expect(changed).toEqual([0, 1]);
     expect(after.get(0)).toEqual(after.get(1));
-    // The instance keeps syncing under the new key.
     await pg.exec(`INSERT INTO t VALUES (-1, 'after')`);
     await pg.close();
     await rejection(openStore({ backend: shared(memory), key, mode: 'open' }), WrongKeyError);
@@ -62,7 +56,6 @@ describe('changeKey', () => {
     expect(await rowsOf(re.pg)).toBe(501);
     await re.pg.exec('DELETE FROM t WHERE id = -1');
     expect(await tablesOf(re.pg)).toEqual(want);
-    // And again, from the instance that opened with the new key.
     const third = await newKey();
     await re.fs.changeKey(third);
     await re.pg.close();
@@ -98,8 +91,7 @@ describe('changeKey', () => {
       );
       const [copy0, copy1] = [await memory.get(0), await memory.get(1)];
       expect(copy0, mode).toEqual(copy1);
-      // a: nothing was written and changeKey failed: the old key. b: the commit applied, and reading
-      // slot 0 shows it: changeKey succeeded, the new key.
+      // a: nothing written, old key. b: commit applied, slot 0 shows it, new key.
       const current = mode === 'before' ? key : next;
       const other = mode === 'before' ? next : key;
       if (mode === 'before') {
@@ -109,7 +101,6 @@ describe('changeKey', () => {
         expect(outcome).toBeNull();
         expect(copy0).not.toEqual(old);
       }
-      // Either way the instance keeps working.
       await pg.exec(`INSERT INTO t VALUES (-1, 'after')`);
       await pg.close();
       await rejection(openStore({ backend: shared(memory), key: other, mode: 'open' }), WrongKeyError);
@@ -121,8 +112,7 @@ describe('changeKey', () => {
 
   it('settles a header commit that rejected: applied, it resolves; not applied, the commit’s error; not readable back, KeyChangeUnknownError, and exactly one key opens', async () => {
     const { key, recs } = await base();
-    // `after`: the commit applies, then rejects. `before`: it rejects and writes nothing. With
-    // `readFails`, reading the header back rejects too, so the outcome cannot be known.
+    // `after`: applies, then rejects. `before`: rejects, writes nothing. `readFails`: reading the header back rejects too.
     for (const [mode, readFails] of [
       ['after', false],
       ['before', false],
@@ -146,7 +136,6 @@ describe('changeKey', () => {
       else if (mode === 'before') expect(outcome, label).toBeInstanceOf(InjectedFault);
       else expect(outcome, label).toBeNull();
 
-      // Exactly one key opens the store: the new one where the commit applied.
       const errors: unknown[] = [outcome];
       const now = await records(memory);
       const opens: boolean[] = [];
@@ -167,8 +156,6 @@ describe('changeKey', () => {
       expect(opens, label).toEqual(mode === 'after' ? [false, true] : [true, false]);
       for (const e of errors) for (const bytes of [...old.bytes, ...next.bytes]) expect(textOf(e), label).not.toContain(bytes);
 
-      // Whatever the outcome, changeKey again on the same instance puts the store under the new key,
-      // and the instance keeps working.
       await fs.changeKey(next.kek);
       await pg.exec(`INSERT INTO t VALUES (-1, 'after')`);
       await pg.close();

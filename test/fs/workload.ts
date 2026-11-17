@@ -1,14 +1,10 @@
-// A write workload of 200 small transactions (2,000 under CIPHER_LONG, in the crash matrix) that
-// changes the file table: a CREATE TABLE, growth, a second table that grows, loses its tail and is
-// truncated by VACUUM, and a DROP TABLE that a checkpoint unlinks; the long workload logs on after
-// that. Every step but VACUUM and CHECKPOINT logs its number in `log`, so a database can be checked
-// against the prefix of steps it holds.
+// 200 small transactions (2,000 under CIPHER_LONG in the crash matrix) that change the file table: CREATE TABLE, growth, a second table grown, shrunk and VACUUM-truncated, a DROP unlinked by a checkpoint.
+// Every step but VACUUM and CHECKPOINT logs its number in `log`, so a database can be checked against the prefix it holds.
 import type { PGlite } from '@electric-sql/pglite';
 import { expect } from 'vitest';
 
 export interface Step {
   sql: string;
-  /** The value this step inserts into `log`, or null. */
   log: number | null;
 }
 
@@ -18,7 +14,6 @@ const BIG_DROP = 141;
 const BIG_ROWS_PER_STEP = 40;
 const BIG_KEPT = 200;
 
-/** The workload of `count` steps (at least 200). */
 export const workload = (count: number): readonly Step[] => {
   const out: Step[] = [];
   let n = 0;
@@ -43,13 +38,11 @@ export const workload = (count: number): readonly Step[] => {
 
 export const STEPS = workload(200);
 
-/** The last step among 1 … n that logs: all that `stepsHeld` can see of n steps. */
 export const lastLogging = (n: number, steps = STEPS): number => {
   for (let i = n; i > 0; i--) if (steps[i - 1]?.log !== null) return i;
   return 0;
 };
 
-/** What the database holds after steps 1 … m. */
 function expected(m: number, all: readonly Step[]): { logs: number; big: number | null } {
   const steps = all.slice(0, m);
   const logs = steps.filter((s) => s.log !== null).length;
@@ -58,10 +51,7 @@ function expected(m: number, all: readonly Step[]): { logs: number; big: number 
   return { logs, big: m >= BIG_DELETE ? Math.min(BIG_KEPT, inserts * BIG_ROWS_PER_STEP) : inserts * BIG_ROWS_PER_STEP };
 }
 
-/**
- * The last logging step the database holds, checked to be a consistent prefix: `log` holds 1 … n
- * with nothing missing, and `big` is as those steps left it.
- */
+/** The last logging step the database holds, checked as a consistent prefix: `log` is 1 … n and `big` matches those steps. */
 export async function stepsHeld(pg: PGlite, steps = STEPS): Promise<number> {
   const { rows } = await pg.query<{ log: boolean; big: boolean }>(
     `SELECT to_regclass('log') IS NOT NULL AS log, to_regclass('big') IS NOT NULL AS big`,
@@ -77,7 +67,6 @@ export async function stepsHeld(pg: PGlite, steps = STEPS): Promise<number> {
     expect(Number(sum ?? 0)).toBe((n * (n + 1)) / 2);
     logs = n;
   }
-  // The step that logged `logs` last (a non-logging step after it may or may not be in).
   let m = 0;
   for (let i = 0; i < steps.length; i++) if ((steps[i]?.log ?? 0) <= logs && steps[i]?.log !== null) m = i + 1;
   if (!has.log) m = 0;
@@ -87,7 +76,6 @@ export async function stepsHeld(pg: PGlite, steps = STEPS): Promise<number> {
   return m;
 }
 
-/** Runs every step, catching what `onError` accepts; returns the steps that resolved, in order. */
 export async function runSteps(pg: PGlite, onStep: (index: number, error: unknown) => Promise<void> | void, steps = STEPS): Promise<void> {
   for (let i = 0; i < steps.length; i++) {
     let error: unknown = null;

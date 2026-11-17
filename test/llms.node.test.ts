@@ -17,7 +17,6 @@ describe('llms-full.txt', () => {
   const text = read('llms-full.txt');
 
   it('names only exports that exist', () => {
-    // Backticked identifiers that look like package exports: PascalCase names and the two functions.
     const named = new Set(
       [...text.matchAll(/`([A-Z][A-Za-z]+(?:Error|Fs|Backend|Options|Stats|Mode|Progress|Result|Size)|importKek|verifyStore|VERSION|FORMAT_VERSION)\b/g)].map(
         (m) => m[1] as string,

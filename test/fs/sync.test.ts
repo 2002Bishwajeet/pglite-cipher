@@ -1,5 +1,4 @@
-// The sync pipeline: serialised syncs, relaxed and strict durability, a second writer, and the
-// three upstream PGlite sync bugs this filesystem must not depend on (PGlite issues 1191, 1065 and 1063).
+// Sync pipeline: serialised syncs, relaxed and strict durability, a second writer, and the three upstream PGlite bugs (issues 1191, 1065, 1063) this filesystem must not depend on.
 import { describe, expect, it } from 'vitest';
 import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
 import { FaultyBackend, type FaultPlan } from '../../src/backend/faulty.ts';
@@ -12,7 +11,6 @@ interface Attempt {
   ok: boolean;
 }
 
-/** Passes everything to `inner`, records every commit attempt, and can hold the next commit. */
 class Recorder implements StorageBackend {
   readonly attempts: Attempt[] = [];
   readonly #inner: StorageBackend;
@@ -22,7 +20,6 @@ class Recorder implements StorageBackend {
     this.#inner = inner;
   }
 
-  /** The next commit waits until `release` resolves; the returned promise resolves when it starts waiting. */
   holdNext(release: Promise<void>): Promise<void> {
     return new Promise((entered) => {
       this.#gate = { entered, release };
@@ -59,7 +56,6 @@ const released = () => {
   return { promise, release };
 };
 
-/** Rows of `t`: their count, checked to be ids 1 … n. */
 async function rowsOf(memory: MemoryBackend, key: CryptoKey): Promise<number> {
   const { pg } = await openStore({ backend: shared(await restore(await records(memory))), key, mode: 'open' });
   const r = (await pg.query<{ n: number; max: number | null }>('SELECT count(*)::int AS n, max(id) AS max FROM t')).rows[0];
@@ -68,7 +64,6 @@ async function rowsOf(memory: MemoryBackend, key: CryptoKey): Promise<number> {
   return r?.n ?? 0;
 }
 
-/** Counts unhandled rejections while `fn` runs. */
 async function unhandledDuring(fn: () => Promise<void>): Promise<number> {
   let count = 0;
   const onNode = () => {
@@ -82,7 +77,6 @@ async function unhandledDuring(fn: () => Promise<void>): Promise<number> {
   else process.on('unhandledRejection', onNode);
   try {
     await fn();
-    // Let a rejection nobody handled be reported.
     await new Promise((resolve) => setTimeout(resolve, 50));
   } finally {
     if (inBrowser) globalThis.removeEventListener('unhandledrejection', onBrowser);
@@ -103,12 +97,10 @@ describe('sync', () => {
     const entered = recorder.holdNext(gate.promise);
     await pg.exec(`INSERT INTO t SELECT i, md5(i::text) FROM generate_series(1, 10) i`);
     await entered;
-    // The commit of rows 1 … 10 is held; queries go on.
     for (let i = 11; i <= 30; i++) await pg.exec(`INSERT INTO t VALUES (${String(i)}, 'later')`);
     const done = recorder.attempts.length;
     gate.release();
     await expect.poll(() => recorder.attempts.length > done && recorder.attempts[done]?.ok).toBe(true);
-    // The store as of that commit: a consistent earlier state, rows 1 … 10.
     const asOfCommit = new MemoryBackend();
     for (const a of recorder.attempts.slice(0, done + 1)) await asOfCommit.commit(a.batch);
     expect(await rowsOf(asOfCommit, key)).toBe(10);
@@ -220,7 +212,6 @@ describe('sync', () => {
     const unhandled = await unhandledDuring(async () => {
       plan.commit = { n: recorder.attempts.length + 1, mode: 'before' };
       await pg.exec(`INSERT INTO t SELECT i, 'x' FROM generate_series(1, 5) i`);
-      // The background sync of that insert failed.
       await expect.poll(() => recorder.attempts.some((a) => !a.ok)).toBe(true);
       expect(fs.hasDirty()).toBe(true);
       await pg.exec(`INSERT INTO t SELECT i, 'y' FROM generate_series(6, 9) i`);
@@ -250,7 +241,6 @@ describe('sync', () => {
     expect(last()).toBe('strict');
   }, 60_000);
 
-  /** Durability and outcome of each commit attempt from `from` on. */
   const commitsOf = (recorder: Recorder, from: number) => recorder.attempts.slice(from).map((a) => [a.batch.durability, a.ok]);
 
   it('a strict sync during a relaxed one waits for it, then commits strict before it resolves', async () => {
@@ -265,7 +255,6 @@ describe('sync', () => {
     await entered;
     const strict = fs.syncToFs(false).then(() => commitsOf(recorder, from));
     gate.release();
-    // The relaxed commit carried the write; a strict one after it makes it durable.
     expect(await strict).toEqual([
       ['relaxed', true],
       ['strict', true],
@@ -313,7 +302,6 @@ describe('sync', () => {
     const strict = [fs.syncToFs(false), fs.syncToFs(false), fs.syncToFs(false)];
     gate.release();
     await Promise.all([relaxed, ...strict]);
-    // Nothing new since that strict commit: no further commit.
     await Promise.all([fs.syncToFs(false), fs.syncToFs(false)]);
     expect(commitsOf(recorder, from)).toEqual([
       ['relaxed', true],

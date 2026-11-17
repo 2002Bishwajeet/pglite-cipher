@@ -10,14 +10,13 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Main runs finish (a newer push only replaces a waiting one); superseded PR runs are cancelled.
+  # Main runs finish; superseded PR runs are cancelled.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
-# Every job runs on a GitHub-hosted Ubuntu runner (16 GB). Browsers come from `playwright install
-# --with-deps`, which also installs their system packages.
+# All jobs run on GitHub-hosted Ubuntu (16 GB); browsers come from `playwright install --with-deps`.
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -75,13 +74,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.browser }}
-      # Firefox keeps about three times the memory of Chromium for the same file (open.test.ts alone:
-      # 8.7 GB against 2.5 GB). The suite's peak is a per-file peak, not a leak: 14.3 GB at the default
-      # 4 files at a time, 8.5 GB at 1. One file at a time fits a 16 GB runner.
+      # Firefox peaks near 3x Chromium's memory per file (14.3 GB at 4 files, 8.5 GB at 1): one file at a time fits.
       - run: npm run test:browser -- --project ${{ matrix.browser }} ${{ matrix.browser == 'firefox' && '--maxWorkers=1' || '' }}
 
-  # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
-  # every engine opens both. Two engines that each read only their own stores is what this catches.
+  # Compat lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, every engine opens both.
   compat-write:
     runs-on: ubuntu-latest
     timeout-minutes: 45

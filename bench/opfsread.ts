@@ -1,9 +1,5 @@
-// Bench only: OPFS read throughput, to set beside IndexedDB's, on the same
-// device. About `mb` MB as sealed-size records (65580 B) are written once; each run then reads all of
-// it back sequentially through three layouts: (a) one file per record, (b) segment files of 255
-// records (about 16 MiB) read in 1 MiB slices, (c) the same segments through a
-// FileSystemSyncAccessHandle in a worker. The page cannot drop the OS cache, so "cold" here means a
-// fresh file or handle per read, not an empty page cache.
+// Bench only: OPFS read throughput beside IndexedDB's: ~`mb` MB of sealed-size records read back in three layouts
+// (file per record, 16 MiB segments in 1 MiB slices, same via a worker's sync handle). "Cold" means a fresh handle, not an empty OS cache.
 import { MB, errorText, now, pct, randomBytes, round, type Json } from './measure.ts';
 
 const RECORD = 65580;
@@ -35,7 +31,6 @@ async function readSegments(dir: FileSystemDirectoryHandle, segments: number): P
   return bytes;
 }
 
-/** Layout (c): a fresh worker per read, so no handle or buffer survives between runs. */
 function readSync(dirs: string[], segments: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./opfsread-worker.ts', import.meta.url), { type: 'module' });

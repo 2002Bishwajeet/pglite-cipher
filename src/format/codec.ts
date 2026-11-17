@@ -1,6 +1,5 @@
-// Fixed binary encodings of the header meta, the root body and table-block bodies (FORMAT.md
-// sections 4, 6 and 7). Decoders throw only CorruptStoreError or UnsupportedFormatError; encoders
-// throw RangeError for a value that does not fit its field.
+// Fixed binary encodings of the header meta, root body and table-block bodies (FORMAT.md sections 4, 6, 7).
+// Decoders throw only CorruptStoreError or UnsupportedFormatError; encoders throw RangeError.
 import type { Bytes } from './bytes.ts';
 import { CorruptStoreError, UnsupportedFormatError } from './errors.ts';
 
@@ -14,7 +13,6 @@ const CIPHER_AES_256_GCM = 1;
 const KDF_RAW = 0;
 const SUBKEY_HKDF_SESSION = 1;
 
-/** Root bytes before the table-block ids. */
 export const ROOT_FIXED_LENGTH = 96;
 export const MAX_ORIGIN_BYTES = 255;
 
@@ -72,7 +70,6 @@ class Writer {
     this.at += length;
   }
 
-  /** A u16 length, then the UTF-8 bytes. */
   text(s: string, field: string): void {
     const b = utf8.encode(s);
     this.u16(b.length, field);
@@ -162,7 +159,6 @@ const blockBody = (body: Uint8Array, what: string): Reader => {
   return r;
 };
 
-// ---- header meta ---------------------------------------------------------------------------
 
 export interface Meta {
   blockSize: BlockSize;
@@ -207,25 +203,21 @@ export const decodeMeta = (bytes: Uint8Array): Meta => {
   return { blockSize, keyId, storeId };
 };
 
-// ---- root body -----------------------------------------------------------------------------
 
 export type RootState = 'ready' | 'populating' | 'rotating';
 const STATES: readonly RootState[] = ['ready', 'populating', 'rotating'];
 
 export interface RootBody {
   gen: number;
-  /** Attempted record encryptions under the current DEK. Telemetry. */
+  /** Attempted encryptions under the current DEK; telemetry. */
   encryptions: number;
   state: RootState;
   /** At most 255 UTF-8 bytes. */
   origin: string;
-  /** File-table entries of kind "file" (regular files, directories and symlinks). */
   fileCount: number;
-  /** Data-block ids in the file table. */
   dataBlocks: number;
   tableDigest: Bytes;
   manifest: Bytes;
-  /** The file-table block ids, in list order. */
   tableIds: Bytes[];
 }
 
@@ -276,7 +268,6 @@ export const decodeRoot = (body: Uint8Array): RootBody => {
   return { gen, encryptions, state, origin, fileCount, dataBlocks, tableDigest, manifest, tableIds };
 };
 
-// ---- table-block body ----------------------------------------------------------------------
 
 export type FileType = 'file' | 'directory' | 'symlink';
 const TYPES: readonly FileType[] = ['file', 'directory', 'symlink'];
@@ -284,20 +275,17 @@ const TYPES: readonly FileType[] = ['file', 'directory', 'symlink'];
 const KIND_FILE = 0x01;
 const KIND_RUN = 0x02;
 
-/** The inode of a regular file, a directory or a symlink. */
 export interface FileEntry {
   kind: 'file';
   fileId: Bytes;
   type: FileType;
   mode: number;
-  /** Bytes; the true size (blocks are padded). */
+  /** True size in bytes (blocks are padded). */
   size: number;
   path: string;
-  /** A symlink's target; empty for other types. */
   target: string;
 }
 
-/** Blocks `first … first + ids.length − 1` of a file live under `ids`. */
 export interface RunEntry {
   kind: 'run';
   fileId: Bytes;
@@ -351,7 +339,7 @@ export const decodeTable = (body: Uint8Array): TableEntry[] => {
       const first = r.u32();
       const n = r.u16();
       if (n === 0) throw r.corrupt('an empty run');
-      // A run longer than what is left is rejected before any of its ids is copied.
+      // Reject a too-long run before copying any id.
       r.need(16 * n);
       const ids: Bytes[] = [];
       for (let j = 0; j < n; j++) ids.push(r.take(16));

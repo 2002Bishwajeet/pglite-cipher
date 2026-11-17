@@ -1,6 +1,5 @@
-// The file map: the in-memory copy of the file table (FORMAT.md section 7), the table blocks it is
-// packed into, and the tag of every stored record. A sync plans against it as a Draft, which
-// changes nothing here; the draft is applied only once its commit is known to be in the store.
+// The in-memory file table (FORMAT.md section 7), the table blocks it packs into, and every record's tag. A sync plans
+// against it as a Draft, applied only once its commit is known to be in the store.
 import { concat, toHex, type Bytes } from '../format/bytes.ts';
 import {
   encodeTable,
@@ -16,7 +15,6 @@ import { newBlockId } from '../format/records.ts';
 import { entrySize, maxRunIds, packEntries, type FileTable } from '../format/table.ts';
 import type { Snapshot, SnapshotInode } from '../tracker/tracker.ts';
 
-/** The `count` field of a table-block body. */
 const COUNT_LENGTH = 2;
 const RUN_ENTRY_FIXED = 23;
 
@@ -26,7 +24,6 @@ export const fromHex = (hex: string): Bytes => {
   return out;
 };
 
-/** Blocks `first … first + n − 1` of a file, listed in table block `block`. */
 export interface MapRun {
   first: number;
   n: number;
@@ -35,30 +32,25 @@ export interface MapRun {
 
 export interface MapFile {
   readonly fileId: Bytes;
-  /** `fileId` in hex. */
   readonly key: string;
   type: FileType;
   mode: number;
   size: number;
   path: string;
   target: string;
-  /** Data-block ids (hex), by index. */
   ids: string[];
-  /** The tag of the record stored under each id, by index; undefined only inside a draft. */
+  /** Tag of the record under each id, by index; undefined only inside a draft. */
   tags: Array<Bytes | undefined>;
-  /** The table block that holds the file entry. */
   home: string;
-  /** In order of `first`; together they cover `ids` exactly once. */
+  /** In `first` order; together they cover `ids` exactly once. */
   runs: MapRun[];
 }
 
 export interface TableBlock {
   readonly id: string;
-  /** File key → the number of that file's entries in this block. */
   readonly members: Map<string, number>;
-  /** Bytes of entries, the count field not included. */
   used: number;
-  /** The tag of its stored record; empty for a block not sealed yet. */
+  /** Empty for a block not sealed yet. */
   tag: Bytes;
 }
 
@@ -78,11 +70,8 @@ export class FileMap {
   readonly blockSize: BlockSize;
   readonly files = new Map<string, MapFile>();
   readonly blocks = new Map<string, TableBlock>();
-  /** Table-block ids in the root's list order. */
   order: string[] = [];
-  /** Every block id the store holds a record under: data blocks and table blocks. */
   readonly live = new Set<string>();
-  /** Every data-block id → its file key and index. */
   readonly places = new Map<string, { key: string; index: number }>();
   entryBytes = 0;
   dataBlocks = 0;
@@ -91,7 +80,6 @@ export class FileMap {
     this.blockSize = blockSize;
   }
 
-  /** The map of a loaded store: its table, and the entries and tag of each table block in list order. */
   static load(
     table: FileTable,
     blocks: ReadonlyArray<{ id: string; tag: Bytes; entries: TableEntry[] }>,
@@ -127,12 +115,11 @@ export class FileMap {
     return map;
   }
 
-  /** The share of table-block bytes that hold entries. */
   get fill(): number {
     return this.order.length === 0 ? 0 : this.entryBytes / (this.order.length * this.blockSize);
   }
 
-  /** Plans a snapshot. `repack` packs the whole table densely, as the first commit of a store does. */
+  /** `repack` packs the whole table densely, as a store's first commit does. */
   plan(snap: Snapshot, { repack = false }: { repack?: boolean } = {}): Draft {
     const draft = new Draft(this);
     for (const fileId of snap.deadFiles) draft.removeFile(toHex(fileId));
@@ -174,10 +161,7 @@ export class FileMap {
   }
 }
 
-/**
- * The map of a store to rotate into: the same files, and a fresh id for every block, none of them
- * an id of `map`. Its table is packed but not stored; the rotation's catch-up packs it again.
- */
+/** The map of a store to rotate into: same files, a fresh id for every block (none an id of `map`). Packed, not stored. */
 export function remap(map: FileMap): FileMap {
   const taken = new Set(map.live);
   const draw = (): string => {
@@ -202,7 +186,6 @@ export function remap(map: FileMap): FileMap {
   return FileMap.load({ files: new Map(files.map((f) => [toHex(f.fileId), f])), blocks: new Map() }, blocks, map.blockSize);
 }
 
-/** A block of a file to seal and put under `id`. */
 export interface BlockWrite {
   id: string;
   file: MapFile;
@@ -210,11 +193,7 @@ export interface BlockWrite {
   bytes: Uint8Array;
 }
 
-/**
- * The changes of one sync, over the map without changing it: new versions of the files and table
- * blocks it touches (null = removed), the new list order, the data blocks to write, the ids to
- * delete.
- */
+/** One sync's changes over the map, without changing it (null = removed). */
 export class Draft {
   readonly map: FileMap;
   readonly files = new Map<string, MapFile | null>();
@@ -260,18 +239,15 @@ export class Draft {
     return (this.blocks.get(id) ?? this.map.blocks.get(id)) as TableBlock;
   }
 
-  /** Every file as it will be. */
   *allFiles(): Generator<MapFile> {
     for (const [key, f] of this.map.files) if (!this.files.has(key)) yield f;
     for (const f of this.files.values()) if (f) yield f;
   }
 
-  /** The table blocks to seal and put: every block this draft created or changed. */
   tables(): TableBlock[] {
     return [...this.blocks.values()].filter((b): b is TableBlock => b !== null);
   }
 
-  /** The body of a table block: the entries its members hold there. */
   encode(block: TableBlock): Bytes {
     const entries: TableEntry[] = [];
     for (const key of block.members.keys()) {
@@ -345,7 +321,6 @@ export class Draft {
     this.#fitRuns(f, oldCount);
   }
 
-  /** Makes the runs of `f` cover its ids after its block count changed from `oldCount`. */
   #fitRuns(f: MapFile, oldCount: number): void {
     const count = f.ids.length;
     const { runs, key } = f;
@@ -378,7 +353,7 @@ export class Draft {
     }
     while (next < count) {
       const n = Math.min(count - next, this.#maxRun);
-      // A file's first run goes into the table block of its file entry when it fits.
+      // A file's first run goes into its entry's table block when it fits.
       const block = this.#findRoom(runSize(n), runs.length === 0 ? f.home : undefined);
       this.#add(block, key, runSize(n));
       runs.push({ first: next, n, block });
@@ -386,7 +361,6 @@ export class Draft {
     }
   }
 
-  /** Drops empty table blocks, repacks a table under half full, and checks the limits. */
   finish(repack: boolean): void {
     const emptied = [...this.blocks.values()].filter((b): b is TableBlock => b !== null && b.members.size === 0);
     for (const b of emptied) this.blocks.set(b.id, null);
@@ -402,7 +376,6 @@ export class Draft {
     }
   }
 
-  /** Replaces the whole table with `packEntries` of the files as they will be, under fresh ids. */
   #repack(): void {
     const files = [...this.allFiles()].map((f) => ({ ...f, ids: f.ids.map(fromHex) }));
     const packed = packEntries(files, this.map.blockSize);
@@ -431,7 +404,6 @@ export class Draft {
     this.repacked = true;
   }
 
-  /** The data-block tags of every regular file, for the manifest. */
   manifestFiles(): Array<{ fileId: Bytes; blockTags: Bytes }> {
     const out: Array<{ fileId: Bytes; blockTags: Bytes }> = [];
     for (const f of this.allFiles()) {
@@ -449,7 +421,6 @@ export class Draft {
     return this.#room - this.block(id).used;
   }
 
-  /** The block to write: the draft's own copy, made on first use. */
   #edit(id: string): TableBlock {
     let b = this.blocks.get(id);
     if (!b) {
@@ -481,7 +452,6 @@ export class Draft {
     this.entryBytes += delta;
   }
 
-  /** `prefer` when it has room, else the first table block in list order with room, else a new one. */
   #findRoom(size: number, prefer?: string): string {
     if (prefer !== undefined && this.#free(prefer) >= size) return prefer;
     for (const id of this.order) if (this.#free(id) >= size) return id;

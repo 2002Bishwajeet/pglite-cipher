@@ -7,7 +7,6 @@ export class BlockBitmap {
     return this.#empty;
   }
 
-  /** Adds the indexes `from … to - 1`. */
   add(from: number, to: number): void {
     if (from >= to) return;
     const need = ((to - 1) >>> 5) + 1;
@@ -27,7 +26,6 @@ export class BlockBitmap {
     this.#empty = false;
   }
 
-  /** The indexes below `limit`, ascending. */
   indexes(limit: number): number[] {
     const out: number[] = [];
     const words = this.#words;

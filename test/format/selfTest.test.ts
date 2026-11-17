@@ -1,5 +1,4 @@
-// The known-answer self-test passes on this engine, and fails loudly when WebCrypto computes
-// something else.
+// The known-answer self-test passes on this engine and fails loudly when WebCrypto computes something else.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CryptoSelfTestError } from '../../src/format/errors.ts';
 import { selfTest } from '../../src/format/selfTest.ts';
@@ -29,7 +28,7 @@ describe('selfTest', () => {
     });
     resetSelfTest();
     await rejection(selfTest(), CryptoSelfTestError);
-    // And keeps failing: no store is written after a failed self-test.
+    // No store is written after a failed self-test.
     await rejection(selfTest(), CryptoSelfTestError);
   });
 

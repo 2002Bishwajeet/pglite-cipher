@@ -63,7 +63,7 @@ describe('no recognisable bytes', () => {
     for (let i = 0; i < N; i++) {
       const { header } = await createHeader(kek, { blockSize, keyId: 1 });
       countBits(headers, header);
-      // A session's records share its salt (rule 4): a fresh session for each one.
+      // Records of a session share its salt (rule 4): one session each.
       countBits(roots, await sealRoot(contextFor(dek, meta), rootBody));
       countBits(tables, await sealTable(contextFor(dek, meta), blockId, tableBody));
       countBits(blocks, await sealBlock(contextFor(dek, meta), fileId, 0, blockBody));

@@ -1,6 +1,5 @@
-// Real engine: a note-taking workload on a PGlite whose MEMFS carries the tracker, with the model
-// store fed only by its snapshots. After every query batch the model must equal PGDATA. Then the
-// database is reopened from the model store alone, through loadState.
+// Real engine: a note-taking workload on PGlite with the tracker on MEMFS and a model store fed only by snapshots; after every query batch the model equals PGDATA,
+// then the database reopens from the model store alone through loadState.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live } from '@electric-sql/pglite/live';
@@ -11,7 +10,6 @@ import { ModelStore, checkModel, type TestFS } from './harness.ts';
 const PGDATA = '/pglite/data';
 const B = 8192;
 
-/** MemoryFS with the tracker on PGDATA; with `from`, PGDATA is first rebuilt from that model store. */
 class TrackedFS extends MemoryFS {
   tracker: Tracker | undefined;
   /** The module's FS, kept: `pg.Module` is gone after close. */
@@ -41,7 +39,6 @@ class TrackedFS extends MemoryFS {
     return Promise.resolve();
   }
 
-  /** Snapshot, apply to the model store, commit; then the model must equal PGDATA. */
   sync(model: ModelStore): void {
     const { tracker, emfs } = this;
     if (!tracker || !emfs) throw new Error('tracker not installed');
@@ -53,7 +50,6 @@ class TrackedFS extends MemoryFS {
   }
 }
 
-/** What an open does: every stored node written back under PGDATA. */
 function rebuild(fs: TestFS, model: ModelStore): void {
   fs.mkdirTree(PGDATA);
   fs.chmod(PGDATA, 0o700);

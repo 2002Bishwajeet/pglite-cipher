@@ -1,5 +1,4 @@
-// Runs the vitest browser projects. With no --project it runs chromium, firefox and webkit;
-// with --project it runs only those, so `npm run test:browser -- --project chromium` works.
+// Runs the vitest browser projects: chromium, firefox and webkit, or only the --project ones.
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);

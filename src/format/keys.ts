@@ -9,7 +9,7 @@ const WRAP_AAD = ascii('pglite-cipher/wrap');
 const HEADER_LABEL = ascii('pglite-cipher/header');
 const RECORD_INFO = ascii('pglite-cipher/v1/record');
 
-/** Encryptions under one session subkey before the writer draws a new salt. */
+/** Encryptions under one session subkey before a new salt is drawn. */
 export const SUBKEY_MAX_ENCRYPTIONS = 2 ** 24;
 let subkeyMaxEncryptions = SUBKEY_MAX_ENCRYPTIONS;
 
@@ -33,10 +33,7 @@ export const deriveRecordKey = (dek: CryptoKey, salt: Bytes): Promise<CryptoKey>
 
 const wrapParams = (wrapNonce: Bytes): AesGcmParams => ({ name: 'AES-GCM', iv: wrapNonce, additionalData: WRAP_AAD });
 
-/**
- * Imports 32 raw bytes as the KEK: AES-GCM, not extractable, usable only to wrap and unwrap.
- * Fills `raw` with zeros before it returns, also when it fails.
- */
+/** Imports 32 raw bytes as a non-extractable AES-GCM KEK (wrap/unwrap only); zeroes `raw` before returning, even on failure. */
 export const importKek = async (raw: Bytes): Promise<CryptoKey> => {
   try {
     if (raw.length !== 32) throw new RangeError('a KEK is 32 bytes');
@@ -46,7 +43,6 @@ export const importKek = async (raw: Bytes): Promise<CryptoKey> => {
   }
 };
 
-/** Header bytes 0–59 are given; draws `metaSalt` and `metaNonce` and seals the meta behind them. */
 const sealHeader = async (dek: CryptoKey, wrapNonce: Bytes, wrapped: Uint8Array, meta: Bytes): Promise<Bytes> => {
   const header = new Uint8Array(HEADER_LENGTH);
   header.set(wrapNonce, 0);
@@ -66,14 +62,12 @@ const sealHeader = async (dek: CryptoKey, wrapNonce: Bytes, wrapped: Uint8Array,
 };
 
 export interface CreatedHeader {
-  /** HKDF key, never extractable. */
   dek: CryptoKey;
   meta: Meta;
-  /** The 168 bytes both header copies hold. */
   header: Bytes;
 }
 
-/** A new store's DEK, `storeId` and header. The DEK's bytes are zeroed once imported. */
+/** A new store's DEK, `storeId` and header; the DEK bytes are zeroed once imported. */
 export const createHeader = async (
   kek: CryptoKey,
   { blockSize, keyId }: { blockSize: BlockSize; keyId: number },
@@ -99,11 +93,8 @@ const isOperationError = (e: unknown): boolean => (e as { name?: unknown } | nul
 
 type CopyResult = { opened: true; dek: CryptoKey; meta: Bytes } | { opened: false; unwrapped: boolean };
 
-/**
- * Unwraps a 168-byte copy into a non-extractable HKDF key and decrypts its meta. A GCM tag failure
- * is a copy that does not open; any other WebCrypto error (a KEK without `unwrapKey`, say) is
- * rethrown, so that it can never read as a wrong key.
- */
+// A GCM tag failure means the copy doesn't open; any other WebCrypto error (a KEK without `unwrapKey`, say) is
+// rethrown so it never reads as a wrong key.
 const openCopy = async (kek: CryptoKey, copy: Bytes): Promise<CopyResult> => {
   let dek: CryptoKey;
   try {
@@ -137,17 +128,13 @@ const openCopy = async (kek: CryptoKey, copy: Bytes): Promise<CopyResult> => {
 export interface OpenedHeader {
   dek: CryptoKey;
   meta: Meta;
-  /** The copy that opened. */
   header: Bytes;
   /** The other copy is missing or differs: the next write rewrites both. */
   headerRepairNeeded: boolean;
 }
 
-/**
- * Opens the store's header from its two copies (FORMAT.md section 4, "Two copies"). Throws
- * UnsupportedFormatError for a version or scheme it does not know, WrongKeyError when both copies
- * are present, identical and do not unwrap, and CorruptStoreError otherwise.
- */
+/** Opens the header from its two copies (FORMAT.md section 4). UnsupportedFormatError for an unknown version or scheme;
+ * WrongKeyError when both copies are identical and do not unwrap; CorruptStoreError otherwise. */
 export const openHeader = async (
   kek: CryptoKey,
   copy0: Bytes | undefined,
@@ -158,7 +145,7 @@ export const openHeader = async (
   let unwrapped = false;
   for (const [i, copy] of copies.entries()) {
     if (copy?.length !== HEADER_LENGTH) continue;
-    // An identical copy fails the same way: no need to try it.
+    // An identical copy fails the same way.
     if (i === 1 && same) break;
     const result = await openCopy(kek, copy);
     if (result.opened) {
@@ -172,11 +159,7 @@ export const openHeader = async (
   throw new WrongKeyError('the key opens neither header copy');
 };
 
-/**
- * The header re-sealed for a new KEK: the same DEK wrapped with a fresh nonce, the same meta sealed
- * with a fresh salt and nonce (its AAD holds the new wrap). The extractable temporary key is not
- * kept.
- */
+/** The header re-sealed for a new KEK: same DEK with a fresh wrap nonce, meta with a fresh salt and nonce (AAD holds the new wrap). */
 export const rewrapHeader = async (oldKek: CryptoKey, newKek: CryptoKey, header: Bytes): Promise<Bytes> => {
   if (header.length !== HEADER_LENGTH) throw new CorruptStoreError('header: wrong length');
   const result = await openCopy(oldKek, header);
@@ -201,11 +184,8 @@ export const rewrapHeader = async (oldKek: CryptoKey, newKek: CryptoKey, header:
   return sealHeader(result.dek, wrapNonce, new Uint8Array(wrapped), result.meta);
 };
 
-/**
- * Session subkeys (FORMAT.md section 5). `current()` is the writer's: each call is one encryption,
- * and at `SUBKEY_MAX_ENCRYPTIONS` it draws a new salt. `forSalt()` is the reader's: one
- * `deriveKey` per distinct salt, cached.
- */
+/** Session subkeys (FORMAT.md section 5). `current()` is the writer's: one encryption per call, a new salt at
+ * `SUBKEY_MAX_ENCRYPTIONS`. `forSalt()` is the reader's, cached per salt. */
 export class SubkeyCache {
   private readonly dek: CryptoKey;
   private readonly keys = new Map<string, Promise<CryptoKey>>();
@@ -216,7 +196,6 @@ export class SubkeyCache {
     this.dek = dek;
   }
 
-  /** Distinct subkeys derived so far. */
   get size(): number {
     return this.keys.size;
   }

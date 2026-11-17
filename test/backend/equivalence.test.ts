@@ -1,5 +1,4 @@
-// Property: the same random sequence of batches leaves MemoryBackend and IndexedDbBackend with the
-// same contents, and each batch succeeds or fails the same way on both.
+// Property: random batch sequences leave MemoryBackend and IndexedDbBackend identical, each batch succeeding or failing alike.
 import fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
 import type { CommitBatch, RecordKey, StorageBackend } from '../../src/backend/backend.ts';

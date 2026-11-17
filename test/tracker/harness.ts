@@ -1,5 +1,4 @@
-// Shared by the tracker tests: a real Emscripten FS from PGlite, a trivially correct model store,
-// and the check that the model holds exactly what MEMFS holds.
+// Shared by the tracker tests: PGlite's Emscripten FS, a trivially correct model store, and the check that the model holds what MEMFS holds.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';
 import type { EmscriptenFS, MemFS, MemNode, Snapshot, SnapshotInode, StoredFile } from '../../src/tracker/tracker.ts';
 
@@ -50,7 +49,6 @@ export async function startPGlite(): Promise<{ pg: PGlite; mod: TestModule }> {
   return { pg, mod: pg.Module as unknown as TestModule };
 }
 
-/** Keeps the unwrapped MEMFS operations; the returned function puts them back. */
 export function saveOps(memfs: MemFS): () => void {
   const holders = [memfs.node_ops, memfs.stream_ops, ...Object.values(memfs.ops_table ?? {}).flatMap((g) => [g.node, g.stream])];
   const saved = holders.map((h) => ({ ...h }));
@@ -74,7 +72,6 @@ export function rmTree(fs: TestFS, path: string): void {
   }
 }
 
-/** Every node under `root` by path relative to it, parents first. */
 export function listTree(fs: TestFS, root: string): Map<string, { mode: number; size: number }> {
   const out = new Map<string, { mode: number; size: number }>();
   const visit = (dir: string, prefix: string) => {
@@ -96,7 +93,7 @@ export interface ModelFile {
   blocks: Map<number, Uint8Array>;
 }
 
-/** The store as a map from file id to its inode and blocks. Strict: it refuses what a real store could not apply. */
+/** The store as file id → inode and blocks; strict: refuses what a real store could not apply. */
 export class ModelStore {
   readonly files = new Map<string, ModelFile>();
   readonly blockSize: number;
@@ -149,7 +146,6 @@ export class ModelStore {
   }
 }
 
-/** Throws unless reconstructing every node under `root` from the model equals MEMFS. */
 export function checkModel(fs: TestFS, root: string, model: ModelStore): void {
   const B = model.blockSize;
   const actual = listTree(fs, root);
@@ -190,7 +186,6 @@ export function checkModel(fs: TestFS, root: string, model: ModelStore): void {
   }
 }
 
-/** Deterministic bytes, never all zero. */
 export function bytesFrom(seed: number, length: number): Uint8Array {
   const out = new Uint8Array(length);
   let x = (seed | 0) ^ 0x9e3779b9 || 1;

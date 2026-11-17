@@ -1,6 +1,4 @@
-// Every kind of tampering with the stored records is detected at open: modified, swapped, moved,
-// deleted, added and replayed records, and a deleted file. A replayed or damaged file table is
-// detected before anything is built from it.
+// Every tampering with stored records is detected at open: modified, swapped, moved, deleted, added, replayed records and a deleted file.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { RecordKey } from '../../src/backend/backend.ts';

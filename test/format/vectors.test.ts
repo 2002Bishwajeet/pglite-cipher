@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
-// The committed vectors are the regression lock: every engine must rebuild them byte for byte,
-// and the package must read them back.
+// The committed vectors are the regression lock: every engine rebuilds them byte for byte.
 import { describe, expect, it } from 'vitest';
 import { decodeRoot, decodeTable } from '../../src/format/codec.ts';
 import { importKek, openHeader } from '../../src/format/keys.ts';
@@ -31,7 +30,7 @@ describe('known-answer vectors', () => {
 
     const rootSealed = fromHex(vectors.root.sealed);
     const root = decodeRoot(await openRoot(ctx, rootSealed));
-    // toEqual ignores the undefined fields: the root body holds neither the stored bytes nor the nonce.
+    // toEqual ignores undefined fields: the root body holds neither the stored bytes nor the nonce.
     expect({
       ...root,
       tableDigest: hex(root.tableDigest),

@@ -1,5 +1,4 @@
-// Bench only: layout (c) of bench/opfsread.ts. Reads the segment files with a
-// FileSystemSyncAccessHandle in 1 MiB chunks and transfers every chunk back to the page.
+// Bench only: layout (c) of opfsread.ts, reading segments via FileSystemSyncAccessHandle.
 interface Req {
   dirs: string[];
   names: string[];

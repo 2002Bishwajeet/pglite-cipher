@@ -4,17 +4,14 @@ import { ROOT } from './backend.ts';
 
 export interface FaultPlan {
   /**
-   * Which commit fails (1 = the first call), and how:
-   * - `before`: rejects and writes nothing;
-   * - `after`: the inner commit applies, then this rejects (the page died after the write);
-   * - `hang`: never settles and writes nothing (a killed process: drop the instance, reopen the store).
+   * Which commit fails (1 = the first), and how: `before` rejects and writes nothing; `after` applies, then rejects;
+   * `hang` never settles and writes nothing (a killed process).
    */
   commit?: { n: number; mode: 'before' | 'after' | 'hang' };
   /** Which `get(2)` call rejects (1 = the first). */
   rootRead?: number;
 }
 
-/** The error an injected fault rejects with. */
 export class InjectedFault extends Error {
   override name = 'InjectedFault';
 }
@@ -27,7 +24,6 @@ const copy = (batch: CommitBatch): CommitBatch => ({
 });
 
 export class FaultyBackend implements StorageBackend {
-  /** Every batch the inner backend applied, in order, copied when it was committed. */
   readonly committed: CommitBatch[] = [];
   readonly #inner: StorageBackend;
   readonly #plan: FaultPlan;
@@ -39,7 +35,7 @@ export class FaultyBackend implements StorageBackend {
     this.#plan = plan;
   }
 
-  /** Commits the first `k` recorded batches into `target`: the state as of a crash after commit `k`. */
+  /** The state as of a crash after commit `k`. */
   async replayInto(target: StorageBackend, k: number): Promise<void> {
     for (const batch of this.committed.slice(0, k)) await target.commit(batch);
   }

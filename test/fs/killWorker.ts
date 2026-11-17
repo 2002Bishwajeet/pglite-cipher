@@ -1,8 +1,5 @@
-// The worker for worker.test.ts: opens the store in IndexedDB, reports what it holds, then inserts
-// rows one strict transaction at a time, recording each before it starts and once it is durable,
-// until it is terminated. The record is a write to a side IndexedDB database that completes before
-// the worker goes on, not a message: terminate() can discard messages the page has not yet
-// received, which would make the page's count of started rows lag the rows that exist.
+// Worker for worker.test.ts: inserts rows one strict transaction at a time until terminated, recording each before it starts and once durable.
+// The record is an IndexedDB write that completes first, not a message: terminate() can discard messages, so the page's started count would lag.
 import { PGlite } from '@electric-sql/pglite';
 import { IndexedDbBackend } from '../../src/backend/indexeddb.ts';
 import { EncryptedFs } from '../../src/encryptedFs.ts';

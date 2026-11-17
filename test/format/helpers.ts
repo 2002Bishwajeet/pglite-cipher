@@ -1,4 +1,3 @@
-// Shared helpers for the format tests.
 import { expect } from 'vitest';
 import { toHex, type Bytes } from '../../src/format/bytes.ts';
 import type { BlockSize } from '../../src/format/codec.ts';
@@ -27,7 +26,6 @@ export const seeded = (seed: number, length: number): Bytes => {
   return out;
 };
 
-/** `n` bytes counting up from `start`. */
 export const run = (n: number, start: number): Bytes => Uint8Array.from({ length: n }, (_, i) => (start + i) & 0xff);
 
 export const newKek = (): Promise<CryptoKey> => importKek(random(32));
@@ -50,7 +48,6 @@ export const flipBit = (bytes: Bytes, bit: number): Bytes => {
   return out;
 };
 
-/** Makes the next draws of the random source return exactly these values, in order. */
 export const injectRandom = (draws: Bytes[]): void => {
   const queue = [...draws];
   setRandomSource((n) => {
@@ -64,7 +61,6 @@ export const restoreRandom = (): void => {
   setRandomSource(null);
 };
 
-/** Awaits a promise that must reject with `type`, and returns the error. */
 export const rejection = async (promise: Promise<unknown>, type: abstract new (...args: never[]) => Error): Promise<Error> => {
   const error = await promise.then(
     () => null,

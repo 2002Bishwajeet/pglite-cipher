@@ -1,6 +1,5 @@
-// The PGlite filesystem that encrypts below Postgres. The data directory lives in MEMFS while the
-// database runs; the tracker knows which blocks changed; each sync seals them, with the file-table
-// blocks and a new root, into one atomic commit of the packed block space (FORMAT.md).
+// The PGlite filesystem that encrypts below Postgres: MEMFS while running, sealed blocks plus a new
+// root committed atomically on each sync (FORMAT.md).
 import { MemoryFS, type PGlite } from '@electric-sql/pglite';
 import { rootMatches, type CommitBatch, type RecordKey, type Slot, type StorageBackend } from './backend/backend.ts';
 import { concat, equalBytes, toHex, type Bytes } from './format/bytes.ts';
@@ -34,11 +33,9 @@ import { installTracker, type EmscriptenFS, type MemFS, type MemNode, type Snaps
 import { checkBlocks, verifyStore, type VerifyOptions, type VerifyResult } from './verify.ts';
 
 const PGDATA = '/pglite/data';
-/** The key id of a new store's first data key. */
 const FIRST_KEY_ID = 1;
-/** Loads begun while another writer keeps committing, before the open gives up. */
+// Load retries while another writer keeps committing.
 const LOAD_ATTEMPTS = 3;
-/** The names a rotation records for the two slots of a pair (`<name>.a`, `<name>.b`). */
 const SLOT_NAMES = ['a', 'b'] as const;
 
 export type OpenMode = 'open' | 'create' | 'open-or-create';
@@ -50,37 +47,30 @@ export interface OpenProgress {
 }
 
 export interface EncryptedFsOptions {
-  /**
-   * The store: one backend, or a pair (`IndexedDbBackend.pair(name)`). A data-key rotation writes the
-   * new store into the empty one of a pair, so an open finds the current store by itself.
-   */
+  /** The store: one backend, or a pair (`IndexedDbBackend.pair(name)`); a rotation writes into the pair's empty slot. */
   backend: StorageBackend | readonly [StorageBackend, StorageBackend];
-  /** The KEK: a non-extractable AES-GCM key with `wrapKey` and `unwrapKey` usages (see `importKek`). */
+  /** The KEK: non-extractable AES-GCM with `wrapKey`/`unwrapKey` (see `importKek`). */
   key: CryptoKey;
   mode: OpenMode;
   /** Used only when a store is created. */
   blockSize?: BlockSize;
-  /** Load progress, for a splash screen. */
   onProgress?: (progress: OpenProgress) => void;
-  /** Called once when this instance stops syncing because another writer committed a newer store. */
+  /** Called once when another writer's newer store stops this instance syncing. */
   onFatal?: (error: Error) => void;
-  /**
-   * One backend only: opens the store an interrupted rotation was writing, by the name its
-   * `backendFactory` gave, so that the open can finish or undo the rotation. Without it, such a store
-   * gives IncompleteStoreError with `rotation: true`.
-   */
+  /** One backend only: opens the store an interrupted rotation was writing (by its `backendFactory` name), so the
+   * open can finish or undo it; otherwise IncompleteStoreError with `rotation: true`. */
   openOrigin?: (name: string) => StorageBackend;
 }
 
 export interface RotateProgress {
-  /** `copy`: every block, from memory; `catch-up`: what changed meanwhile, then the file table; `verify`: the new store read back. */
+  /** `copy`: all blocks; `catch-up`: changes since, then the file table; `verify`: read-back. */
   phase: 'copy' | 'catch-up' | 'verify';
   done: number;
   total: number;
 }
 
 export interface RotateOptions {
-  /** One backend only (a pair rotates into its empty slot): an empty backend for the new store, and the name `openOrigin` opens it by. */
+  /** One backend only: an empty backend for the new store, and the name `openOrigin` opens it by. */
   backendFactory?: () => { name: string; backend: StorageBackend };
   onProgress?: (progress: RotateProgress) => void;
 }
@@ -103,13 +93,11 @@ export interface EncryptedFsStats {
   dataBlocks: number;
   table: { blocks: number; fill: number };
   trackingGaps: number;
-  /** null until the first sync. */
   lastSync: SyncStats | null;
   /** null for a store this instance created. */
   lastOpen: { tableMs: number; blocksMs: number } | null;
 }
 
-/** The parts of Emscripten's FS this filesystem calls. */
 interface ModuleFS extends EmscriptenFS {
   filesystems: { MEMFS: MemFS };
   analyzePath(path: string): { exists: boolean };
@@ -125,18 +113,16 @@ interface ModuleFS extends EmscriptenFS {
   rmdir(path: string): void;
 }
 
-/** The parts of the Emscripten module the close-time wipe reaches (`mod` in a `preRun` hook). */
 interface ModuleMemory {
   HEAPU8?: Uint8Array;
   wasmMemory?: WebAssembly.Memory;
 }
 
-/** Overwrites the plaintext of a snapshot's blocks (copies this filesystem owns) once it is committed or requeued. */
+// Zeroes snapshot plaintext once committed or requeued.
 function wipeSnapshot(snap: Snapshot): void {
   for (const block of snap.blocks) block.bytes.fill(0);
 }
 
-/** A sealed sync, ready to commit. */
 interface Prepared {
   draft: Draft;
   root: Bytes;
@@ -152,16 +138,12 @@ const now = () => performance.now();
 const isEmpty = (s: Snapshot) =>
   s.blocks.length === 0 && s.inodes.length === 0 && s.deleteRanges.length === 0 && s.deadFiles.length === 0;
 
-/** Removes a store: every record, and the storage itself where the backend can (an IndexedDB database). */
 async function deleteStore(backend: StorageBackend): Promise<void> {
   await backend.clear();
   await backend.destroy?.();
 }
 
-/**
- * Commits `batch`, which puts `value` in `slot`. A rejection other than a stale writer is settled by
- * reading the slot back: `value` there means the batch applied; otherwise the rejection stands.
- */
+// Commits `batch`; a non-stale rejection is settled by reading `slot` back: `value` there means it applied.
 async function commitSettled(backend: StorageBackend, batch: CommitBatch, slot: Slot, value: Bytes): Promise<void> {
   try {
     await backend.commit(batch);
@@ -177,10 +159,7 @@ async function commitSettled(backend: StorageBackend, batch: CommitBatch, slot: 
   }
 }
 
-/**
- * Which key opens the header `backend` holds, read back after a header commit that rejected: 'new'
- * when `newKek` does, 'old' when only `oldKek` does, 'unknown' when the read fails or neither does.
- */
+// After a rejected header commit: 'new' if newKek opens it, 'old' if only oldKek does, else 'unknown'.
 async function headerKey(backend: StorageBackend, oldKek: CryptoKey, newKek: CryptoKey): Promise<'new' | 'old' | 'unknown'> {
   const copies = await Promise.all([backend.get(0), backend.get(1)]).catch(() => null);
   if (copies === null) return 'unknown';
@@ -194,14 +173,13 @@ async function headerKey(backend: StorageBackend, oldKek: CryptoKey, newKek: Cry
   return (await opens(oldKek)) ? 'old' : 'unknown';
 }
 
-/** A store's header and root, opened. */
 interface OpenedRoot {
   ctx: RecordContext;
   root: RootBody;
   sealed: Bytes;
 }
 
-/** A store's header and root, opened; null for a store without a root or without a header, which nothing opens. */
+// null for a store without a root or header.
 async function openRootOf(backend: StorageBackend, kek: CryptoKey): Promise<OpenedRoot | null> {
   const [copy0, copy1, sealed] = (await Promise.all([backend.get(0), backend.get(1), backend.get(2)])) as Array<Bytes | undefined>;
   if (sealed === undefined || (copy0 === undefined && copy1 === undefined)) return null;
@@ -212,7 +190,6 @@ async function openRootOf(backend: StorageBackend, kek: CryptoKey): Promise<Open
   return { ctx, root, sealed };
 }
 
-/** The root body for the map as `draft` leaves it. The root's own encryption is the next one. */
 async function rootBody(draft: Draft, ctx: RecordContext, fields: Pick<RootBody, 'gen' | 'state' | 'origin'>): Promise<RootBody> {
   const encryptions = ctx.encryptions + 1;
   const tableDigest = await computeTableDigest(draft.order.map((id) => draft.block(id).tag));
@@ -228,7 +205,7 @@ async function rootBody(draft: Draft, ctx: RecordContext, fields: Pick<RootBody,
   };
 }
 
-/** Block `index` of a MEMFS file as it is now, zero-padded; zeros for a file no longer there. */
+// Zeros for a file no longer there.
 function blockOf(node: MemNode | undefined, index: number, blockSize: number): Bytes {
   const bytes = new Uint8Array(blockSize);
   const contents = node?.contents as Uint8Array | null | undefined;
@@ -236,12 +213,8 @@ function blockOf(node: MemNode | undefined, index: number, blockSize: number): B
   return bytes;
 }
 
-/**
- * Seals `items` and commits them strict, at most PAGE records per commit, so that one batch of
- * ciphertext is held at a time. `deletes` go with the first commit. The store being written has no
- * root yet, and each commit requires that: once another instance switched to a store in that slot,
- * the commit gets StaleWriterError instead of adding records to it.
- */
+// Seals and commits `items` strict, at most PAGE records per commit; `deletes` go with the first. The store has no
+// root yet and each commit requires that, so a store another instance switched to gives StaleWriterError.
 async function putInBatches<T>(
   backend: StorageBackend,
   items: readonly T[],
@@ -260,7 +233,6 @@ async function putInBatches<T>(
   }
 }
 
-/** Removes everything under `dir`. */
 function clearDir(FS: ModuleFS, dir: string): void {
   for (const name of FS.readdir(dir)) {
     if (name === '.' || name === '..') continue;
@@ -273,9 +245,7 @@ function clearDir(FS: ModuleFS, dir: string): void {
 }
 
 export class EncryptedFs extends MemoryFS {
-  /** One backend, or the two of a pair. */
   readonly #slots: StorageBackend[];
-  /** The backend that holds the store. */
   #backend: StorageBackend;
   #key: CryptoKey;
   readonly #mode: OpenMode;
@@ -289,28 +259,25 @@ export class EncryptedFs extends MemoryFS {
   #tracker: Tracker | null = null;
   #ctx: RecordContext | null = null;
   #map: FileMap | null = null;
-  /** The header both copies must hold. */
   #header: Bytes | null = null;
   #headerRepair = false;
-  /** The stored root as this instance last read or wrote it; null while the store does not exist. */
+  /** null while the store does not exist. */
   #lastRoot: Bytes | null = null;
   #gen = 0;
   #origin = '';
 
-  /** Syncs are enabled once the open succeeded. */
   #ready = false;
   /** Set when another writer committed: syncs stay disabled. */
   #fatal: Error | null = null;
-  /** A commit whose outcome is unknown: its plan and snapshot, kept until a read of the root settles it. */
+  /** Unsettled commit: plan and snapshot, kept until a root read settles it. */
   #unsettled: { prepared: Prepared; snap: Snapshot; durability: Durability } | null = null;
   #drain: Promise<void> | null = null;
   #requested = false;
   #strict = false;
-  /** A commit applied since the last strict one: a strict request still owes a strict commit. */
+  /** A relaxed commit since the last strict one: a strict request still owes one. */
   #owesStrict = false;
-  /** The sync running now, if any. */
   #syncing: Promise<void> | null = null;
-  /** Set while a key change, rotation or verify runs: syncs wait for it. */
+  /** A key change, rotation or verify runs: syncs wait. */
   #hold: Promise<void> | null = null;
 
   #lastSync: SyncStats | null = null;
@@ -332,8 +299,7 @@ export class EncryptedFs extends MemoryFS {
   override async init(pg: PGlite, emscriptenOptions: Parameters<MemoryFS['init']>[1]): ReturnType<MemoryFS['init']> {
     await selfTest();
     const { emscriptenOpts } = await super.init(pg, emscriptenOptions);
-    // The tracker needs the block size, which an existing store keeps in its header: it is
-    // installed by initialSyncFs.
+    // The tracker needs the header's block size: installed by initialSyncFs.
     const keepFs = (mod: { FS: unknown }) => {
       this.#FS = mod.FS as ModuleFS;
       this.#mod = mod as ModuleMemory;
@@ -341,14 +307,13 @@ export class EncryptedFs extends MemoryFS {
     return { emscriptenOpts: { ...emscriptenOpts, preRun: [...(emscriptenOpts.preRun ?? []), keepFs] } };
   }
 
-  // ---- open --------------------------------------------------------------------------------
 
   override async initialSyncFs(): Promise<void> {
     const FS = this.#FS;
     if (!FS) throw new Error('EncryptedFs: initialSyncFs before init');
     try {
       this.#backend = await this.#open(FS);
-      // One backend, resumed into the store of its origin: that is the backend now.
+      // Resumed into the origin store: that is now the backend.
       if (this.#slots.length === 1) this.#slots[0] = this.#backend;
     } catch (error) {
       if (FS.analyzePath(PGDATA).exists) clearDir(FS, PGDATA);
@@ -357,7 +322,7 @@ export class EncryptedFs extends MemoryFS {
     this.#ready = true;
   }
 
-  /** Finds the store among the slots, finishes or undoes a rotation a crash interrupted, and loads it. */
+  // Also finishes or undoes a rotation a crash interrupted.
   async #open(FS: ModuleFS): Promise<StorageBackend> {
     const slots = this.#slots;
     const used: StorageBackend[] = [];
@@ -369,8 +334,7 @@ export class EncryptedFs extends MemoryFS {
       return slots[0] as StorageBackend;
     }
     if (other === undefined) {
-      // A root marked "rotating": a rotation from this store was interrupted. Anything else, and
-      // anything that does not open here, is for the load to report.
+      // A root marked "rotating" is an interrupted rotation; anything else is for the load to report.
       const opened = this.#mode === 'create' ? null : await openRootOf(store, this.#key).catch(() => null);
       const mark = opened?.root.state === 'rotating' ? opened : null;
       const next = mark === null ? undefined : slots.length === 2 ? slots[slots.indexOf(store) ^ 1] : this.#openOrigin?.(mark.root.origin);
@@ -380,8 +344,7 @@ export class EncryptedFs extends MemoryFS {
       }
       return this.#resume(FS, store, next, mark);
     }
-    // Two stores: a rotation from the one marked "rotating" into the other. Without a mark, a store
-    // with no root or no header is what an undone rotation left, and is deleted.
+    // A rotation from the store marked "rotating"; unmarked, a store with no root or header is an undone rotation's leftover.
     if (this.#mode === 'create') throw new StoreExistsError('a store exists');
     const opened = await Promise.all(used.map((backend) => openRootOf(backend, this.#key)));
     const marked = opened.map((o) => o?.root.state === 'rotating');
@@ -399,17 +362,11 @@ export class EncryptedFs extends MemoryFS {
     throw new CorruptStoreError('the two stores of the pair are not a rotation');
   }
 
-  /**
-   * Resumes a rotation from `from`, whose root is `mark`, into `to`. A new store that loads (so its
-   * root is ready and every record checks) is the store, and the old one is deleted. Otherwise the
-   * old one is set back to ready and loaded, and the new store is deleted. An open cannot tell a
-   * crashed rotation from one that still runs, so before either store is deleted the old root moves
-   * off the mark, in a commit guarded by it, as the rotation's own step 8 does: only one of them
-   * wins, and the others get StaleWriterError and delete nothing.
-   */
+  // Resumes a rotation from `from` (root `mark`) into `to`: a new store that loads wins and the old is deleted; else the
+  // old is set back to ready and the new deleted. An open can't tell a crash from a live rotation, so the old root first
+  // moves off the mark in a commit guarded by it (as step 8): one wins, the rest get StaleWriterError and delete nothing.
   async #resume(FS: ModuleFS, from: StorageBackend, to: StorageBackend, mark: OpenedRoot): Promise<StorageBackend> {
     const { ctx, root, sealed } = mark;
-    // A pair keeps both backends; one backend keeps only the store it ends on.
     const drop = async (backend: StorageBackend) => {
       await deleteStore(backend);
       if (this.#slots.length === 1) await backend.close();
@@ -430,7 +387,7 @@ export class EncryptedFs extends MemoryFS {
       }
     }
     if (loaded) {
-      // Still "rotating" until it is deleted, so that a crash in between finishes the rotation again.
+      // Stays "rotating" until deleted, so a crash in between finishes the rotation again.
       await move('rotating', root.origin);
       await drop(from);
       return to;
@@ -441,7 +398,6 @@ export class EncryptedFs extends MemoryFS {
     return from;
   }
 
-  /** A new store, in memory only: the first sync writes it, header copies and all. */
   async #create(FS: ModuleFS): Promise<void> {
     const blockSize = this.#createBlockSize;
     const { dek, meta, header } = await createHeader(this.#key, { blockSize, keyId: FIRST_KEY_ID });
@@ -451,10 +407,7 @@ export class EncryptedFs extends MemoryFS {
     this.#tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
   }
 
-  /**
-   * Slots, table and blocks are separate backend reads, so a writer that commits during a load makes
-   * a healthy store look corrupt. A root that moved meanwhile says so, and the load starts over.
-   */
+  // Slots, table and blocks are separate reads, so a writer committing mid-load looks like corruption; a moved root restarts the load.
   async #load(FS: ModuleFS, backend: StorageBackend): Promise<void> {
     for (let attempt = 1; ; attempt++) {
       const slots = await Promise.all([backend.get(0), backend.get(1), backend.get(2)]);
@@ -469,11 +422,10 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /** Loads the store the slots name. The tracker is installed only once the load is complete. */
+  // The tracker is installed only once the load is complete.
   async #loadFrom(FS: ModuleFS, backend: StorageBackend, slots: Array<Uint8Array | undefined>): Promise<void> {
     const [copy0, copy1, sealedRoot] = slots;
 
-    // 1. Header and root.
     if (copy0 === undefined && copy1 === undefined) throw new IncompleteStoreError('the store has records but no header');
     let opened;
     try {
@@ -490,7 +442,7 @@ export class EncryptedFs extends MemoryFS {
     if (this.#mode === 'create') throw new StoreExistsError('a store exists');
     const { blockSize } = ctx.meta;
 
-    // 2. File table. Nothing is built before its digest matches the root.
+    // Nothing is built before the table digest matches the root.
     const t0 = now();
     const tableIds = root.tableIds.map(toHex);
     const blocks: Array<{ id: string; tag: Bytes; entries: TableEntry[] }> = [];
@@ -519,7 +471,6 @@ export class EncryptedFs extends MemoryFS {
     );
     const tableMs = now() - t0;
 
-    // The tree, every file at its final size.
     if (!FS.analyzePath(PGDATA).exists) FS.mkdirTree(PGDATA);
     FS.chmod(PGDATA, 0o700);
     const depth = (f: MapFile) => f.path.split('/').length;
@@ -542,8 +493,7 @@ export class EncryptedFs extends MemoryFS {
       FS.chmod(path, f.mode & 0o7777);
     }
 
-    // 3. Blocks, in the order of their random ids. The next page is read while this one decrypts,
-    // so a load holds at most two pages of ciphertext.
+    // The next page is read while this one decrypts: at most two pages of ciphertext held.
     const t1 = now();
     const tableSet = new Set(tableIds);
     const total = tableIds.length + root.dataBlocks;
@@ -593,19 +543,13 @@ export class EncryptedFs extends MemoryFS {
     this.#origin = root.origin;
   }
 
-  // ---- sync --------------------------------------------------------------------------------
 
-  /** Whether anything is owed to the store. Hosts use it for a flush on hide or when idle. */
   hasDirty(): boolean {
     return this.#unsettled !== null || this.#headerRepair || (this.#tracker?.hasDirty() ?? false);
   }
 
-  /**
-   * Commits everything dirty. Calls are serialised: one made during a sync waits for it and then
-   * for one more, and every caller's promise settles once everything dirty at its call is in the
-   * store. With `relaxedDurability` true (PGlite does not await those) a failure does not reject:
-   * the changes stay dirty and the next sync retries them.
-   */
+  /** Commits everything dirty; concurrent calls are serialised. With `relaxedDurability` a failure does not reject:
+   * changes stay dirty for the next sync. */
   override syncToFs(relaxedDurability?: boolean): Promise<void> {
     if (!this.#ready) return Promise.reject(new Error('EncryptedFs: the store is not open'));
     this.#requested = true;
@@ -614,11 +558,8 @@ export class EncryptedFs extends MemoryFS {
     return relaxedDurability === true ? this.#drain.catch(() => undefined) : this.#drain;
   }
 
-  /**
-   * Runs syncs while one is requested. `#drain` is cleared in the same step that leaves the loop,
-   * so a call after that step starts a new run instead of getting this finished one back. The
-   * loop always awaits first, so `syncToFs` has assigned `#drain` before it is cleared.
-   */
+  // `#drain` is cleared in the step that leaves the loop, so a later call starts a new run; the loop awaits first so
+  // `syncToFs` has assigned it.
   async #runAll(): Promise<void> {
     let failure: { error: unknown } | null = null;
     try {
@@ -686,11 +627,7 @@ export class EncryptedFs extends MemoryFS {
     this.#apply(prepared, snap, durability);
   }
 
-  /**
-   * A strict sync. When it had nothing to commit but a commit since the last strict one was not
-   * strict (a relaxed sync it joined, say), it puts the root again, unchanged, in a strict commit:
-   * that makes the store durable up to it.
-   */
+  // Strict sync. With nothing to commit but a non-strict commit since the last strict one, re-puts the unchanged root strictly.
   async #syncStrict(): Promise<void> {
     await this.#syncOnce('strict');
     if (!this.#owesStrict) return;
@@ -704,7 +641,6 @@ export class EncryptedFs extends MemoryFS {
     this.#owesStrict = false;
   }
 
-  /** Plans the snapshot against the file map and seals every record it writes. */
   async #prepare(snap: Snapshot): Promise<Prepared> {
     const ctx = this.#ctx as RecordContext;
     const t0 = now();
@@ -742,11 +678,8 @@ export class EncryptedFs extends MemoryFS {
     return { draft, root, puts, deletes: draft.deletes, stats };
   }
 
-  /**
-   * After a commit whose outcome is unknown, decides by the stored root: this plan's root means it
-   * applied (true); the previous root means nothing was written (false, the snapshot is owed
-   * again); anything else is another writer.
-   */
+  // After an unknown-outcome commit the stored root decides: this plan's root = applied (true); the previous = not
+  // written (false, snapshot owed again); anything else is another writer.
   #settled(prepared: Prepared, snap: Snapshot, stored: Bytes | undefined, durability: Durability): boolean {
     if (stored !== undefined && equalBytes(stored, prepared.root)) {
       this.#apply(prepared, snap, durability);
@@ -763,7 +696,6 @@ export class EncryptedFs extends MemoryFS {
     throw error;
   }
 
-  /** Settles an unsettled commit before anything else is planned. */
   async #settle(): Promise<void> {
     const { prepared, snap, durability } = this.#unsettled as { prepared: Prepared; snap: Snapshot; durability: Durability };
     const stored = await this.#backend.get(2);
@@ -794,12 +726,8 @@ export class EncryptedFs extends MemoryFS {
     this.#onFatal?.(error);
   }
 
-  // ---- keys and verify ---------------------------------------------------------------------
 
-  /**
-   * Runs a key operation on the open, idle store: it waits for the running sync and settles an
-   * unsettled one, and syncs wait for it.
-   */
+  // Runs a key operation on the open, idle store; syncs wait for it.
   async #exclusive<T>(run: () => Promise<T>): Promise<T> {
     while (this.#hold) await this.#hold;
     if (!this.#ready) throw new Error('EncryptedFs: the store is not open');
@@ -818,12 +746,8 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /**
-   * The other slot of a pair holds a store only when a rotation or an open could not delete the one
-   * it left: a root marked "rotating", or none. That one is deleted once a read of this store's root
-   * shows it is still the one this instance wrote. A root that moved, or a ready root in the other
-   * slot, is another writer's: StaleWriterError, and nothing is deleted.
-   */
+  // The other slot holds a store only if a rotation or open couldn't delete it (root "rotating", or none). Deleted once this
+  // store's root reads back as the one we wrote; a moved root, or a ready root there, is another writer's: StaleWriterError.
   async #dropLeftover(): Promise<void> {
     const other = this.#slots.find((backend) => backend !== this.#backend);
     if (!other || (await other.isEmpty())) return;
@@ -838,21 +762,15 @@ export class EncryptedFs extends MemoryFS {
   }
 
   /**
-   * Wraps the same data key under `newKek` (a non-extractable AES-GCM key with `wrapKey` and
-   * `unwrapKey`). One commit puts the new header in both copies, so the store is never under two
-   * keys at once. Afterwards the old key does not open the store, but it still opens a copy of the
-   * old header, and with it any later copy of the store: after a suspected exposure, rotate the
-   * data key too (`rotateDataKey`).
-   *
-   * A commit that rejects is settled by reading the header back: when the new key opens it, the
-   * change is done; when the old key does, this rejects with the commit's error; when the read
-   * fails (or neither opens it), with KeyChangeUnknownError: either key may open the store.
+   * Wraps the same data key under `newKek`, one commit for both header copies. The old KEK no longer opens the store
+   * but still opens copies of the old header: after suspected exposure also call `rotateDataKey`. A rejected commit is
+   * settled by reading the header back; if neither key opens it, KeyChangeUnknownError.
    */
   changeKey(newKek: CryptoKey): Promise<void> {
     return this.#exclusive(async () => {
       await this.#dropLeftover();
       const header = await rewrapHeader(this.#key, newKek, this.#header as Bytes);
-      // A store not written yet gets its header with its first sync.
+      // Header goes with the first sync.
       if (this.#lastRoot !== null) {
         const batch: CommitBatch = { expectRoot: this.#lastRoot, puts: [[0, header], [1, header]], deletes: [], durability: 'strict' };
         try {
@@ -878,17 +796,14 @@ export class EncryptedFs extends MemoryFS {
     });
   }
 
-  /** Checks every record of the store (`verifyStore`), with syncs held back meanwhile. */
   verify(options: VerifyOptions = {}): Promise<VerifyResult> {
     return this.#exclusive(() => verifyStore(this.#backend, this.#key, options));
   }
 
   /**
-   * A new data key, and every record sealed again under it, in a fresh store that then replaces this
-   * one: the empty slot of a pair, or `backendFactory()`'s backend. The KEK stays: after a suspected
-   * exposure, call `changeKey` first. Queries keep running; syncs wait, and what they owe becomes
-   * durable when the rotation is done. A failure before the switch leaves the old store as it was,
-   * and nothing in memory is lost.
+   * Re-seals every record under a new data key in a fresh store (a pair's empty slot, or `backendFactory()`'s) that
+   * replaces this one. The KEK stays: after suspected exposure call `changeKey` first. Syncs wait; a failure before the
+   * switch leaves the old store intact.
    */
   rotateDataKey(options: RotateOptions = {}): Promise<void> {
     return this.#exclusive(() => this.#rotate(options));
@@ -915,17 +830,16 @@ export class EncryptedFs extends MemoryFS {
     let snap: Snapshot | null = null;
     let next: { ctx: RecordContext; map: FileMap; header: Bytes; root: Bytes; snap: Snapshot; retired: Bytes };
     try {
-      // 1. Flush. Syncs stay held back from here to the end; the tracker collects what queries change.
+      // 1. Flush; syncs held back from here to the end.
       await this.#syncOnce('strict');
       before = this.#lastRoot;
 
-      // 2. Mark the old store, with the new store's name inside its encrypted root.
+      // 2. Mark the old store, naming the new store inside its encrypted root.
       mark = await this.#sealRootAs(this.#gen + 1, 'rotating', name);
       await commitSettled(from, { expectRoot: before, puts: [[2, mark]], deletes: [], durability: 'strict' }, 2, mark);
 
-      // 3. The new store: a new data key under the same KEK and both header copies, then every block
-      // read from MEMFS under a fresh id. No root, so it reads as incomplete. The copy is fuzzy:
-      // queries may change blocks while it runs, and step 4 puts those again.
+      // 3. New store: new data key, both headers, every block under a fresh id. No root, so it reads as incomplete. The copy
+      // is fuzzy; step 4 re-puts blocks changed meanwhile.
       const old = this.#ctx as RecordContext;
       const { blockSize } = old.meta;
       const created = await createHeader(this.#key, { blockSize, keyId: old.meta.keyId + 1 });
@@ -952,8 +866,7 @@ export class EncryptedFs extends MemoryFS {
         (done) => onProgress?.({ phase: 'copy', done, total: copy.length }),
       );
 
-      // 4. Catch up: every block, inode and delete since step 1, through the new map. The data blocks
-      // now equal MEMFS as of the snapshot. Then the file table, once, packed densely.
+      // 4. Catch up every change since step 1, then the file table, packed densely.
       snap = tracker.snapshot();
       const draft = map.plan(snap, { repack: true });
       const tables = draft.tables();
@@ -982,8 +895,7 @@ export class EncryptedFs extends MemoryFS {
       );
       map.apply(draft);
 
-      // 5. Read it back: both header copies, and every record there, opening as the map says, and
-      // nothing else.
+      // 5. Read back: both headers and every record open as the map says, nothing else.
       const body = await rootBody(new Draft(map), ctx, { gen: this.#gen + 2, state: 'ready', origin: this.#origin });
       const check = await checkBlocks(to, ctx, body, 2, (p) => {
         if (p.phase === 'blocks') onProgress?.({ phase: 'verify', done: p.done, total: p.total });
@@ -993,9 +905,9 @@ export class EncryptedFs extends MemoryFS {
         throw new CorruptStoreError('the new store does not read back as it was written');
       }
 
-      // 6. The switch: the new store's root. Until it is in, the old store is the store.
+      // 6. Switch: the new store's root. Until it is in, the old store is the store.
       const root = await sealRoot(ctx, encodeRoot(body, blockSize));
-      // Step 8's old root, sealed while the old data key and map are the filesystem's.
+      // Step 8's old root, sealed while the old key and map are still current.
       const retired = await this.#sealRootAs(this.#gen + 2, 'rotating', name);
       await commitSettled(to, { expectRoot: null, puts: [[2, root]], deletes: [], durability: 'strict' }, 2, root);
       next = { ctx, map, header: created.header, root, snap, retired };
@@ -1009,7 +921,7 @@ export class EncryptedFs extends MemoryFS {
       throw error;
     }
 
-    // 7. The filesystem moves to the new store.
+    // 7. Move the filesystem to the new store.
     this.#backend = to;
     if (single) this.#slots[0] = to;
     this.#ctx = next.ctx;
@@ -1021,13 +933,11 @@ export class EncryptedFs extends MemoryFS {
     tracker.commit(next.snap);
     wipeSnapshot(next.snap);
 
-    // 8. Retire the old store, then delete it. The retiring commit keeps the old root "rotating", so
-    // that a crash before the deletion finishes the rotation at the next open, and it is guarded by
-    // the mark: an instance that opened the pair since step 2 took this rotation for an interrupted
-    // one and finished or undid it, or this one retires the old store, never both. On
-    // StaleWriterError the old store is not touched, the new one is deleted if the other instance
-    // kept the old one, and this instance stops. Should anything else fail, the old store stays
-    // marked, and the next open of the pair, or its next rotation or key change, deletes it.
+    // 8. Retire, then delete the old store. The retiring commit keeps the old root "rotating" (a crash before deletion is
+    // finished by the next open) and is guarded by the mark, so this rotation or an open that took it for interrupted
+    // retires the old store, never both. On StaleWriterError the old store is untouched, the new is deleted if the other
+    // instance kept the old, and this instance stops. Any other failure leaves the old marked for the next open, rotation
+    // or key change to delete.
     try {
       const retired = next.retired;
       await commitSettled(from, { expectRoot: mark, puts: [[2, retired]], deletes: [], durability: 'strict' }, 2, retired);
@@ -1036,7 +946,7 @@ export class EncryptedFs extends MemoryFS {
       if (!(error instanceof StaleWriterError)) return;
       const kept = await openRootOf(from, this.#key).catch(() => null);
       if (kept !== null && kept.root.state !== 'rotating') {
-        // Guarded by this rotation's root, so that nothing written into the slot since is deleted.
+        // Guarded by this rotation's root: nothing written into the slot since is deleted.
         await to
           .commit({ expectRoot: next.root, puts: [], deletes: [0, 1, 2], durability: 'strict' })
           .then(() => deleteStore(to))
@@ -1049,22 +959,16 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /** The current map's root, sealed with another state or origin: to mark a rotation, to retire the old store, and to undo the mark. */
+  // The current root sealed with another state or origin (mark, retire, undo).
   async #sealRootAs(gen: number, state: RootState, origin: string): Promise<Bytes> {
     const ctx = this.#ctx as RecordContext;
     const body = await rootBody(new Draft(this.#map as FileMap), ctx, { gen, state, origin });
     return sealRoot(ctx, encodeRoot(body, ctx.meta.blockSize));
   }
 
-  /**
-   * A rotation failed before the switch. It writes into the new store only once its mark is in the
-   * old one, and an instance that moved the root off the mark owns both stores from then on. So the
-   * new store is deleted, and the old one set back to ready in a commit guarded by the mark, only
-   * while the old store still holds the mark. Without the mark, or with the old store's root as it
-   * was, nothing of this rotation is anywhere. Any other root is another writer's: nothing is
-   * deleted, and this instance stops. Should the undo fail, the old store stays marked, the next
-   * open resolves it, and this instance stops syncing.
-   */
+  // A rotation failed before the switch. The new store is deleted and the old set back to ready (commit guarded by the
+  // mark) only while the old store still holds the mark; any other root is another writer's: nothing deleted, this
+  // instance stops. If the undo fails the old stays marked for the next open and this instance stops syncing.
   async #undoRotation(from: StorageBackend, to: StorageBackend, before: Bytes | null, mark: Bytes | null, single: boolean): Promise<void> {
     try {
       if (mark === null) return;
@@ -1083,16 +987,11 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  // ---- close and stats ---------------------------------------------------------------------
 
   /**
-   * Waits for a running sync or key operation, commits what is dirty (strict), drops the module's
-   * FS, the tracker and the file map, then closes the backends. PGlite drops its module on close;
-   * through these, a host that keeps the closed instance kept the wasm memory and the data
-   * directory too. They go first, so a backend that fails to close keeps none of them.
-   * A failed close-time sync rejects with its error, but drops them all the same, with an
-   * unsettled commit and the PGlite instance: PGlite takes no second close, so nothing
-   * could retry it. PGlite then keeps its own module until the host drops the instance.
+   * Commits what is dirty (strict), then drops the module's FS, tracker and file map before closing the backends, so a
+   * host keeping the closed instance keeps no plaintext, even if a backend fails to close or the final sync rejects.
+   * PGlite takes no second close.
    */
   override async closeFs(): Promise<void> {
     try {
@@ -1114,11 +1013,8 @@ export class EncryptedFs extends MemoryFS {
     }
   }
 
-  /**
-   * Best effort: overwrites with zeros the contents of every tracked MEMFS file and the wasm
-   * memory, so plaintext does not linger after close. Copies the app made, engine-internal copies
-   * and swap are not covered. An error here never replaces the close error.
-   */
+  // Zeroes every tracked MEMFS file and the wasm memory. Best effort: app copies, engine-internal copies and swap are
+  // not covered; never replaces the close error.
   #wipe(): void {
     try {
       for (const { node } of this.#tracker?.files() ?? []) if (node.contents instanceof Uint8Array) node.contents.fill(0);

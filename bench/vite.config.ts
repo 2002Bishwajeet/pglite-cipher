@@ -1,5 +1,4 @@
-// Builds the benchmark page to bench/dist and serves it cross-origin isolated (PGlite and
-// measureUserAgentSpecificMemory want it).
+// Builds the bench page to bench/dist, cross-origin isolated (PGlite and measureUserAgentSpecificMemory need it).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 

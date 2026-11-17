@@ -1,5 +1,4 @@
-// The side record of how far a killed-worker run got (worker.test.ts, killWorker.ts): a small
-// IndexedDB database the worker writes before and after each row and the page reads after the kill.
+// Side record of a killed worker's progress: an IndexedDB database written before and after each row, read by the page after the kill.
 export const progressName = (name: string) => `${name}-progress`;
 
 export async function readProgress(name: string): Promise<{ started: number; acked: number }> {

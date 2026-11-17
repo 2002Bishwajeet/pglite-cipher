@@ -1,14 +1,11 @@
-// The behaviour every StorageBackend must have, as one vitest suite. A new backend passes it before
-// anything else uses it: `runBackendConformance('MyBackend', () => new MyBackend(...))`.
+// The behaviour every StorageBackend must have, as one vitest suite: `runBackendConformance(name, () => new MyBackend())`.
 import { afterEach, describe, expect, it } from 'vitest';
 import { StaleWriterError } from '../format/errors.ts';
 import type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from './backend.ts';
 
-/** A distinct, well-formed block id for each n < 2^32, in an order unrelated to n. */
 export const testBlockId = (n: number): BlockId =>
   (Math.imul(n, 0x9e3779b1) >>> 0).toString(16).padStart(8, '0').repeat(4);
 
-/** Bytes that say which record they were written for. */
 export const testValue = (n: number, length = 16): Uint8Array =>
   Uint8Array.from({ length }, (_, i) => (i < 4 ? n >>> (8 * i) : n) & 0xff);
 
@@ -19,7 +16,6 @@ const batch = (puts: Array<[RecordKey, Uint8Array]>, deletes: RecordKey[] = [], 
   ...extra,
 });
 
-/** Every block, by paging through readRange. */
 const allBlocks = async (backend: StorageBackend, page = 1000): Promise<Array<[BlockId, Uint8Array]>> => {
   const out: Array<[BlockId, Uint8Array]> = [];
   for (;;) {
@@ -69,7 +65,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
       );
       expect(await slots(b)).toEqual([testValue(100), testValue(101, 40), testValue(102, 3)]);
       expect(await b.getMany(ids)).toEqual(ids.map((_, i) => testValue(i, 64)));
-      // Overwrite.
       await b.commit(batch([[2, testValue(7)], [ids[0] as BlockId, testValue(8)]], [], { durability: 'strict' }));
       expect(await b.get(2)).toEqual(testValue(7));
       expect(await b.getMany([ids[0] as BlockId])).toEqual([testValue(8)]);
@@ -109,7 +104,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
 
     it('getMany returns values in the order asked, undefined for a missing id (2,000 ids)', async () => {
       const b = await fresh();
-      // Store the even numbers below 2,000 and ask for 0..1,999 in a scrambled order.
       await b.commit(batch(Array.from({ length: 1000 }, (_, i): [BlockId, Uint8Array] => [testBlockId(2 * i), testValue(2 * i)])));
       const asked = Array.from({ length: 2000 }, (_, i) => (i * 7919) % 2000);
       const got = await b.getMany(asked.map(testBlockId));
@@ -131,16 +125,13 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
       const sorted = [...ids].sort();
       const value = (id: BlockId) => testValue(ids.indexOf(id));
       expect(await b.readRange(null, 100)).toEqual(sorted.map((id) => [id, value(id)]));
-      // Paging with a small limit gives the same sequence.
       for (const limit of [1, 7, 50]) {
         const pages = await allBlocks(b, limit);
         expect(pages.map(([id]) => id)).toEqual(sorted);
       }
-      // After every stored id: exactly the ids above it.
       for (const [i, after] of sorted.entries()) {
         expect((await b.readRange(after, 3)).map(([id]) => id)).toEqual(sorted.slice(i + 1, i + 4));
       }
-      // After an id that is not stored: the ids above it.
       const absent = testBlockId(10_000);
       expect((await b.readRange(absent, 100)).map(([id]) => id)).toEqual(sorted.filter((id) => id > absent));
       expect(await b.readRange('ffffffffffffffffffffffffffffffff', 10)).toEqual([]);
@@ -155,7 +146,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
       expect(await slots(b)).toEqual([testValue(0), undefined, testValue(2)]);
       expect((await allBlocks(b)).map(([id]) => id)).toEqual(ids.filter((_, i) => i !== 3 && i !== 7).sort());
       expect(await b.count()).toBe(10);
-      // Deleting only absent keys, from an empty store as well.
       await b.commit(batch([], [1, testBlockId(500)]));
       const empty = await fresh();
       await empty.commit(batch([], [0, 1, 2, testBlockId(1)]));
@@ -191,7 +181,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
         ).rejects.toBeInstanceOf(StaleWriterError);
         expect({ slots: await slots(b), blocks: await allBlocks(b) }).toEqual(before);
       }
-      // The matching root passes.
       await b.commit(batch([[2, testValue(3)]], [], { expectRoot: root.slice() }));
       expect(await b.get(2)).toEqual(testValue(3));
     });
@@ -205,7 +194,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
       await b.commit(batch([], [2]));
       await b.commit(batch([[2, testValue(4)]], [], { expectRoot: null }));
       expect(await b.get(2)).toEqual(testValue(4));
-      // A root expected where none is stored.
       await b.commit(batch([], [2]));
       await expect(b.commit(batch([[1, testValue(5)]], [], { expectRoot: testValue(4) }))).rejects.toBeInstanceOf(StaleWriterError);
       expect(await b.get(1)).toBeUndefined();
@@ -227,7 +215,6 @@ export function runBackendConformance(name: string, makeBackend: () => StorageBa
         expect({ slots: await slots(b), blocks: await allBlocks(b) }).toEqual(before);
         expect(await b.count()).toBe(2);
       }
-      // An invalid key among the deletes is refused the same way.
       await expect(b.commit(batch([[0, testValue(9)]], [testBlockId(1), 'nope']))).rejects.toThrow();
       expect({ slots: await slots(b), blocks: await allBlocks(b) }).toEqual(before);
     });

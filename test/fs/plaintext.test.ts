@@ -1,5 +1,4 @@
-// What the stored bytes show: equal-size blocks under random ids, and no plain text, no path and no
-// byte that names the format.
+// Stored bytes show equal-size blocks under random ids, and no plain text, path or byte naming the format.
 import { describe, expect, it } from 'vitest';
 import type { RecordKey, StorageBackend } from '../../src/backend/backend.ts';
 import { IndexedDbBackend } from '../../src/backend/indexeddb.ts';
@@ -15,7 +14,7 @@ const utf16 = (s: string, littleEndian: boolean) => {
   return out;
 };
 
-/** The first needle found in any value or key, or null. Needles are at least 5 bytes long. */
+/** The first needle found in any value or key, or null; needles are at least 5 bytes. */
 function findAny(recs: Map<RecordKey, Uint8Array>, needles: Uint8Array[]): string | null {
   const prefix = (b: Uint8Array, i: number) => (((b[i] ?? 0) << 24) | ((b[i + 1] ?? 0) << 16) | ((b[i + 2] ?? 0) << 8) | (b[i + 3] ?? 0)) >>> 0;
   const byPrefix = new Map<number, Uint8Array[]>();
@@ -39,7 +38,6 @@ function findAny(recs: Map<RecordKey, Uint8Array>, needles: Uint8Array[]): strin
   return null;
 }
 
-/** Each kind of store: a function that makes a fresh one, and its IndexedDB name if it has one. */
 const stores: Array<[string, () => { connect: () => StorageBackend; idb: string | null }]> = [
   ['MemoryBackend', () => {
     const memory = new MemoryBackend();
@@ -60,15 +58,13 @@ describe('no plaintext', () => {
       const { pg } = await openStore({ backend: connect(), key });
       await pg.exec(`CREATE TABLE t_${marker} (id int PRIMARY KEY, c_${marker} text);`);
       await pg.exec(`INSERT INTO t_${marker} SELECT i, '${marker} ' || i FROM generate_series(1, 50) i;`);
-      // Every path under PGDATA, absolute and relative; relative ones of 4 bytes or less (`base`)
-      // would match random bytes by chance, and their absolute forms are searched for instead.
+      // Paths under PGDATA, absolute and relative; relative ones of 4 bytes or less match random bytes, so only their absolute forms are searched.
       const paths = [...listTree(fsOf(pg)).keys()];
       await pg.close();
 
       const texts = [marker, 'pglite', 'cipher', 'PGLCIPHR', 'PG_VERSION', ...paths.map((p) => `${PGDATA}/${p}`)];
       texts.push(...paths.filter((p) => utf8(p).length >= 5));
       const needles = texts.flatMap((t) => [utf8(t), utf16(t, true), utf16(t, false)]);
-      // The search finds what is there.
       expect(findAny(new Map([[2, utf16(`..${marker}..`, true)]]), needles)).not.toBeNull();
       expect(findAny(await records(connect()), needles)).toBeNull();
     }, 120_000);
@@ -119,7 +115,6 @@ describe('nothing but blocks', () => {
   }, 120_000);
 });
 
-/** The keys of an IndexedDB database, read with IndexedDB itself; it has one object store. */
 async function rawKeys(name: string): Promise<IDBValidKey[]> {
   const request = <T>(r: IDBRequest<T>) =>
     new Promise<T>((resolve, reject) => {

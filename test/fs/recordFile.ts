@@ -1,5 +1,4 @@
-// A whole store in one file, for test/fixtures: per record, u8 key length ‖ key (ASCII: "0", "1",
-// "2" or a 32-character hex id) ‖ u32 value length, big-endian ‖ value.
+// A whole store in one file for test/fixtures: per record u8 key length ‖ key (ASCII "0", "1", "2" or 32-hex id) ‖ u32 big-endian value length ‖ value.
 import type { RecordKey } from '../../src/backend/backend.ts';
 
 export function encodeRecords(recs: Map<RecordKey, Uint8Array>): Uint8Array {
