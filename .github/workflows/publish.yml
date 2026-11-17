@@ -1,20 +1,35 @@
 name: publish
 
-# A version tag (v0.1.0) publishes that version to npm. Auth is npm trusted publishing (OIDC):
-# no token exists anywhere, and npm attaches provenance on its own.
+# Run it from the Actions tab and pick patch, minor or major. It bumps the version, checks and
+# publishes to npm through trusted publishing (OIDC: no token, provenance is automatic), then
+# commits and tags the bump on main and makes a GitHub release. The npm trust entry names this
+# file and the `npm` environment, so keep both.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version bump'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
-permissions:
-  contents: read
-  id-token: write
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: npm
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,10 +38,27 @@ jobs:
           cache: npm
       # Trusted publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@^11.5.1
-      - name: tag matches package.json
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: Bump version
+        id: version
+        run: |
+          npm version ${{ inputs.version_type }} --no-git-tag-version
+          version=$(node -p "require('./package.json').version")
+          sed -i "s/^export const VERSION = '.*';$/export const VERSION = '$version';/" src/index.ts
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # Before the push: if this fails, nothing is committed or tagged and the run can be repeated.
       - run: npm publish --access public
+      - name: Commit, tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "release: v$VERSION"
+          git tag "v$VERSION"
+          git push origin HEAD:main "v$VERSION"
+          gh release create "v$VERSION" --generate-notes --title "v$VERSION"

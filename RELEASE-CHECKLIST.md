@@ -13,19 +13,12 @@ release issue, with a link where there is one.
 - [ ] **The frozen fixtures open**: `test/fs/reference.test.ts` (the v1 reference store) passes in
       Node, Chromium, Firefox and WebKit, and the CI compat jobs (a store written by WebKit opened by
       Chromium and Node, and the reverse) are green.
-- [ ] **Version** in `package.json` and `VERSION` in `src/index.ts` agree (a repo test checks it),
-      merged to `main`.
 - [ ] **`npm pack --dry-run`** lists only `dist`, `src`, the docs and the licence files.
-- [ ] **Once, before the first release:** the package must exist before a trusted publisher can be
-      set. `npm login`, then `npm stage publish` (it creates the package with a `0.0.0-stage`
-      placeholder; reject the staged version on npmjs.com). In the package settings, add the trusted
-      publisher: GitHub Actions, `2002Bishwajeet/pglite-cipher`, workflow `publish.yml`, environment
-      `npm`; then set "Require 2FA and disallow tokens".
-- [ ] **Publish:** tag that commit (`git tag v0.1.0 && git push origin v0.1.0`). The `publish`
-      workflow checks the tag matches the version, runs lint, typecheck and the Node tests, and
-      publishes through npm trusted publishing, with provenance. No token is involved.
-- [ ] **Check the release:** `npm view pglite-cipher` shows the version and its provenance, and a
-      GitHub release for the tag links the changes.
+- [ ] **Publish:** Actions → publish → Run workflow on `main`, and pick patch, minor or major. It
+      bumps `package.json` and `VERSION`, runs lint, typecheck and the Node tests, publishes to npm
+      through trusted publishing (with provenance, no token), then commits and tags the bump on
+      `main` and creates the GitHub release.
+- [ ] **Check the release:** `npm view pglite-cipher` shows the version and its provenance.
 - [ ] **The limits read once more**: the README's "What it does not protect", the SQLCipher
       table in `docs/design/comparison.md` and `SECURITY.md` still match what the code does, and the date in
       `SECURITY.md` is the release date.
