@@ -17,6 +17,7 @@ import {
   startPGlite,
   type Stream,
   type TestFS,
+  memfsOf,
   type TestModule,
 } from './harness.ts';
 
@@ -59,7 +60,7 @@ interface Env {
 function setup(B: number): Env {
   const root = `/tmp/reg-${String(++count)}`;
   fs.mkdir(root);
-  const memfs = fs.filesystems.MEMFS;
+  const memfs = memfsOf(mod);
   const restore = saveOps(memfs);
   const original = {
     write: memfs.stream_ops.write as Original['write'],

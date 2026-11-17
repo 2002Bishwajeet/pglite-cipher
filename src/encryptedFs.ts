@@ -101,7 +101,6 @@ export interface EncryptedFsStats {
 }
 
 interface ModuleFS extends EmscriptenFS {
-  filesystems: { MEMFS: MemFS };
   analyzePath(path: string): { exists: boolean };
   mkdirTree(path: string): void;
   mkdir(path: string, mode: number): void;
@@ -257,6 +256,7 @@ export class EncryptedFs extends MemoryFS {
   readonly #openOrigin: ((name: string) => StorageBackend) | undefined;
 
   #FS: ModuleFS | null = null;
+  #MEMFS: MemFS | null = null;
   #mod: ModuleMemory | null = null;
   #tracker: Tracker | null = null;
   #ctx: RecordContext | null = null;
@@ -302,13 +302,20 @@ export class EncryptedFs extends MemoryFS {
     await selfTest();
     const { emscriptenOpts } = await super.init(pg, emscriptenOptions);
     // The tracker needs the header's block size: installed by initialSyncFs.
-    const keepFs = (mod: { FS: unknown }) => {
+    // PGlite 0.5.15 dropped FS.filesystems; the module itself has exported MEMFS since 0.5.10.
+    const keepFs = (mod: { FS: unknown; MEMFS?: MemFS }) => {
       this.#FS = mod.FS as ModuleFS;
+      this.#MEMFS = (mod.FS as { filesystems?: { MEMFS?: MemFS } }).filesystems?.MEMFS ?? mod.MEMFS ?? null;
       this.#mod = mod as ModuleMemory;
     };
     return { emscriptenOpts: { ...emscriptenOpts, preRun: [...(emscriptenOpts.preRun ?? []), keepFs] } };
   }
 
+
+  #memfs(): MemFS {
+    if (!this.#MEMFS) throw new Error('EncryptedFs: this PGlite build exposes no MEMFS');
+    return this.#MEMFS;
+  }
 
   override async initialSyncFs(): Promise<void> {
     const FS = this.#FS;
@@ -406,7 +413,7 @@ export class EncryptedFs extends MemoryFS {
     this.#ctx = { subkeys: new SubkeyCache(dek), meta, encryptions: 0 };
     this.#header = header;
     this.#map = new FileMap(blockSize);
-    this.#tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
+    this.#tracker = installTracker(FS, this.#memfs(), PGDATA, blockSize);
   }
 
   // Slots, table and blocks are separate reads, so a writer committing mid-load looks like corruption; a moved root restarts the load.
@@ -530,7 +537,7 @@ export class EncryptedFs extends MemoryFS {
       [...map.files.values()].filter((f) => f.type === 'file').map((f) => ({ fileId: f.fileId, blockTags: concat(f.tags as Bytes[]) })),
     );
     if (!equalBytes(manifest, root.manifest)) throw new CorruptStoreError('the blocks differ from the manifest');
-    const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
+    const tracker = installTracker(FS, this.#memfs(), PGDATA, blockSize);
     tracker.loadState([...map.files.values()].map((f) => ({ path: f.path, fileId: f.fileId, blocks: f.ids.length })));
 
     this.#lastOpen = { tableMs, blocksMs: now() - t1 };
@@ -1005,6 +1012,7 @@ export class EncryptedFs extends MemoryFS {
       this.#wipe();
       this.#ready = false;
       this.#FS = null;
+      this.#MEMFS = null;
       this.#mod = null;
       this.#tracker = null;
       this.#map = null;

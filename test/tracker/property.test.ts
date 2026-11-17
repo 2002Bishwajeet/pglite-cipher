@@ -21,6 +21,7 @@ import {
   saveOps,
   startPGlite,
   type Stream,
+  memfsOf,
   type TestModule,
 } from './harness.ts';
 import { runs as longRuns, timeout } from '../long.ts';
@@ -82,7 +83,7 @@ function pick<T>(list: readonly T[], n: number): T | undefined {
 /** Runs one sequence; `failures` lets syncs fail (requeue instead of commit). */
 function run(B: number, ops: readonly Op[], failures: boolean): void {
   const fs = mod.FS;
-  const memfs = fs.filesystems.MEMFS;
+  const memfs = memfsOf(mod);
   const root = `/tmp/prop-${String(++runs)}`;
   fs.mkdir(root);
   const restore = saveOps(memfs);

@@ -7,7 +7,7 @@ import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { live } from '@electric-sql/pglite/live';
 import { describe, expect, it } from 'vitest';
 import { installTracker, type Tracker } from '../../src/tracker/tracker.ts';
-import { ModelStore, checkModel, type TestFS } from './harness.ts';
+import { ModelStore, checkModel, memfsOf, type TestFS, type TestModule } from './harness.ts';
 
 const PGDATA = '/pglite/data';
 const B = 8192;
@@ -28,7 +28,7 @@ class TrackedFS extends MemoryFS {
     const install = (mod: { FS: unknown }) => {
       const fs = mod.FS as TestFS;
       this.emfs = fs;
-      this.tracker = installTracker(fs, fs.filesystems.MEMFS, PGDATA, B);
+      this.tracker = installTracker(fs, memfsOf(mod as TestModule), PGDATA, B);
     };
     return { emscriptenOpts: { ...emscriptenOpts, preRun: [...(emscriptenOpts.preRun ?? []), install] } };
   }
