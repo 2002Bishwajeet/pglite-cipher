@@ -1,0 +1,64 @@
+// The errors the store reports. Messages name a record by its slot or block id, never a path, and
+// never hold plaintext or key material.
+
+/** The key opens neither header copy, and both copies are present and identical. */
+export class WrongKeyError extends Error {
+  override name = 'WrongKeyError';
+}
+
+/** A record failed its tag, a body failed to decode, or the file table is inconsistent. */
+export class CorruptStoreError extends Error {
+  override name = 'CorruptStoreError';
+}
+
+/**
+ * The store was never completely written: records without a header, a header without a root, or a
+ * root still `populating`. `rotation` is true when a data-key rotation was interrupted.
+ */
+export class IncompleteStoreError extends Error {
+  override name = 'IncompleteStoreError';
+  readonly rotation: boolean;
+
+  constructor(message: string, { rotation = false }: { rotation?: boolean } = {}) {
+    super(message);
+    this.rotation = rotation;
+  }
+}
+
+/** Mode `open`, and the backend holds no record at all. */
+export class StoreMissingError extends Error {
+  override name = 'StoreMissingError';
+}
+
+/** Mode `create`, and the backend already holds a store. */
+export class StoreExistsError extends Error {
+  override name = 'StoreExistsError';
+}
+
+/** Another writer committed since this one last read the root. */
+export class StaleWriterError extends Error {
+  override name = 'StaleWriterError';
+}
+
+/** The header opened, but names a version, cipher, KDF or subkey scheme this reader does not know. */
+export class UnsupportedFormatError extends Error {
+  override name = 'UnsupportedFormatError';
+}
+
+/** A write would pass the format's limit on table blocks or on ids in a run. */
+export class StoreFullError extends Error {
+  override name = 'StoreFullError';
+}
+
+/** WebCrypto on this platform computes something other than the known answer. */
+export class CryptoSelfTestError extends Error {
+  override name = 'CryptoSelfTestError';
+}
+
+/**
+ * A `changeKey` commit failed, and reading the header back did not tell whether it applied: either
+ * the old key or the new one opens the store.
+ */
+export class KeyChangeUnknownError extends Error {
+  override name = 'KeyChangeUnknownError';
+}

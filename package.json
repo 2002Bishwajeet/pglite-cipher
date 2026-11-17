@@ -1,0 +1,50 @@
+{
+  "name": "pglite-cipher",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run --project node",
+    "test:browser": "node scripts/test-browser.mjs",
+    "test:long": "CIPHER_LONG=1 vitest run --project node",
+    "bench:build": "vite build --config bench/vite.config.ts",
+    "bench:serve": "vite preview --config bench/vite.config.ts"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "^0.5.10"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@electric-sql/pglite-pgvector": "0.0.11",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@types/node": "^26.6.6",
+    "@vitest/browser": "^5.1.0",
+    "@vitest/browser-playwright": "^5.1.0",
+    "eslint": "^10.14.0",
+    "fake-indexeddb": "^6.2.8",
+    "fast-check": "^4.10.2",
+    "playwright": "1.65.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,739 @@
+diff --git a/bench/bench.ts b/bench/bench.ts
+index 3053a71..9eedcab 100644
+--- a/bench/bench.ts
++++ b/bench/bench.ts
+@@ -8,7 +8,8 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
+ import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
+ import { runOpfsRead } from './opfsread.ts';
+ import { judgeGates, judgeYear } from './judge.ts';
+-import { parseBlockSize, parsePack } from './params.ts';
++import { setOpenWorkers } from '../src/fs/openWorkers.ts';
++import { parseBlockSize, parsePack, parseWorkers } from './params.ts';
+ import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
+ 
+ // `&block=N` builds the encrypted store at that block size; read per part, so a bad value fails that part.
+@@ -26,6 +27,8 @@ const pack = (): number => {
+ const unpack = (): void => {
+   if (packed.pack !== undefined) packed.pack = 1;
+ };
++// `&workers=W` (the workers bench patch): every open of the page reads its blocks in W key ranges, each in a worker.
++setOpenWorkers(parseWorkers(new URLSearchParams(location.search).get('workers')));
+ const MB = 1024 * 1024;
+ 
+ const statusEl = document.getElementById('status');
+diff --git a/bench/measure.ts b/bench/measure.ts
+index 9186f90..55ee410 100644
+--- a/bench/measure.ts
++++ b/bench/measure.ts
+@@ -5,6 +5,7 @@ import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
+ import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
+ import { live } from '@electric-sql/pglite/live';
+ import { EncryptedFs, IndexedDbBackend, importKek, type BlockSize, type SyncStats } from '../src/index.ts';
++import { openWorkers, readInRanges } from '../src/fs/openWorkers.ts';
+ import { PAGE } from '../src/fs/pool.ts';
+ 
+ export type Json = Record<string, unknown>;
+@@ -144,6 +145,9 @@ class TimedFs extends EncryptedFs {
+     const d = decrypting.ms;
+     await super.initialSyncFs();
+     this.openSplit = { readMs: reading.ms - r, decryptMs: decrypting.ms - d };
++    // The workers bench patch: with W > 1 the reads and decrypts run in the workers; the slowest range's.
++    const split = this.stats().lastOpen?.split;
++    if (split) this.openSplit = { readMs: Math.max(...split.map((x) => x.readMs)), decryptMs: Math.max(...split.map((x) => x.decryptMs)) };
+   }
+   override async syncToFs(relaxed?: boolean): Promise<void> {
+     const dirty = this.hasDirty();
+@@ -535,6 +539,17 @@ async function readsOnly(name: string, blockSize: number): Promise<{ ms: number;
+     let records = 0;
+     let bytes = 0;
+     const t = now();
++    // The workers bench patch: with W > 1, W ranges read at once, each in its own worker, as the open reads.
++    // It posts no key, so it runs in workers on WebKit too, where the open itself falls back to W = 1.
++    const w = openWorkers();
++    const split = w > 1 ? await readInRanges(backend, w) : null;
++    if (split) {
++      for (const x of split) {
++        records += x.records;
++        bytes += x.bytes;
++      }
++      return { ms: now() - t, page: PAGE / w, records, bytes };
++    }
+     for (let next: Promise<Array<[string, Uint8Array]>> | null = backend.readRange(null, page); next; ) {
+       const got: Array<[string, Uint8Array]> = await next;
+       next = got.length < page ? null : backend.readRange((got[got.length - 1] as [string, Uint8Array])[0], page);
+diff --git a/bench/params.ts b/bench/params.ts
+index 825a6d9..d0c27a8 100644
+--- a/bench/params.ts
++++ b/bench/params.ts
+@@ -18,3 +18,11 @@ export function parsePack(raw: string | null): number {
+   if (!PACKS.includes(n)) throw new Error(`?pack=${raw} is not one of ${PACKS.join(', ')}`);
+   return n;
+ }
++
++/** `?workers=` (the workers bench patch): the open's W key ranges, each in a worker; absent or empty is 1. */
++export function parseWorkers(raw: string | null): 1 | 2 | 4 {
++  if (raw === null || raw === '') return 1;
++  const n = Number(raw);
++  if (n !== 1 && n !== 2 && n !== 4) throw new Error(`?workers=${raw} is not 1, 2 or 4`);
++  return n;
++}
+diff --git a/bench/run.mjs b/bench/run.mjs
+index a4cc0e1..994664f 100644
+--- a/bench/run.mjs
++++ b/bench/run.mjs
+@@ -1,6 +1,6 @@
+ // Runs the benchmark page headless in Playwright's browsers and saves what it reports to
+ // bench/results/<browser>.json (merged per part, so parts can run apart).
+-// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8]
++// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8] [--workers 2]
+ // --throttle N (Chromium only) slows the page's CPU N times through CDP and saves to <browser>-throttle<N>.json.
+ // --block N builds the gates' encrypted store with N-byte blocks and saves to <browser>-block<N>.json.
+ // --pack N stores N blocks per IndexedDB record (needs bench/patches/pack.patch) and saves to <browser>-pack<N>.json.
+@@ -20,6 +20,7 @@ const runs = Number(opt('runs', '20'));
+ const throttle = Number(opt('throttle', '1'));
+ const block = opt('block', '');
+ const pack = opt('pack', '');
++const workers = opt('workers', ''); // the workers bench patch: &workers=W, saved to <browser>-workers<W>.json
+ const browsers = args.length > 0 ? args : ['chromium', 'firefox', 'webkit'];
+ const config = fileURLToPath(new URL('./vite.config.ts', import.meta.url));
+ const results = new URL('./results/', import.meta.url);
+@@ -34,7 +35,7 @@ let failed = false;
+ try {
+   for (const name of browsers) {
+     const slow = throttle > 1 && name === 'chromium';
+-    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${pack ? `-pack${pack}` : ''}.json`, results);
++    const file = new URL(`${name}${slow ? `-throttle${String(throttle)}` : ''}${block ? `-block${block}` : ''}${pack ? `-pack${pack}` : ''}${workers ? `-workers${workers}` : ''}.json`, results);
+     const merged = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { browser: name, parts: {} };
+     // Without the flag Chromium buckets performance.memory (G3); headless has no measureUserAgentSpecificMemory.
+     const launchArgs = name === 'chromium' ? ['--enable-precise-memory-info'] : [];
+@@ -49,7 +50,7 @@ try {
+         page.on('pageerror', (e) => {
+           console.log(`[${name}] pageerror: ${e.message}`);
+         });
+-        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}${pack ? `&pack=${pack}` : ''}`);
++        await page.goto(`${base}?auto=1&parts=${part}&runs=${String(runs)}${block ? `&block=${block}` : ''}${pack ? `&pack=${pack}` : ''}${workers ? `&workers=${workers}` : ''}`);
+         await page.waitForFunction(() => window.__benchResult || window.__benchError, undefined, { timeout: PART_TIMEOUT, polling: 1000 });
+         const { result, error } = await page.evaluate(() => ({ result: window.__benchResult, error: window.__benchError }));
+         await page.close();
+diff --git a/src/backend/backend.ts b/src/backend/backend.ts
+index 5cbd1f7..0c607f8 100644
+--- a/src/backend/backend.ts
++++ b/src/backend/backend.ts
+@@ -26,8 +26,11 @@ export interface StorageBackend {
+   get(slot: Slot): Promise<Uint8Array | undefined>;
+   /** One read for many blocks; the result has the order of `ids`, with undefined for a missing one. */
+   getMany(ids: BlockId[]): Promise<Array<Uint8Array | undefined>>;
+-  /** Blocks only, never the slots. Ascending id order, at most `limit` per page; resume with `after`. */
+-  readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>>;
++  /**
++   * Blocks only, never the slots. Ascending id order, at most `limit` per page; resume with `after`.
++   * `before` (the workers bench patch): a backend may stop at ids from `before` on; the caller filters them anyway.
++   */
++  readRange(after: BlockId | null, limit: number, before?: BlockId | null): Promise<Array<[BlockId, Uint8Array]>>;
+   /** All or nothing. Deletes run before puts. Rejects with StaleWriterError when expectRoot does not match. */
+   commit(batch: CommitBatch): Promise<void>;
+   /** Removes every record. */
+diff --git a/src/backend/faulty.ts b/src/backend/faulty.ts
+index 813852f..54f42d0 100644
+--- a/src/backend/faulty.ts
++++ b/src/backend/faulty.ts
+@@ -74,8 +74,8 @@ export class FaultyBackend implements StorageBackend {
+     return this.#inner.getMany(ids);
+   }
+ 
+-  readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>> {
+-    return this.#inner.readRange(after, limit);
++  readRange(after: BlockId | null, limit: number, before: BlockId | null = null): Promise<Array<[BlockId, Uint8Array]>> {
++    return this.#inner.readRange(after, limit, before);
+   }
+ 
+   clear(): Promise<void> {
+diff --git a/src/backend/indexeddb.ts b/src/backend/indexeddb.ts
+index f9ec033..ce4a7d2 100644
+--- a/src/backend/indexeddb.ts
++++ b/src/backend/indexeddb.ts
+@@ -48,6 +48,11 @@ export class IndexedDbBackend implements StorageBackend {
+     return [new IndexedDbBackend(`${name}.a`), new IndexedDbBackend(`${name}.b`)];
+   }
+ 
++  /** The database name (the workers bench patch: an open worker opens its own connection to it). */
++  get name(): string {
++    return this.#name;
++  }
++
+   async isEmpty(): Promise<boolean> {
+     return (await this.count()) === 0;
+   }
+@@ -68,11 +73,11 @@ export class IndexedDbBackend implements StorageBackend {
+     return Promise.all(ids.map((id) => done(store.get(id) as IDBRequest<Uint8Array | undefined>)));
+   }
+ 
+-  async readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>> {
++  async readRange(after: BlockId | null, limit: number, before: BlockId | null = null): Promise<Array<[BlockId, Uint8Array]>> {
+     // getAll treats a count of 0 as "no limit".
+     if (limit < 1) return [];
+     const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
+-    const range = IDBKeyRange.lowerBound(after ?? '', after !== null);
++    const range = before === null ? IDBKeyRange.lowerBound(after ?? '', after !== null) : IDBKeyRange.bound(after ?? '', before, after !== null, true);
+     const [keys, values] = await Promise.all([
+       done(store.getAllKeys(range, limit) as IDBRequest<BlockId[]>),
+       done(store.getAll(range, limit) as IDBRequest<Uint8Array[]>),
+diff --git a/src/backend/memory.ts b/src/backend/memory.ts
+index f3d8e13..ac7e0c4 100644
+--- a/src/backend/memory.ts
++++ b/src/backend/memory.ts
+@@ -37,11 +37,12 @@ export class MemoryBackend implements StorageBackend {
+     return this.#run(() => ids.map((id) => this.#blocks.get(id)?.slice()));
+   }
+ 
+-  readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>> {
++  readRange(after: BlockId | null, limit: number, before: BlockId | null = null): Promise<Array<[BlockId, Uint8Array]>> {
+     return this.#run(() => {
+       const start = after === null ? 0 : this.#firstAbove(after);
+       return this.#ids
+         .slice(start, start + Math.max(0, limit))
++        .filter((id) => before === null || id < before)
+         .map((id): [BlockId, Uint8Array] => [id, (this.#blocks.get(id) as Uint8Array).slice()]);
+     });
+   }
+diff --git a/src/encryptedFs.ts b/src/encryptedFs.ts
+index 032e866..f9736d9 100644
+--- a/src/encryptedFs.ts
++++ b/src/encryptedFs.ts
+@@ -29,6 +29,7 @@ import { openBlock, openRoot, openTable, sealBlock, sealRoot, sealTable, tagOf,
+ import { selfTest } from './format/selfTest.ts';
+ import { assembleFiles } from './format/table.ts';
+ import { Draft, FileMap, fromHex, remap, type MapFile } from './fs/fileMap.ts';
++import { loadInRanges, openWorkers, type RangeStats } from './fs/openWorkers.ts';
+ import { PAGE, pool } from './fs/pool.ts';
+ import { installTracker, type EmscriptenFS, type MemFS, type MemNode, type Snapshot, type Tracker } from './tracker/tracker.ts';
+ import { checkBlocks, verifyStore, type VerifyOptions, type VerifyResult } from './verify.ts';
+@@ -106,7 +107,8 @@ export interface EncryptedFsStats {
+   /** null until the first sync. */
+   lastSync: SyncStats | null;
+   /** null for a store this instance created. */
+-  lastOpen: { tableMs: number; blocksMs: number } | null;
++  /** `split` (the workers bench patch): each range's reads and decrypts, with W > 1. */
++  lastOpen: { tableMs: number; blocksMs: number; split?: RangeStats[] } | null;
+ }
+ 
+ /** The parts of Emscripten's FS this filesystem calls. */
+@@ -314,7 +316,7 @@ export class EncryptedFs extends MemoryFS {
+   #hold: Promise<void> | null = null;
+ 
+   #lastSync: SyncStats | null = null;
+-  #lastOpen: { tableMs: number; blocksMs: number } | null = null;
++  #lastOpen: { tableMs: number; blocksMs: number; split?: RangeStats[] } | null = null;
+ 
+   constructor(options: EncryptedFsOptions) {
+     super();
+@@ -554,7 +556,25 @@ export class EncryptedFs extends MemoryFS {
+       next.catch(() => undefined); // awaited below; not unhandled if this page's decrypt throws first
+       return next;
+     };
+-    for (let next: Promise<Array<[string, Uint8Array]>> | null = readPage(null); next; ) {
++    // The workers bench patch: with W > 1 the blocks are read and decrypted in W key ranges, each in its own
++    // worker, and placed here as they arrive; the loop below then reads nothing.
++    const split =
++      openWorkers() === 1
++        ? undefined
++        : await loadInRanges(backend, ctx, map, tableIds, openWorkers(), (opened, records) => {
++            for (const { id, plain, tag } of opened) {
++              const place = map.places.get(id) as { key: string; index: number };
++              const file = map.files.get(place.key) as MapFile;
++              const start = place.index * blockSize;
++              (buffers.get(file.key) as Uint8Array).set(plain.subarray(0, Math.min(blockSize, file.size - start)), start);
++              plain.fill(0);
++              file.tags[place.index] = tag;
++              read++;
++            }
++            done += records;
++            this.#onProgress?.({ phase: 'blocks', done, total });
++          });
++    for (let next: Promise<Array<[string, Uint8Array]>> | null = split ? null : readPage(null); next; ) {
+       const page: Array<[string, Uint8Array]> = await next;
+       if (page.length === 0) break;
+       next = page.length < PAGE ? null : readPage((page[page.length - 1] as [string, Uint8Array])[0]);
+@@ -581,7 +601,7 @@ export class EncryptedFs extends MemoryFS {
+     const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
+     tracker.loadState([...map.files.values()].map((f) => ({ path: f.path, fileId: f.fileId, blocks: f.ids.length })));
+ 
+-    this.#lastOpen = { tableMs, blocksMs: now() - t1 };
++    this.#lastOpen = { tableMs, blocksMs: now() - t1, ...(split ? { split } : {}) };
+     ctx.encryptions = root.encryptions;
+     this.#ctx = ctx;
+     this.#map = map;
+diff --git a/src/format/keys.ts b/src/format/keys.ts
+index 2899d58..0eb5f41 100644
+--- a/src/format/keys.ts
++++ b/src/format/keys.ts
+@@ -216,6 +216,11 @@ export class SubkeyCache {
+     this.dek = dek;
+   }
+ 
++  /** The DEK itself, non-extractable (the workers bench patch: posted to the open workers by structured clone). */
++  get baseKey(): CryptoKey {
++    return this.dek;
++  }
++
+   /** Distinct subkeys derived so far. */
+   get size(): number {
+     return this.keys.size;
+diff --git a/src/fs/openWorker.ts b/src/fs/openWorker.ts
+new file mode 100644
+index 0000000..2729598
+--- /dev/null
++++ b/src/fs/openWorker.ts
+@@ -0,0 +1,35 @@
++// The workers bench patch: one range of the open in a dedicated worker (openWorkers.ts). It opens its own
++// IndexedDB connection, reads its range with readRange, decrypts with the DEK it was posted (a
++// non-extractable CryptoKey, cloned, never exported), and transfers the plaintext blocks back.
++import { IndexedDbBackend } from '../backend/indexeddb.ts';
++import { CorruptStoreError } from '../format/errors.ts';
++import { loadRange, opener, workerContext, type FromOpenWorker, type Opened, type ToOpenWorker } from './openWorkers.ts';
++
++const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
++const post = (message: FromOpenWorker, transfer: Transferable[] = []) => {
++  scope.postMessage(message, transfer);
++};
++
++// The request did not clone here (a CryptoKey this engine cannot receive, say): say so, never hang.
++scope.addEventListener('messageerror', () => {
++  post({ type: 'error', corrupt: false, message: 'the request did not clone' });
++});
++
++scope.addEventListener('message', (event: MessageEvent<ToOpenWorker>) => {
++  const { name, range, pageSize, open } = event.data;
++  const backend = new IndexedDbBackend(name);
++  const decrypt = open && opener(workerContext(open.dek, open.meta), open.places, new Set(open.table));
++  const deliver = (opened: Opened[], records: number) => {
++    post({ type: 'page', opened, records }, opened.map((o) => o.plain.buffer));
++  };
++  loadRange((after, limit, before) => backend.readRange(after, limit, before), range, pageSize, decrypt, deliver)
++    .then((stats) => {
++      post({ type: 'done', stats });
++    })
++    .catch((error: unknown) => {
++      // Block ids and error names only: nothing of a key or a plaintext.
++      const corrupt = error instanceof CorruptStoreError;
++      post({ type: 'error', corrupt, message: corrupt ? error.message : error instanceof Error ? error.name : 'unknown' });
++    })
++    .finally(() => void backend.close());
++});
+diff --git a/src/fs/openWorkers.ts b/src/fs/openWorkers.ts
+new file mode 100644
+index 0000000..9d3751f
+--- /dev/null
++++ b/src/fs/openWorkers.ts
+@@ -0,0 +1,235 @@
++// The workers bench patch (bench/patches/workers.patch, never committed to src/): the open's blocks phase
++// split into W key ranges, each read and decrypted by its own dedicated worker. Chromium unwraps
++// every IndexedDB value over 64 KiB on the thread that calls getAll, so one thread cannot overlap
++// reads and decrypts; W workers run W unwrap pipelines at once.
++//
++// A range reads pages of PAGE / W records with the next page in flight while one decrypts, so the
++// W ranges together hold at most what one reader held before: two pages of PAGE records.
++// Where there is no Worker, or the backend is not IndexedDB, the ranges run on this thread. Where the
++// DEK does not clone to a worker (WebKit: DataCloneError for any CryptoKey), the open falls back to
++// the single-thread loader of src/; the key is never exported.
++import type { BlockId, StorageBackend } from '../backend/backend.ts';
++import { IndexedDbBackend } from '../backend/indexeddb.ts';
++import type { Bytes } from '../format/bytes.ts';
++import type { Meta } from '../format/codec.ts';
++import { CorruptStoreError } from '../format/errors.ts';
++import { SubkeyCache } from '../format/keys.ts';
++import { openBlock, tagOf, type RecordContext } from '../format/records.ts';
++import type { FileMap, MapFile } from './fileMap.ts';
++import { fromHex } from './fileMap.ts';
++import { PAGE, pool } from './pool.ts';
++
++let workers = 1;
++
++/** W, the open's ranges: 1 is the loader of src/ as it is. */
++export const openWorkers = (): number => workers;
++
++/** Sets W for the opens that follow (the bench page's `?workers=`, the tests' CIPHER_OPEN_WORKERS). */
++export function setOpenWorkers(w: number): void {
++  if (w !== 1 && w !== 2 && w !== 4) throw new RangeError('open workers must be 1, 2 or 4');
++  workers = w;
++}
++
++/** Ids `after < id < before`; null is open-ended. */
++export interface KeyRange {
++  after: BlockId | null;
++  before: BlockId | null;
++}
++
++/** W ranges split on the first hex digit of the random ids, so each holds about 1/W of the blocks. */
++export const keyRanges = (w: number): KeyRange[] => {
++  const cuts = Array.from({ length: w - 1 }, (_, i) => (((i + 1) * 16) / w).toString(16));
++  return Array.from({ length: w }, (_, i) => ({ after: cuts[i - 1] ?? null, before: cuts[i] ?? null }));
++};
++
++export interface Opened {
++  id: BlockId;
++  plain: Uint8Array<ArrayBuffer>;
++  tag: Bytes;
++}
++
++/** One range: wall time with a read in flight, with a decrypt in flight, and what it read. */
++export interface RangeStats {
++  readMs: number;
++  decryptMs: number;
++  records: number;
++  bytes: number;
++}
++
++const now = (): number => globalThis.performance.now();
++
++/** Wall time with at least one call in flight; overlapping calls count once. */
++class Busy {
++  #inFlight = 0;
++  #since = 0;
++  ms = 0;
++  async time<T>(call: () => Promise<T>): Promise<T> {
++    if (this.#inFlight++ === 0) this.#since = now();
++    try {
++      return await call();
++    } finally {
++      if (--this.#inFlight === 0) this.ms += now() - this.#since;
++    }
++  }
++}
++
++type Read = (after: BlockId | null, limit: number, before: BlockId | null) => Promise<Array<[BlockId, Uint8Array]>>;
++type Open = (id: BlockId, sealed: Bytes) => Promise<Opened | null>;
++type Deliver = (opened: Opened[], records: number) => void;
++
++/** Opens a block as the loader does; null for a table block. Data block places are `[fileId, index]`. */
++export const opener =
++  (ctx: RecordContext, places: ReadonlyMap<BlockId, readonly [Bytes, number]>, table: ReadonlySet<BlockId>): Open =>
++  async (id, sealed) => {
++    if (table.has(id)) return null;
++    const place = places.get(id);
++    if (!place) throw new CorruptStoreError(`block ${id}: not in the file table`);
++    const plain = await openBlock(ctx, fromHex(id), place[0], place[1], sealed);
++    return { id, plain, tag: tagOf(sealed).slice() };
++  };
++
++/**
++ * Reads one range in pages of `pageSize`, the next page in flight while this one decrypts, and
++ * hands each page's opened data blocks to `deliver` in key order, with the page's record count.
++ * With `open` null nothing is decrypted (the bench's reads-only row). Stops reading once `stopped()`.
++ */
++export async function loadRange(read: Read, range: KeyRange, pageSize: number, open: Open | null, deliver: Deliver, stopped: () => boolean = () => false): Promise<RangeStats> {
++  const reading = new Busy();
++  const decrypting = new Busy();
++  const stats: RangeStats = { readMs: 0, decryptMs: 0, records: 0, bytes: 0 };
++  const readPage = (after: BlockId | null) => {
++    const next = reading.time(() => read(after, pageSize, range.before));
++    next.catch(() => undefined); // awaited below; not unhandled if this page's decrypt throws first
++    return next;
++  };
++  for (let next: Promise<Array<[BlockId, Uint8Array]>> | null = readPage(range.after); next && !stopped(); ) {
++    let page: Array<[BlockId, Uint8Array]> = await next;
++    const full = page.length === pageSize;
++    const end = range.before === null ? -1 : page.findIndex(([id]) => id >= (range.before as BlockId));
++    if (end !== -1) page = page.slice(0, end);
++    if (page.length === 0) break;
++    next = full && end === -1 ? readPage((page[page.length - 1] as [BlockId, Uint8Array])[0]) : null;
++    stats.records += page.length;
++    for (const [, sealed] of page) stats.bytes += sealed.byteLength;
++    const opened: Array<Opened | null> = new Array<Opened | null>(page.length).fill(null);
++    if (open) {
++      const at = new Map(page.map(([id], i) => [id, i]));
++      await pool(page, async ([id, sealed]) => {
++        opened[at.get(id) as number] = await decrypting.time(() => open(id, sealed as Bytes));
++      });
++    }
++    if (!stopped()) deliver(opened.filter((o): o is Opened => o !== null), page.length);
++  }
++  stats.readMs = reading.ms;
++  stats.decryptMs = decrypting.ms;
++  return stats;
++}
++
++/** What an open worker is asked: its range, and for an open (not reads only) the key and the places. */
++export interface ToOpenWorker {
++  name: string;
++  range: KeyRange;
++  pageSize: number;
++  open: { dek: CryptoKey; meta: Meta; places: Map<BlockId, readonly [Bytes, number]>; table: BlockId[] } | null;
++}
++
++export type FromOpenWorker =
++  | { type: 'page'; opened: Opened[]; records: number }
++  | { type: 'done'; stats: RangeStats }
++  | { type: 'error'; corrupt: boolean; message: string };
++
++/** Listens to one range's worker; settles once it is done or failed. */
++function settled(worker: Worker, deliver: Deliver): Promise<RangeStats> {
++  return new Promise((resolve, reject) => {
++    worker.onmessage = (event: MessageEvent<FromOpenWorker>) => {
++      const m = event.data;
++      if (m.type === 'page') deliver(m.opened, m.records);
++      else if (m.type === 'done') resolve(m.stats);
++      else reject(m.corrupt ? new CorruptStoreError(m.message) : new Error(`EncryptedFs: an open worker failed: ${m.message}`));
++    };
++    worker.onmessageerror = () => {
++      reject(new Error('EncryptedFs: an open worker sent what does not clone'));
++    };
++    worker.onerror = (event) => {
++      event.preventDefault();
++      reject(new Error('EncryptedFs: an open worker failed'));
++    };
++  });
++}
++
++const workerUsable = (backend: StorageBackend): backend is IndexedDbBackend => backend instanceof IndexedDbBackend && typeof Worker !== 'undefined';
++
++const newWorker = (): Worker => new Worker(new URL('./openWorker.ts', import.meta.url), { type: 'module' });
++
++/**
++ * Runs the W ranges, each in a worker or on this thread; the first failure stops them all. Null when
++ * this engine cannot post a range's request to a worker (WebKit cannot clone a CryptoKey there):
++ * the caller then uses the single-thread loader. Nothing has been read or delivered by then.
++ */
++async function runRanges(backend: StorageBackend, w: number, toWorker: (i: number) => ToOpenWorker, here: (i: number, deliver: Deliver, stopped: () => boolean) => Promise<RangeStats>, deliver: Deliver): Promise<RangeStats[] | null> {
++  let failed = false;
++  const guarded: Deliver = (opened, records) => {
++    if (!failed) deliver(opened, records);
++  };
++  const fail = (error: unknown): never => {
++    failed = true;
++    throw error;
++  };
++  const each = Array.from({ length: w }, (_, i) => i);
++  if (!workerUsable(backend)) return Promise.all(each.map((i) => here(i, guarded, () => failed).catch(fail)));
++  const started = each.map(newWorker);
++  try {
++    const results = each.map((i) => settled(started[i] as Worker, guarded).catch(fail));
++    try {
++      for (const i of each) (started[i] as Worker).postMessage(toWorker(i));
++    } catch (error) {
++      failed = true;
++      if (error instanceof DOMException && error.name === 'DataCloneError') return null;
++      throw error;
++    }
++    return await Promise.all(results);
++  } finally {
++    for (const worker of started) worker.terminate();
++  }
++}
++
++type Places = Map<BlockId, readonly [Bytes, number]>;
++
++/**
++ * The open's blocks phase in W ranges: `deliver` gets every opened data block, in key order per range.
++ * Null when the DEK does not clone to a worker (WebKit): the caller loads on its own thread instead.
++ */
++export function loadInRanges(backend: StorageBackend, ctx: RecordContext, map: FileMap, tableIds: readonly BlockId[], w: number, deliver: Deliver): Promise<RangeStats[] | null> {
++  const pageSize = PAGE / w;
++  const ranges = keyRanges(w);
++  const rangeOf = (id: BlockId) => ranges.findIndex((r) => (r.after === null || id > r.after) && (r.before === null || id < r.before));
++  const places = ranges.map((): Places => new Map());
++  for (const [id, { key, index }] of map.places) places[rangeOf(id)]?.set(id, [(map.files.get(key) as MapFile).fileId, index]);
++  const table = ranges.map((): BlockId[] => []);
++  for (const id of tableIds) table[rangeOf(id)]?.push(id);
++  const read: Read = (after, limit, before) => backend.readRange(after, limit, before);
++  return runRanges(
++    backend,
++    w,
++    (i) => ({ name: (backend as IndexedDbBackend).name, range: ranges[i] as KeyRange, pageSize, open: { dek: ctx.subkeys.baseKey, meta: ctx.meta, places: places[i] as Places, table: table[i] as BlockId[] } }),
++    (i, into, stopped) => loadRange(read, ranges[i] as KeyRange, pageSize, opener(ctx, places[i] as Places, new Set(table[i])), into, stopped),
++    deliver,
++  );
++}
++
++/** The bench's reads-only row with W ranges: every record read as the open reads it, nothing decrypted. */
++export function readInRanges(backend: StorageBackend, w: number): Promise<RangeStats[] | null> {
++  const pageSize = PAGE / w;
++  const ranges = keyRanges(w);
++  const read: Read = (after, limit, before) => backend.readRange(after, limit, before);
++  return runRanges(
++    backend,
++    w,
++    (i) => ({ name: (backend as IndexedDbBackend).name, range: ranges[i] as KeyRange, pageSize, open: null }),
++    (i, into, stopped) => loadRange(read, ranges[i] as KeyRange, pageSize, null, into, stopped),
++    () => undefined,
++  );
++}
++
++/** For openWorker.ts: the open's context in a worker, from the DEK it was posted. */
++export const workerContext = (dek: CryptoKey, meta: Meta): RecordContext => ({ subkeys: new SubkeyCache(dek), meta, encryptions: 0 });
+diff --git a/test/fs/memory.test.ts b/test/fs/memory.test.ts
+index e7824db..43daf98 100644
+--- a/test/fs/memory.test.ts
++++ b/test/fs/memory.test.ts
+@@ -1,60 +1,83 @@
+-// A load holds at most two pages of ciphertext at a time (the next page is read
+-// while one decrypts): the database, two pages and the file map. The counting
+-// backend zero-fills every page but the latest it handed out as soon as the next read starts, so a
+-// load that kept using an older page (or a view into it, such as a tag) would fail.
++// A load holds at most two pages of ciphertext at a time (the next page is read while one
++// decrypts): the database, two pages and the file map. The workers bench patch reads in W key ranges
++// at once, each with pages of PAGE / W records, so the bound is stated in bytes, with the same limit:
++// at most two PAGE-record pages of ciphertext, a read in flight counted at its full `limit`. The
++// counting backend zero-fills every page of a range but that range's latest as soon as the range's
++// next read starts, so a load that kept using an older page (or a view into it, such as a tag) would fail.
+ import { PGlite } from '@electric-sql/pglite';
+ import { describe, expect, it } from 'vitest';
+ import type { BlockId, CommitBatch, Slot, StorageBackend } from '../../src/backend/backend.ts';
+ import { MemoryBackend } from '../../src/backend/memory.ts';
+ import { EncryptedFs } from '../../src/encryptedFs.ts';
+ import { CorruptStoreError } from '../../src/format/errors.ts';
++import { SEALED_OVERHEAD } from '../../src/format/records.ts';
++import { PAGE } from '../../src/fs/pool.ts';
+ import { newKey, openStore, rejection, shared } from './helpers.ts';
+ 
+ class CountingBackend implements StorageBackend {
+-  /** Pages handed out and not yet dropped, at most, per phase. */
+-  readonly maxHeld = { table: 0, blocks: 0 };
++  /** Table pages handed out and not yet dropped, at most (a read in flight counts as one). */
++  maxTablePages = 0;
++  /** Block ciphertext bytes handed out and not yet dropped, at most, every range together; a read in flight counts at its full `limit`. */
++  maxBlockBytes = 0;
+   readonly pages = { table: 0, blocks: 0 };
+   readonly #inner: StorageBackend;
++  /** The bytes of one stored block. */
++  readonly #record: number;
+   /** Control: zero-fill a page as soon as it is returned. */
+   readonly #dropAtOnce: boolean;
+-  #held: Uint8Array[][] = [];
+-  #inFlight = 0;
++  /** The pages handed out and not dropped, per stream: `table`, or a range by its `before`. */
++  readonly #held = new Map<string, Uint8Array[][]>();
++  #tableInFlight = 0;
++  #blockBytesInFlight = 0;
+ 
+-  constructor(inner: StorageBackend, { dropAtOnce = false } = {}) {
++  constructor(inner: StorageBackend, record: number, { dropAtOnce = false } = {}) {
+     this.#inner = inner;
++    this.#record = record;
+     this.#dropAtOnce = dropAtOnce;
+   }
+ 
+   getMany(ids: BlockId[]): Promise<Array<Uint8Array | undefined>> {
+-    return this.#read('table', () => this.#inner.getMany(ids));
++    return this.#read('table', 0, () => this.#inner.getMany(ids));
+   }
+ 
+-  readRange(after: BlockId | null, limit: number): Promise<Array<[BlockId, Uint8Array]>> {
+-    return this.#read('blocks', () => this.#inner.readRange(after, limit));
++  readRange(after: BlockId | null, limit: number, before: BlockId | null = null): Promise<Array<[BlockId, Uint8Array]>> {
++    return this.#read(`range<${before ?? 'end'}`, Math.max(0, limit) * this.#record, () => this.#inner.readRange(after, limit, before));
+   }
+ 
+-  async #read<T extends ReadonlyArray<Uint8Array | undefined | [BlockId, Uint8Array]>>(phase: 'table' | 'blocks', read: () => Promise<T>): Promise<T> {
+-    // A new read: every page returned before the latest is dropped now. A read in flight counts as held.
+-    for (const page of this.#held.slice(0, -1)) for (const v of page) v.fill(0);
+-    this.#held = this.#held.slice(-1);
+-    this.#inFlight++;
+-    this.#note(phase);
++  async #read<T extends ReadonlyArray<Uint8Array | undefined | [BlockId, Uint8Array]>>(stream: string, reserve: number, read: () => Promise<T>): Promise<T> {
++    // A new read of a stream: every page of it returned before its latest is dropped now. The blocks
++    // phase follows the table phase, so a block read drops every table page.
++    const table = stream === 'table';
++    const own = this.#held.get(stream) ?? [];
++    for (const page of own.slice(0, -1)) for (const v of page) v.fill(0);
++    this.#held.set(stream, own.slice(-1));
++    if (!table) {
++      for (const page of this.#held.get('table') ?? []) for (const v of page) v.fill(0);
++      this.#held.delete('table');
++    }
++    if (table) this.#tableInFlight++;
++    else this.#blockBytesInFlight += reserve;
++    this.#note();
+     const values = await read();
+-    this.#inFlight--;
+-    this.pages[phase]++;
++    if (table) this.#tableInFlight--;
++    else this.#blockBytesInFlight -= reserve;
++    this.pages[table ? 'table' : 'blocks']++;
+     const page: Uint8Array[] = [];
+     for (const v of values) {
+       const bytes = Array.isArray(v) ? v[1] : v;
+       if (bytes) page.push(bytes);
+     }
+-    this.#held.push(page);
+-    this.#note(phase);
++    this.#held.get(stream)?.push(page);
++    this.#note();
+     if (this.#dropAtOnce) for (const v of page) v.fill(0);
+     return values;
+   }
+ 
+-  #note(phase: 'table' | 'blocks'): void {
+-    this.maxHeld[phase] = Math.max(this.maxHeld[phase], this.#held.length + this.#inFlight);
++  #note(): void {
++    this.maxTablePages = Math.max(this.maxTablePages, (this.#held.get('table')?.length ?? 0) + this.#tableInFlight);
++    let bytes = this.#blockBytesInFlight;
++    for (const [stream, pages] of this.#held) if (stream !== 'table') for (const page of pages) for (const v of page) bytes += v.byteLength;
++    this.maxBlockBytes = Math.max(this.maxBlockBytes, bytes);
+   }
+ 
+   get = (slot: Slot) => this.#inner.get(slot);
+@@ -74,16 +97,21 @@ describe('memory shape', () => {
+       await a.pg.exec(`CREATE TABLE t (id int PRIMARY KEY, v text); INSERT INTO t SELECT i, md5(i::text) FROM generate_series(1, 5000) i;`);
+       await a.pg.close();
+ 
+-      const counting = new CountingBackend(shared(memory));
++      const record = SEALED_OVERHEAD + blockSize;
++      const limit = 2 * PAGE * record;
++      const counting = new CountingBackend(shared(memory), record);
+       const b = await openStore({ backend: counting, key, mode: 'open' });
+       expect((await b.pg.query('SELECT count(*)::int AS n FROM t')).rows).toEqual([{ n: 5000 }]);
+       expect(counting.pages.table).toBeGreaterThanOrEqual(1);
+       expect(counting.pages.blocks).toBeGreaterThan(2);
+-      expect(counting.maxHeld).toEqual({ table: 1, blocks: 2 });
++      expect(counting.maxTablePages).toBe(1);
++      expect(counting.maxBlockBytes).toBeLessThanOrEqual(limit);
++      // Not vacuous: the load does reach past half the limit.
++      expect(counting.maxBlockBytes).toBeGreaterThan(limit / 2);
+       await b.pg.close();
+ 
+       // Control: a page dropped before the loader is done with it fails the open.
+-      const fs = new EncryptedFs({ backend: new CountingBackend(shared(memory), { dropAtOnce: true }), key, mode: 'open' });
++      const fs = new EncryptedFs({ backend: new CountingBackend(shared(memory), record, { dropAtOnce: true }), key, mode: 'open' });
+       await rejection(PGlite.create({ fs }), CorruptStoreError);
+     }, 120_000);
+   }
+diff --git a/test/long.ts b/test/long.ts
+index 1da6b90..d761a38 100644
+--- a/test/long.ts
++++ b/test/long.ts
+@@ -14,6 +14,8 @@ declare module 'vitest' {
+     compatWrite: boolean;
+     /** CIPHER_COMPAT_READ=webkit,chromium: the engines whose stores test/fs/compat.test.ts opens. */
+     compatRead: string[];
++    /** The workers bench patch: CIPHER_OPEN_WORKERS, the open's W key ranges, 1 by default. */
++    openWorkers: number;
+   }
+ }
+ 
+diff --git a/test/setup.ts b/test/setup.ts
+index 7523219..f7a0be7 100644
+--- a/test/setup.ts
++++ b/test/setup.ts
+@@ -2,5 +2,8 @@
+ // so a failure can be repeated with CIPHER_SEED.
+ import fc from 'fast-check';
+ import { inject } from 'vitest';
++import { setOpenWorkers } from '../src/fs/openWorkers.ts';
+ 
+ if (inject('long')) fc.configureGlobal({ seed: inject('seed') });
++// The workers bench patch: every open in W key ranges.
++setOpenWorkers(inject('openWorkers'));
+diff --git a/vitest.config.ts b/vitest.config.ts
+index c7137a9..603b855 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -19,6 +19,8 @@ const shared = {
+     soakMinutes: Number(process.env.CIPHER_SOAK_MINUTES ?? 30),
+     compatWrite: process.env.CIPHER_COMPAT_WRITE === '1',
+     compatRead: (process.env.CIPHER_COMPAT_READ ?? '').split(',').filter(Boolean),
++    // The workers bench patch: the open's W key ranges (1, 2 or 4).
++    openWorkers: Number(process.env.CIPHER_OPEN_WORKERS ?? 1),
+   },
+ };
+ 

@@ -1,0 +1,234 @@
+diff --git a/src/backend/indexeddb.ts b/src/backend/indexeddb.ts
+index f9ec033..03158b2 100644
+--- a/src/backend/indexeddb.ts
++++ b/src/backend/indexeddb.ts
+@@ -19,6 +19,17 @@ const STORE = 'kv';
+ /** How long a blocked deletion is waited for before destroy() returns anyway. */
+ const BLOCKED_GRACE_MS = 2000;
+ 
++/**
++ * A block record under `pack` > 1 (bench/patches/pack.patch): one block as its bytes, or up to
++ * `pack` blocks with consecutive ids as [id, bytes] pairs in id order, under the smallest id.
++ */
++type Entry = [BlockId, Uint8Array];
++type Packed = Uint8Array | Entry[];
++const unpack = (key: BlockId, value: Packed): Entry[] => (Array.isArray(value) ? value : [[key, value]]);
++const byId = (a: Entry, b: Entry): number => (a[0] < b[0] ? -1 : 1);
++/** The record that holds `id`, if any: the one with the greatest key not after it. */
++const holder = (id: BlockId): IDBKeyRange => IDBKeyRange.bound('', id);
++
+ const done = <T>(request: IDBRequest<T>): Promise<T> =>
+   new Promise((resolve, reject) => {
+     request.onsuccess = () => {
+@@ -30,7 +41,15 @@ const done = <T>(request: IDBRequest<T>): Promise<T> =>
+   });
+ 
+ export class IndexedDbBackend implements StorageBackend {
++  /**
++   * Blocks per IndexedDB record for backends constructed from now on (bench/patches/pack.patch).
++   * 1 is the unpatched layout. The bench sets it from `?pack=`; test runs take
++   * VITE_CIPHER_PACK. A store written with `pack` > 1 must be read with `pack` > 1.
++   */
++  static pack = Number((import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_CIPHER_PACK ?? 1);
++
+   readonly #name: string;
++  readonly #pack = IndexedDbBackend.pack;
+   #db: Promise<IDBDatabase> | null = null;
+   /** Why later calls are refused, once this connection is closed. */
+   #closed: string | null = null;
+@@ -49,11 +68,17 @@ export class IndexedDbBackend implements StorageBackend {
+   }
+ 
+   async isEmpty(): Promise<boolean> {
++    if (this.#pack > 1) return (await done(this.#transaction(await this.#database(), 'readonly').objectStore(STORE).count())) === 0;
+     return (await this.count()) === 0;
+   }
+ 
+   async count(): Promise<number> {
+     const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
++    if (this.#pack > 1) {
++      // Slots plus blocks, so every block record is read: verify() is the one caller that counts.
++      const [slots, values] = await Promise.all([done(store.count(IDBKeyRange.bound(0, 2))), done(store.getAll(IDBKeyRange.lowerBound('')) as IDBRequest<Packed[]>)]);
++      return values.reduce((n, value) => n + (Array.isArray(value) ? value.length : 1), slots);
++    }
+     return done(store.count());
+   }
+ 
+@@ -65,6 +90,14 @@ export class IndexedDbBackend implements StorageBackend {
+   async getMany(ids: BlockId[]): Promise<Array<Uint8Array | undefined>> {
+     if (ids.length === 0) return [];
+     const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
++    if (this.#pack > 1) {
++      return Promise.all(
++        ids.map(async (id) => {
++          const cursor = await done(store.openCursor(holder(id), 'prev'));
++          return cursor ? unpack(cursor.key as BlockId, cursor.value as Packed).find(([k]) => k === id)?.[1] : undefined;
++        }),
++      );
++    }
+     return Promise.all(ids.map((id) => done(store.get(id) as IDBRequest<Uint8Array | undefined>)));
+   }
+ 
+@@ -72,6 +105,7 @@ export class IndexedDbBackend implements StorageBackend {
+     // getAll treats a count of 0 as "no limit".
+     if (limit < 1) return [];
+     const store = this.#transaction(await this.#database(), 'readonly').objectStore(STORE);
++    if (this.#pack > 1) return this.#readPacked(store, after, limit);
+     const range = IDBKeyRange.lowerBound(after ?? '', after !== null);
+     const [keys, values] = await Promise.all([
+       done(store.getAllKeys(range, limit) as IDBRequest<BlockId[]>),
+@@ -80,6 +114,48 @@ export class IndexedDbBackend implements StorageBackend {
+     return keys.map((key, i): [BlockId, Uint8Array] => [key, values[i] as Uint8Array]);
+   }
+ 
++  /**
++   * Under `pack` > 1: the blocks after `after` from the record that holds it, then whole records,
++   * ceil(missing / pack) per getAll until `limit` blocks, all in the one transaction.
++   */
++  #readPacked(store: IDBObjectStore, after: BlockId | null, limit: number): Promise<Entry[]> {
++    return new Promise((resolve, reject) => {
++      const out: Entry[] = [];
++      const failed = (request: IDBRequest) => () => {
++        reject(request.error ?? new Error('IndexedDbBackend: request failed'));
++      };
++      const more = (range: IDBKeyRange) => {
++        if (out.length >= limit) {
++          resolve(out.slice(0, limit));
++          return;
++        }
++        const want = Math.ceil((limit - out.length) / this.#pack);
++        const keys = store.getAllKeys(range, want) as IDBRequest<BlockId[]>;
++        const values = store.getAll(range, want) as IDBRequest<Packed[]>;
++        keys.onerror = failed(keys);
++        values.onerror = failed(values);
++        // Requests complete in the order they were made: the keys are there when the values are.
++        values.onsuccess = () => {
++          keys.result.forEach((key, i) => out.push(...unpack(key, values.result[i] as Packed)));
++          const last = keys.result.at(-1);
++          if (last === undefined || keys.result.length < want) resolve(out.slice(0, limit));
++          else more(IDBKeyRange.lowerBound(last, true));
++        };
++      };
++      if (after === null) {
++        more(IDBKeyRange.lowerBound(''));
++        return;
++      }
++      const first = store.openCursor(holder(after), 'prev');
++      first.onerror = failed(first);
++      first.onsuccess = () => {
++        const cursor = first.result;
++        if (cursor) out.push(...unpack(cursor.key as BlockId, cursor.value as Packed).filter(([id]) => id > after));
++        more(IDBKeyRange.lowerBound(after, true));
++      };
++    });
++  }
++
+   async commit(batch: CommitBatch): Promise<void> {
+     const db = await this.#database();
+     // From opening the transaction to its last request there is no await: every value arrives
+@@ -99,6 +175,10 @@ export class IndexedDbBackend implements StorageBackend {
+         reject(failure ?? tx.error ?? new Error('IndexedDbBackend: the commit was aborted'));
+       };
+       const write = () => {
++        if (this.#pack > 1) {
++          this.#writePacked(store, batch, fail);
++          return;
++        }
+         try {
+           for (const key of batch.deletes) {
+             if (!isRecordKey(key)) throw invalidKey();
+@@ -129,6 +209,94 @@ export class IndexedDbBackend implements StorageBackend {
+     });
+   }
+ 
++  /**
++   * Under `pack` > 1, inside the commit's transaction: slots as they are; each changed block id finds
++   * the record that holds it (keys first, then each such record once), and those records are written
++   * again with the changes, split evenly into records of at most `pack` blocks. Ids before every
++   * record make records of their own. No await: callbacks only, so the transaction stays open.
++   */
++  #writePacked(store: IDBObjectStore, batch: CommitBatch, fail: (error: Error) => void): void {
++    const pack = this.#pack;
++    const changes = new Map<BlockId, Uint8Array | null>();
++    try {
++      for (const key of batch.deletes) {
++        if (!isRecordKey(key)) throw invalidKey();
++        if (typeof key === 'number') store.delete(key);
++        else changes.set(key, null);
++      }
++      for (const [key, value] of batch.puts) {
++        if (!isRecordKey(key)) throw invalidKey();
++        // As unpacked: a partial view (or a SharedArrayBuffer's) is copied to its own bytes first.
++        const whole = value.byteOffset === 0 && value.byteLength === value.buffer.byteLength && value.buffer instanceof ArrayBuffer;
++        const own = whole ? value : value.slice();
++        if (typeof key === 'number') store.put(own, key);
++        else changes.set(key, own);
++      }
++    } catch (error) {
++      fail(error as Error);
++      return;
++    }
++    const ids = [...changes.keys()];
++    if (ids.length === 0) return;
++    const held = new Map<BlockId, BlockId[]>(); // record key -> the changed ids it holds
++    const before: BlockId[] = []; // changed ids before every record
++    const put = (list: Entry[]) => {
++      const parts = Math.ceil(list.length / pack);
++      for (let i = 0; i < parts; i++) {
++        const part = list.slice(Math.floor((i * list.length) / parts), Math.floor(((i + 1) * list.length) / parts));
++        const [first] = part as [Entry];
++        store.put(part.length === 1 ? first[1] : part, first[0]);
++      }
++    };
++    const putBefore = () => {
++      put(before.flatMap((id): Entry[] => {
++        const value = changes.get(id) ?? null;
++        return value === null ? [] : [[id, value]];
++      }).sort(byId));
++    };
++    const rewrite = () => {
++      try {
++        let pending = held.size;
++        for (const [key, changed] of held) {
++          const request = store.get(key) as IDBRequest<Packed>;
++          request.onsuccess = () => {
++            try {
++              const blocks = new Map(unpack(key, request.result));
++              for (const id of changed) {
++                const value = changes.get(id) ?? null;
++                if (value === null) blocks.delete(id);
++                else blocks.set(id, value);
++              }
++              const list = [...blocks].sort(byId);
++              if (list[0]?.[0] !== key) store.delete(key);
++              put(list);
++              if (--pending === 0) putBefore();
++            } catch (error) {
++              fail(error as Error);
++            }
++          };
++        }
++        if (held.size === 0) putBefore();
++      } catch (error) {
++        fail(error as Error);
++      }
++    };
++    let pending = ids.length;
++    for (const id of ids) {
++      const lookup = store.openKeyCursor(holder(id), 'prev');
++      lookup.onsuccess = () => {
++        const key = lookup.result?.key as BlockId | undefined;
++        if (key === undefined) before.push(id);
++        else {
++          const changed = held.get(key);
++          if (changed) changed.push(id);
++          else held.set(key, [id]);
++        }
++        if (--pending === 0) rewrite();
++      };
++    }
++  }
++
+   async clear(): Promise<void> {
+     const store = this.#transaction(await this.#database(), 'readwrite').objectStore(STORE);
+     await done(store.clear());

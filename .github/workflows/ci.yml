@@ -1,0 +1,134 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**']
+  pull_request:
+    paths-ignore: ['docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Main runs finish (a newer push only replaces a waiting one); superseded PR runs are cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+# Every job runs on a GitHub-hosted Ubuntu runner (16 GB). Browsers come from `playwright install
+# --with-deps`, which also installs their system packages.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  test-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      # Firefox keeps about three times the memory of Chromium for the same file (open.test.ts alone:
+      # 8.7 GB against 2.5 GB). The suite's peak is a per-file peak, not a leak: 14.3 GB at the default
+      # 4 files at a time, 8.5 GB at 1. One file at a time fits a 16 GB runner.
+      - run: npm run test:browser -- --project ${{ matrix.browser }} ${{ matrix.browser == 'firefox' && '--maxWorkers=1' || '' }}
+
+  # The compatibility lock (test/fs/compat.test.ts): WebKit and Chromium each write a store, and
+  # every engine opens both. Two engines that each read only their own stores is what this catches.
+  compat-write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [webkit, chromium]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npx vitest run --project ${{ matrix.browser }} test/fs/compat.test.ts
+        env:
+          CIPHER_COMPAT_WRITE: '1'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compat-${{ matrix.browser }}
+          path: test-results/compat/${{ matrix.browser }}.bin
+          if-no-files-found: error
+          retention-days: 3
+
+  compat-read:
+    needs: compat-write
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [node, chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: compat-*
+          merge-multiple: true
+          path: test-results/compat
+      - if: matrix.project != 'node'
+        run: npx playwright install --with-deps ${{ matrix.project }}
+      - run: npx vitest run --project ${{ matrix.project }} test/fs/compat.test.ts
+        env:
+          CIPHER_COMPAT_READ: webkit,chromium
