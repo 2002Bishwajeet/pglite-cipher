@@ -1,0 +1,34 @@
+{
+  "target": "redmi-76-opfsread",
+  "parts": {
+    "opfsread": {
+      "sizeMB": 300,
+      "recordBytes": 65580,
+      "records": 4797,
+      "segments": 19,
+      "writePerRecordMBps": 5.39,
+      "perRecordFiles": {
+        "ms": 23888.9,
+        "MBps": 12.56
+      },
+      "writeSegmentMBps": 88.72,
+      "segmentSlices": {
+        "ms": 1975.47,
+        "MBps": 151.87
+      },
+      "syncHandleWorker": {
+        "ms": 10575.49,
+        "MBps": 28.37
+      },
+      "measuredAt": "2026-11-16T19:59:06.499Z",
+      "runs": 1
+    }
+  },
+  "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36",
+  "runs": 1,
+  "finishedAt": "2026-11-16T19:59:06.499Z",
+  "crossOriginIsolated": true,
+  "hardwareConcurrency": 8,
+  "deviceMemory": 4,
+  "startedAt": "2026-11-16T19:57:27.679Z"
+}
