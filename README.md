@@ -19,6 +19,8 @@ Encryption at rest for [PGlite](https://pglite.dev), the Postgres build that run
 npm install pglite-cipher @electric-sql/pglite
 ```
 
+Or straight from GitHub (it builds on install): `npm install github:2002Bishwajeet/pglite-cipher @electric-sql/pglite`.
+
 ```ts
 import { PGlite } from '@electric-sql/pglite';
 import { EncryptedFs, IndexedDbBackend, importKek } from 'pglite-cipher';
