@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.svg">
+  <img alt="pglite-cipher: encryption at rest for PGlite" src=".github/assets/banner-light.svg">
+</picture>
+
 # pglite-cipher
 
 Encryption at rest for [PGlite](https://pglite.dev), the Postgres build that runs in the browser. It works like SQLCipher, with AES-256-GCM through WebCrypto and no runtime dependencies.
@@ -5,6 +10,8 @@ Encryption at rest for [PGlite](https://pglite.dev), the Postgres build that run
 - **Encrypts below Postgres.** Every file under PGDATA is encrypted, including catalogs, WAL and `pg_control`. File names, sizes and the file count are hidden.
 - **Detects tampering.** A changed, moved, replayed or missing block fails the open (`CorruptStoreError`).
 - **Two-tier keys.** You supply a key-encryption key, and the package wraps its own data key. You can change the key instantly, or rotate the data key.
+
+**[Try the demo](https://2002bishwajeet.github.io/pglite-cipher/)**: in your own browser, compare plain and encrypted speed, search the raw storage for your data, and flip a bit to watch the open refuse it.
 
 ## Quick start
 
