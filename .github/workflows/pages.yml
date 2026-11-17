@@ -1,10 +1,10 @@
 name: pages
 
-# Publishes examples/demo to GitHub Pages: the built package next to the page, no bundler.
+# Publishes the home page (web/), llms.txt and examples/demo to GitHub Pages: the built package next to the page, no bundler.
 on:
   push:
     branches: [main]
-    paths: ['examples/**', 'src/**', 'package.json', '.github/workflows/pages.yml']
+    paths: ['examples/**', 'src/**', 'web/**', 'llms.txt', 'llms-full.txt', 'package.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 concurrency:
@@ -36,7 +36,7 @@ jobs:
           mkdir -p site/examples
           cp -r dist site/dist
           cp -r examples/demo site/examples/demo
-          printf '<!doctype html><meta http-equiv="refresh" content="0; url=examples/demo/"><a href="examples/demo/">pglite-cipher demo</a>\n' > site/index.html
+          cp web/* llms.txt llms-full.txt site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
