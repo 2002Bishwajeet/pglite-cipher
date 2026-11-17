@@ -5,14 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import { LONG, timeout } from '../long.ts';
 import { inBrowser } from './helpers.ts';
+import { progressName, readProgress } from './killProgress.ts';
 import type { FromWorker, ToWorker } from './killWorker.ts';
 
 const REPETITIONS = LONG ? 500 : 50;
 
 interface Run {
   opened: Promise<{ n: number; max: number }>;
-  acked: number;
-  started: number;
   error: string | null;
   worker: Worker;
 }
@@ -26,16 +25,12 @@ function start(name: string, raw: Uint8Array<ArrayBuffer>): Run {
       resolveOpened = resolve;
       rejectOpened = reject;
     }),
-    acked: 0,
-    started: 0,
     error: null,
     worker,
   };
   worker.addEventListener('message', (event: MessageEvent<FromWorker>) => {
     const m = event.data;
     if (m.type === 'opened') resolveOpened(m);
-    else if (m.type === 'started') run.started = m.id;
-    else if (m.type === 'acked') run.acked = m.id;
     else {
       run.error = m.message;
       rejectOpened(new Error(m.message));
@@ -71,17 +66,21 @@ describe.runIf(inBrowser)('a worker killed mid-sync', () => {
         await new Promise((resolve) => setTimeout(resolve, Math.random() * 400));
         run.worker.terminate();
         expect(run.error, `repetition ${String(rep)}`).toBeNull();
-        if (run.started > n) kills++;
-        acked = Math.max(n, run.acked);
-        started = Math.max(n, run.started);
+        // What the worker recorded in IndexedDB, not what its messages managed to report before it died.
+        const progress = await readProgress(name);
+        if (progress.started > n) kills++;
+        acked = Math.max(n, progress.acked);
+        started = Math.max(n, progress.started);
       }
       // Most kills landed while rows were being written.
       expect(kills).toBeGreaterThan(REPETITIONS / 2);
     } finally {
-      await new Promise((resolve) => {
-        const request = indexedDB.deleteDatabase(name);
-        request.onsuccess = request.onerror = request.onblocked = resolve;
-      });
+      for (const db of [name, progressName(name)]) {
+        await new Promise((resolve) => {
+          const request = indexedDB.deleteDatabase(db);
+          request.onsuccess = request.onerror = request.onblocked = resolve;
+        });
+      }
     }
   }, timeout(900_000, 10));
 });
