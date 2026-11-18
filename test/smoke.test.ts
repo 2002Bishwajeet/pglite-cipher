@@ -7,7 +7,8 @@ import { FORMAT_VERSION, VERSION } from '../src/index.ts';
 
 describe('smoke', () => {
   it('exports the version constants', () => {
-    expect(VERSION).toBe('0.1.0');
+    // repo.node.test.ts checks it against package.json; the publish workflow bumps both.
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
     expect(FORMAT_VERSION).toBe(1);
   });
 
