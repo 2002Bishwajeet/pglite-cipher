@@ -4,7 +4,7 @@ pglite-cipher encrypts a PGlite database at rest: every file under PGDATA is cut
 each block is sealed with AES-256-GCM through WebCrypto, and the blocks are stored in IndexedDB.
 `FORMAT.md` is the exact format; this file says what that design claims and what it does not.
 
-**Status, as of 2026-11-17 (0.1.0, the first public release):** new code. It has had no external
+**Status, as of 2026-11-18 (0.1.0, the first public release):** new code. It has had no external
 audit or review. The composition has not been FIPS validated, and no FIPS-validated build exists. Only
 standard primitives are used, all through WebCrypto; no cryptography is written by hand or taken
 from a third-party package.

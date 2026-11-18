@@ -1,6 +1,6 @@
 {
   "name": "pglite-cipher",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Encryption at rest for PGlite: AES-256-GCM through WebCrypto, blocks in IndexedDB, like SQLCipher for Postgres in the browser.",
   "keywords": [
     "pglite",
