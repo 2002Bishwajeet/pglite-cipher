@@ -29,8 +29,9 @@ describe('rotation crash matrix', () => {
     const opened = await openPair(pair, key);
     pg = opened.pg;
     await pg.exec('CREATE TABLE r (i int PRIMARY KEY)');
-    await opened.fs.syncToFs(false);
+    // Read before the sync: the first scan sets hint bits on every page, and those writes must not fall into the rotation.
     const base = await tablesOf(pg);
+    await opened.fs.syncToFs(false);
     const start = journal.length;
     await opened.fs.rotateDataKey({
       onProgress: (p) => {
