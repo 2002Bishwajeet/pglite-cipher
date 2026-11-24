@@ -23,11 +23,11 @@ import { LONG, timeout } from '../long.ts';
 // Decoder fuzz: 1,000,000 cases each under CIPHER_LONG.
 const RUNS = LONG ? 1_000_000 : 20_000;
 const BUDGET_MS = 50;
+const RETIMES = 3;
 
 type ErrorType = typeof CorruptStoreError | typeof UnsupportedFormatError;
 
-/** Fails on any outcome but a value or one of `allowed`, or on taking over 50 ms. */
-const outcome = <T>(fn: () => T, allowed: ErrorType[]): T | null => {
+const timed = <T>(fn: () => T, allowed: ErrorType[]): { value: T | null; ms: number } => {
   const start = performance.now();
   let value: T | null = null;
   try {
@@ -35,8 +35,19 @@ const outcome = <T>(fn: () => T, allowed: ErrorType[]): T | null => {
   } catch (e) {
     if (!allowed.some((type) => e instanceof type)) throw e;
   }
-  const ms = performance.now() - start;
-  if (ms > BUDGET_MS) throw new Error(`one case took ${ms.toFixed(1)} ms`);
+  return { value, ms: performance.now() - start };
+};
+
+/**
+ * Fails on any outcome but a value or one of `allowed`, or on taking over 50 ms. A slow case is
+ * timed again up to 3 times and fails only if every run is slow: one GC pause or stalled runner
+ * in a million cases is not a slow input.
+ */
+const outcome = <T>(fn: () => T, allowed: ErrorType[]): T | null => {
+  const { value, ms } = timed(fn, allowed);
+  let fastest = ms;
+  for (let i = 0; i < RETIMES && fastest > BUDGET_MS; i++) fastest = Math.min(fastest, timed(fn, allowed).ms);
+  if (fastest > BUDGET_MS) throw new Error(`one case took ${fastest.toFixed(1)} ms at best of ${String(RETIMES + 1)} runs`);
   return value;
 };
 
@@ -107,6 +118,25 @@ const buffer = (bases: Base[]) =>
   );
 
 describe('decoder fuzz', () => {
+  it('the 50 ms budget fails a case slow on every run, not one slow once', () => {
+    const busy = (ms: number) => {
+      const end = performance.now() + ms;
+      while (performance.now() < end);
+    };
+    expect(() => {
+      outcome(() => {
+        busy(BUDGET_MS + 10);
+      }, []);
+    }).toThrow(/at best of 4 runs/);
+    let calls = 0;
+    const once = () => {
+      if (calls++ === 0) busy(BUDGET_MS + 10);
+      return 1;
+    };
+    expect(outcome(once, [])).toBe(1);
+    expect(calls).toBe(2);
+  });
+
   it('decodeMeta', () => {
     fc.assert(
       fc.property(buffer(metaBases), (bytes) => {
