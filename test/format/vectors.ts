@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Known-answer vectors from fixed inputs; vectors.json is the committed output and regression lock. Never regenerate it to pass a test.
 // Written once: node -e "import('./test/format/vectors.ts').then(async (m) => console.log(JSON.stringify(await m.buildVectors(), null, 2)))" > test/format/vectors.json
 import { setRandomSource } from '../../src/testing.ts';

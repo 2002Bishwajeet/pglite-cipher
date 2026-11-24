@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Shared by the key tests: store, fault, journal and table-content helpers.
 import { PGlite } from '@electric-sql/pglite';
 import { expect } from 'vitest';

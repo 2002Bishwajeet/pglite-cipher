@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Gate table of one bench result: ratios against plain idb:// and absolute budgets times `factor`.
 // The page uses factor 1; the nightly workflow its CI factor (bench/gates.ts).
 import type { VariantResult } from './measure.ts';

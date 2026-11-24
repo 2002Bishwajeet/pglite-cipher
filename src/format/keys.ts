@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The two key tiers (FORMAT.md section 4): the caller's KEK wraps a random DEK in the 168-byte
 // header, and the DEK only ever feeds HKDF, for the header key and for one subkey per session.
 import { ascii, concat, equalBytes, randomBytes, toHex, type Bytes } from './bytes.ts';

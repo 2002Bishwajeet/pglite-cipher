@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -53,7 +53,7 @@ describe("repository invariants", () => {
     for (const file of files) {
       const head = read(file).slice(0, 400);
       expect(head, file).toContain("Copyright 2026 Bishwajeet Parhi");
-      expect(head, file).toContain("SPDX-License-Identifier: FSL-1.1-ALv2");
+      expect(head, file).toContain("SPDX-License-Identifier: Apache-2.0");
     }
   });
 

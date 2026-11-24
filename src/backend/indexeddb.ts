@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The IndexedDB backend: one database named as given, one object store `kv`. Slots are number keys 0-2, blocks 32-char
 // string keys; numbers sort before strings, so a range from "" holds blocks only.
 import { StaleWriterError } from '../format/errors.ts';

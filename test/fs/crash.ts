@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Crash matrix over the 200-transaction workload (2,000 under CIPHER_LONG), one block size. Per commit K: (a) K fails before writing; (b) K applies but reports failure;
 // (b′) as (b) and the following root read fails too; (c) the instance is dropped at K and the store as of K − 1 and K is opened fresh. Browser: every tenth K.
 import { describe, expect, it } from 'vitest';

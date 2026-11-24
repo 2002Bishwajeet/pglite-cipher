@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Bench only: OPFS read throughput beside IndexedDB's: ~`mb` MB of sealed-size records read back in three layouts
 // (file per record, 16 MiB segments in 1 MiB slices, same via a worker's sync handle). "Cold" means a fresh handle, not an empty OS cache.
 import { MB, errorText, now, pct, randomBytes, round, type Json } from './measure.ts';

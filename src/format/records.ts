@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Sealing and opening the root, table blocks and data blocks (FORMAT.md section 5): every value is
 // `salt16 ‖ nonce12 ‖ AES-256-GCM(subkey, blockSize bytes) ‖ tag16`, `44 + blockSize` bytes.
 import { concat, randomBytes, toHex, u32, type Bytes } from './bytes.ts';

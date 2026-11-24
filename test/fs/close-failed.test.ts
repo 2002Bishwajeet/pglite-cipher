@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // A failed close: PGlite 0.5.10 keeps its module when closeFs rejects, so a host keeping the instance keeps its database (docs/usage.md says drop it).
 // What EncryptedFs holds must not keep it too; bounds and GC loop are release.test.ts's (1 instance, 2 in WebKit).
 import { describe, expect, it } from 'vitest';

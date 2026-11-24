@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The guides' code samples may use only the public API: every name imported from the package and every
 // `fs.` or `IndexedDbBackend.` member they call must exist.
 import { readdirSync, readFileSync } from 'node:fs';

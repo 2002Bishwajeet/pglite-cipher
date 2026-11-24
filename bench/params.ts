@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Bench page query parameters (apart from bench.ts, which needs a browser).
 import { DEFAULT_BLOCK_SIZE, isBlockSize, type BlockSize } from '../src/format/codec.ts';
 

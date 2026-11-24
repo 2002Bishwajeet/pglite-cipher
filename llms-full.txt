@@ -6,7 +6,7 @@ Facts to keep in mind:
 - Browser and webview only (IndexedDB plus WebCrypto). Node works for tests with `MemoryBackend`.
 - `@electric-sql/pglite` `^0.5.10` is a peer dependency. pglite-cipher has no runtime dependencies.
 - The whole database is decrypted into memory at open, as with PGlite's `idb://`. While it is open, its contents are plaintext in memory.
-- Licence: FSL-1.1-ALv2 (any use except a competing commercial product; Apache 2.0 two years after each release).
+- Licence: Apache-2.0.
 
 ## Install
 

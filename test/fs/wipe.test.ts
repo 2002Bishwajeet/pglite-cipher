@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Best-effort hygiene: close zeroes MEMFS file contents and wasm memory, so plaintext does not linger in RAM.
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';

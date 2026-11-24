@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // verify() and verifyStore(): every tamper is reported by the damaged record's key and a reason, without throwing and without naming a path.
 import { describe, expect, it } from 'vitest';
 import type { RecordKey } from '../../src/backend/backend.ts';

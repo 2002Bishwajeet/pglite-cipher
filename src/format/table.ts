@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Pure functions over file-table entries (FORMAT.md section 7): joining them into files, and
 // packing a whole table densely into table blocks.
 import { toHex, type Bytes } from './bytes.ts';

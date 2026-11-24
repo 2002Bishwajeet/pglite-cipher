@@ -1,6 +1,6 @@
 // Copyright 2026 Bishwajeet Parhi (modifications and additions)
 // Portions Copyright (c) 2026 David Muggleton, from https://github.com/davidmuggleton/pglite-encrypted-fs
-// SPDX-License-Identifier: FSL-1.1-ALv2 AND MIT
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 // Test scenarios ported from that project and modified; its MIT licence text is in THIRD_PARTY.md.
 // Its passphrase-only cases have no counterpart.
 import type { PGlite } from '@electric-sql/pglite';

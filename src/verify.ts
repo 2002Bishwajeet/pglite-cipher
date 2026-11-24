@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // verify(): checks a store record by record without Postgres (like `PRAGMA cipher_integrity_check`); names findings by
 // slot or block id, never path, and never throws for a damaged record.
 import type { BlockId, Slot, StorageBackend } from './backend/backend.ts';

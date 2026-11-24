@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Byte helpers shared by the format modules, and the one source of randomness they draw from.
 
 export type Bytes = Uint8Array<ArrayBuffer>;

@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // changeKey: the data key wrapped under a new KEK in both header copies. After a failed commit exactly one key opens, and changeKey says which or that it cannot.
 // Documented: a copy of the old header still opens later copies of the store with the old key.
 import { describe, expect, it } from 'vitest';

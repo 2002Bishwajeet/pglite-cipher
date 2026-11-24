@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Writes test/fixtures/v1-reference/records.bin, the frozen format v1 store. Run once by hand; later versions must open it.
 // Key and known row: that folder's README.
 import { writeFile } from 'node:fs/promises';
