@@ -11,7 +11,7 @@ taken from it.
 - `bench/bench.ts` takes the shape of its `bench/` (`crypto-overhead.bench.ts`, `startup.bench.ts`,
   `operations.bench.ts`) for the `extras` crypto-overhead rows and the `ops` part.
 
-Both files carry its copyright line beside ours (`SPDX-License-Identifier: FSL-1.1-ALv2 AND MIT`).
+Both files carry its copyright line beside ours (`SPDX-License-Identifier: Apache-2.0 AND MIT`).
 
 Its licence:
 

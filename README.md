@@ -67,4 +67,4 @@ npm run lint && npm run typecheck
 
 ## Licence
 
-[FSL-1.1-ALv2](LICENSE), © Bishwajeet Parhi. You can use it for anything except a competing commercial product, and each release becomes Apache 2.0 two years after it ships. Contributions are made under the [CLA](CLA.md). Third-party notices are in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+[Apache-2.0](LICENSE), © Bishwajeet Parhi. Versions 0.1.0 and 0.1.1 were released under FSL-1.1-ALv2. Contributions are made under the [CLA](CLA.md). Third-party notices are in [`THIRD_PARTY.md`](THIRD_PARTY.md).

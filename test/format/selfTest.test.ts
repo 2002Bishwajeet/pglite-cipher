@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The known-answer self-test passes on this engine and fails loudly when WebCrypto computes something else.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CryptoSelfTestError } from '../../src/format/errors.ts';

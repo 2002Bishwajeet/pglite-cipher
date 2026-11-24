@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // FaultyBackend: each injected fault, the recorded batches, and replay to "as of commit K".
 import { describe, expect, it } from 'vitest';
 import type { CommitBatch, StorageBackend } from '../../src/backend/backend.ts';

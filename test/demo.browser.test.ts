@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The demo page's three checks (examples/demo), in every browser: what the page shows must be true.
 import { afterAll, describe, expect, it } from 'vitest';
 import { newKey, proof, reset, speed, storeKeys, tamper } from '../examples/demo/demo.mjs';

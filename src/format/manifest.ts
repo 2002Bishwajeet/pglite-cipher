@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The two whole-store digests in the root (FORMAT.md section 8). Both are SHA-256 over record tags;
 // the root's own AEAD protects them, so no MAC key is needed.
 import { compareBytes, concat, u32, type Bytes } from './bytes.ts';

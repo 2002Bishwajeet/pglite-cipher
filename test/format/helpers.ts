@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 
 import { expect } from 'vitest';
 import { toHex, type Bytes } from '../../src/format/bytes.ts';

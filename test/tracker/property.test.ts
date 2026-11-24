@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Model-based property test: random operations through the real Emscripten FS; at every quiescent sync the model store, fed only by snapshots, equals MEMFS.
 import type { PGlite } from '@electric-sql/pglite';
 import fc from 'fast-check';

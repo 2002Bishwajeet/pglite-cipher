@@ -6,10 +6,9 @@ Thank you for contributing to pglite-cipher (the "Project"). This Contributor Li
 "Agreement") sets out the terms under which you contribute to the Project. It is between you and
 **Bishwajeet Parhi** (the "Maintainer"), who owns and maintains the Project.
 
-The Project is published under the Functional Source License, Version 1.1, ALv2 Future License
-(`LICENSE`). The Maintainer may also offer the Project under other terms, including commercial
-licences. This Agreement lets the Maintainer do that with your Contributions, while you keep the
-copyright in your own work.
+The Project is published under the Apache License, Version 2.0 (`LICENSE`). The Maintainer may
+also offer the Project under other terms, including commercial licences. This Agreement lets the
+Maintainer do that with your Contributions, while you keep the copyright in your own work.
 
 ## 1. Definitions
 

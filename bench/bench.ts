@@ -1,6 +1,6 @@
 // Copyright 2026 Bishwajeet Parhi (modifications and additions)
 // Portions Copyright (c) 2026 David Muggleton, from https://github.com/davidmuggleton/pglite-encrypted-fs
-// SPDX-License-Identifier: FSL-1.1-ALv2 AND MIT
+// SPDX-License-Identifier: Apache-2.0 AND MIT
 // The `extras` crypto-overhead rows and the `ops` part follow that project's bench, modified; its MIT licence text is in THIRD_PARTY.md.
 // Benchmark page: EncryptedFs over IndexedDbBackend vs plain IdbFs; gates G1-G9 (bench/README.md), key operations.
 import { IdbFs, PGlite } from '@electric-sql/pglite';

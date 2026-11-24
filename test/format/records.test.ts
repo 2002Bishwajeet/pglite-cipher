@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Sealed records: round trips, tamper detection, binding to place and type, and the digests.
 import fc from 'fast-check';
 import { beforeAll, describe, expect, it } from 'vitest';

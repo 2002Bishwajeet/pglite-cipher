@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Worker for worker.test.ts: inserts rows one strict transaction at a time until terminated, recording each before it starts and once durable.
 // The record is an IndexedDB write that completes first, not a message: terminate() can discard messages, so the page's started count would lag.
 import { PGlite } from '@electric-sql/pglite';

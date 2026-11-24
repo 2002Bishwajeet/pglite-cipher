@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // 200 small transactions (2,000 under CIPHER_LONG in the crash matrix) that change the file table: CREATE TABLE, growth, a second table grown, shrunk and VACUUM-truncated, a DROP unlinked by a checkpoint.
 // Every step but VACUUM and CHECKPOINT logs its number in `log`, so a database can be checked against the prefix it holds.
 import type { PGlite } from '@electric-sql/pglite';

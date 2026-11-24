@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // A backend wrapper that fails on purpose, for crash tests. Exported as `pglite-cipher/testing`.
 import type { BlockId, CommitBatch, RecordKey, Slot, StorageBackend } from './backend.ts';
 import { ROOT } from './backend.ts';

@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The errors the store reports. Messages name a record by its slot or block id, never a path, and
 // never hold plaintext or key material.
 

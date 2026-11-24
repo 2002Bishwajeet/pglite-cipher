@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Soak (CIPHER_LONG only): CIPHER_SOAK_MINUTES (30 default) of a random workload on one store, the same SQL on a shadow PGlite on MemoryFS. After every reopen: table checksums equal the shadow's,
 // the store holds one record per table and data block and nothing else, the file table is at most twice a dense packing plus 4 blocks, and `trackingGaps` is 0. A failure prints the seed and last operations.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';

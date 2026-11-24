@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // The in-memory file table (FORMAT.md section 7), the table blocks it packs into, and every record's tag. A sync plans
 // against it as a Draft, applied only once its commit is known to be in the store.
 import { concat, toHex, type Bytes } from '../format/bytes.ts';

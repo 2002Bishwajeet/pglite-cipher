@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Real engine: a note-taking workload on PGlite with the tracker on MEMFS and a model store fed only by snapshots; after every query batch the model equals PGDATA,
 // then the database reopens from the model store alone through loadState.
 import { MemoryFS, PGlite } from '@electric-sql/pglite';

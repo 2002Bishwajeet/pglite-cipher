@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Conformance suite on IndexedDB (fake-indexeddb in Node), plus names, object stores, transactions, durability, versionchange.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BlockId, CommitBatch } from '../../src/backend/backend.ts';

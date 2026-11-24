@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // In-memory backend with IndexedDB semantics: sorted blocks beside three slots, expectRoot check, atomic commits,
 // values copied in and out.
 import { StaleWriterError } from '../format/errors.ts';

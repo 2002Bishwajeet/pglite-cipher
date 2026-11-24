@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Named regressions: "mark blocks on write" losing data, the safety net, and snapshot isolation.
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';

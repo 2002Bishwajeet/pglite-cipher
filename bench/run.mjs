@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Runs the bench page headless in Playwright; merges results per part into bench/results/<browser>.json.
 // Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

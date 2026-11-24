@@ -1,4 +1,4 @@
-<!-- Copyright 2026 Bishwajeet Parhi. SPDX-License-Identifier: FSL-1.1-ALv2 -->
+<!-- Copyright 2026 Bishwajeet Parhi. SPDX-License-Identifier: Apache-2.0 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="t d">
 <title id="t">pglite-cipher</title><desc id="d">Encryption at rest for PGlite: AES-256-GCM, WebCrypto, IndexedDB.</desc>
 <rect width="1280" height="320" fill="#FAFAF9"/>

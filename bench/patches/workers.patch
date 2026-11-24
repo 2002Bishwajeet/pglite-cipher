@@ -83,7 +83,7 @@ index e422633..4b94133 100644
 +++ b/bench/run.mjs
 @@ -1,7 +1,7 @@
  // Copyright 2026 Bishwajeet Parhi
- // SPDX-License-Identifier: FSL-1.1-ALv2
+ // SPDX-License-Identifier: Apache-2.0
  // Runs the bench page headless in Playwright; merges results per part into bench/results/<browser>.json.
 -// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8]
 +// Usage: node bench/run.mjs [chromium] [firefox] [webkit] [--parts gates10,gates100,extras,year,ops] [--runs 20] [--throttle 4] [--block 262144] [--pack 8] [--workers 2]
@@ -565,7 +565,7 @@ index 97d9f67..92a85f4 100644
 +++ b/test/fs/memory.test.ts
 @@ -1,59 +1,80 @@
  // Copyright 2026 Bishwajeet Parhi
- // SPDX-License-Identifier: FSL-1.1-ALv2
+ // SPDX-License-Identifier: Apache-2.0
 -// A load holds at most two pages of ciphertext (the next is read while one decrypts). The counting backend zero-fills
 -// every page but the latest once the next read starts, so a load using an older page or a view into it fails.
 +// A load holds at most two pages of ciphertext (the next is read while one decrypts); with the workers bench patch, W ranges

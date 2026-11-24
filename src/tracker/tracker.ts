@@ -1,5 +1,5 @@
 // Copyright 2026 Bishwajeet Parhi
-// SPDX-License-Identifier: FSL-1.1-ALv2
+// SPDX-License-Identifier: Apache-2.0
 // Knows which blocks of the files under PGDATA changed since the last sync, by wrapping the
 // Emscripten MEMFS operations that change a file's contents or its place in the tree.
 import { BlockBitmap } from './bitmap.ts';
