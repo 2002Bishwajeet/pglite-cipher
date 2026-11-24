@@ -1,8 +1,8 @@
 diff --git a/bench/bench.ts b/bench/bench.ts
-index 1e1740d..bb1ce70 100644
+index 336f415..9a48f64 100644
 --- a/bench/bench.ts
 +++ b/bench/bench.ts
-@@ -9,7 +9,8 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
+@@ -10,7 +10,8 @@ import { deriveRecordKey, SubkeyCache } from '../src/format/keys.ts';
  import { openBlock, sealBlock, type RecordContext } from '../src/format/records.ts';
  import { runOpfsRead } from './opfsread.ts';
  import { judgeGates, judgeYear } from './judge.ts';
@@ -12,7 +12,7 @@ index 1e1740d..bb1ce70 100644
  import { SCHEMA, createPg, dropIdb, errorText, newKek, now, pct, randomBytes, ratios, round, runPair, stat, wasmBytes, type Json, type Pg, type PgOptions, type Stat } from './measure.ts';
  
  // `&block=N`: encrypted store block size, read per part.
-@@ -25,6 +26,8 @@ const pack = (): number => {
+@@ -26,6 +27,8 @@ const pack = (): number => {
  const unpack = (): void => {
    if (packed.pack !== undefined) packed.pack = 1;
  };
@@ -22,7 +22,7 @@ index 1e1740d..bb1ce70 100644
  
  const statusEl = document.getElementById('status');
 diff --git a/bench/measure.ts b/bench/measure.ts
-index 3fad97f..9670191 100644
+index 96d09cc..e56bb66 100644
 --- a/bench/measure.ts
 +++ b/bench/measure.ts
 @@ -6,6 +6,7 @@ import { IdbFs, PGlite, type PGliteOptions } from '@electric-sql/pglite';
@@ -62,7 +62,7 @@ index 3fad97f..9670191 100644
        const got: Array<[string, Uint8Array]> = await next;
        next = got.length < page ? null : backend.readRange((got[got.length - 1] as [string, Uint8Array])[0], page);
 diff --git a/bench/params.ts b/bench/params.ts
-index cea4baf..9290c2f 100644
+index b7822ab..1872b1e 100644
 --- a/bench/params.ts
 +++ b/bench/params.ts
 @@ -20,3 +20,11 @@ export function parsePack(raw: string | null): number {
@@ -78,7 +78,7 @@ index cea4baf..9290c2f 100644
 +  return n;
 +}
 diff --git a/bench/run.mjs b/bench/run.mjs
-index e422633..4b94133 100644
+index 793d190..4255200 100644
 --- a/bench/run.mjs
 +++ b/bench/run.mjs
 @@ -1,7 +1,7 @@
@@ -117,7 +117,7 @@ index e422633..4b94133 100644
          const { result, error } = await page.evaluate(() => ({ result: window.__benchResult, error: window.__benchError }));
          await page.close();
 diff --git a/src/backend/backend.ts b/src/backend/backend.ts
-index 1492d80..88ff3e2 100644
+index cb38037..83257a6 100644
 --- a/src/backend/backend.ts
 +++ b/src/backend/backend.ts
 @@ -24,8 +24,8 @@ export interface StorageBackend {
@@ -132,7 +132,7 @@ index 1492d80..88ff3e2 100644
    commit(batch: CommitBatch): Promise<void>;
    clear(): Promise<void>;
 diff --git a/src/backend/faulty.ts b/src/backend/faulty.ts
-index eac8e3d..fa15b14 100644
+index 8b2e3bb..ad5d01f 100644
 --- a/src/backend/faulty.ts
 +++ b/src/backend/faulty.ts
 @@ -72,8 +72,8 @@ export class FaultyBackend implements StorageBackend {
@@ -147,7 +147,7 @@ index eac8e3d..fa15b14 100644
  
    clear(): Promise<void> {
 diff --git a/src/backend/indexeddb.ts b/src/backend/indexeddb.ts
-index e838a4f..19785cc 100644
+index ad5bc67..41e3e2e 100644
 --- a/src/backend/indexeddb.ts
 +++ b/src/backend/indexeddb.ts
 @@ -43,6 +43,11 @@ export class IndexedDbBackend implements StorageBackend {
@@ -177,7 +177,7 @@ index e838a4f..19785cc 100644
        done(store.getAllKeys(range, limit) as IDBRequest<BlockId[]>),
        done(store.getAll(range, limit) as IDBRequest<Uint8Array[]>),
 diff --git a/src/backend/memory.ts b/src/backend/memory.ts
-index 5add7ec..673daa1 100644
+index 69c86c2..41003f9 100644
 --- a/src/backend/memory.ts
 +++ b/src/backend/memory.ts
 @@ -37,11 +37,12 @@ export class MemoryBackend implements StorageBackend {
@@ -195,7 +195,7 @@ index 5add7ec..673daa1 100644
      });
    }
 diff --git a/src/encryptedFs.ts b/src/encryptedFs.ts
-index fdfaf1f..c17a39b 100644
+index 0a0c5ed..a25d750 100644
 --- a/src/encryptedFs.ts
 +++ b/src/encryptedFs.ts
 @@ -30,6 +30,7 @@ import { openBlock, openRoot, openTable, sealBlock, sealRoot, sealTable, tagOf,
@@ -225,7 +225,7 @@ index fdfaf1f..c17a39b 100644
  
    constructor(options: EncryptedFsOptions) {
      super();
-@@ -506,7 +508,25 @@ export class EncryptedFs extends MemoryFS {
+@@ -513,7 +515,25 @@ export class EncryptedFs extends MemoryFS {
        next.catch(() => undefined); // awaited below; not unhandled if this page's decrypt throws first
        return next;
      };
@@ -252,8 +252,8 @@ index fdfaf1f..c17a39b 100644
        const page: Array<[string, Uint8Array]> = await next;
        if (page.length === 0) break;
        next = page.length < PAGE ? null : readPage((page[page.length - 1] as [string, Uint8Array])[0]);
-@@ -533,7 +553,7 @@ export class EncryptedFs extends MemoryFS {
-     const tracker = installTracker(FS, FS.filesystems.MEMFS, PGDATA, blockSize);
+@@ -540,7 +560,7 @@ export class EncryptedFs extends MemoryFS {
+     const tracker = installTracker(FS, this.#memfs(), PGDATA, blockSize);
      tracker.loadState([...map.files.values()].map((f) => ({ path: f.path, fileId: f.fileId, blocks: f.ids.length })));
  
 -    this.#lastOpen = { tableMs, blocksMs: now() - t1 };
@@ -262,7 +262,7 @@ index fdfaf1f..c17a39b 100644
      this.#ctx = ctx;
      this.#map = map;
 diff --git a/src/format/keys.ts b/src/format/keys.ts
-index 0b17b2a..5e5ebf3 100644
+index 49d5b4a..9c5dc35 100644
 --- a/src/format/keys.ts
 +++ b/src/format/keys.ts
 @@ -198,6 +198,11 @@ export class SubkeyCache {
@@ -560,7 +560,7 @@ index 0000000..392c885
 +/** For openWorker.ts: the open's context in a worker, from the DEK it was posted. */
 +export const workerContext = (dek: CryptoKey, meta: Meta): RecordContext => ({ subkeys: new SubkeyCache(dek), meta, encryptions: 0 });
 diff --git a/test/fs/memory.test.ts b/test/fs/memory.test.ts
-index 97d9f67..92a85f4 100644
+index 6c8a60e..f06c3a8 100644
 --- a/test/fs/memory.test.ts
 +++ b/test/fs/memory.test.ts
 @@ -1,59 +1,80 @@
@@ -691,7 +691,7 @@ index 97d9f67..92a85f4 100644
      }, 120_000);
    }
 diff --git a/test/long.ts b/test/long.ts
-index eb5077e..65ef331 100644
+index 6696ba7..6254805 100644
 --- a/test/long.ts
 +++ b/test/long.ts
 @@ -12,6 +12,8 @@ declare module 'vitest' {
@@ -704,7 +704,7 @@ index eb5077e..65ef331 100644
  }
  
 diff --git a/test/setup.ts b/test/setup.ts
-index f25e213..c433812 100644
+index 6bd0941..5c815a6 100644
 --- a/test/setup.ts
 +++ b/test/setup.ts
 @@ -3,5 +3,8 @@
@@ -717,10 +717,10 @@ index f25e213..c433812 100644
 +// The workers bench patch: every open in W key ranges.
 +setOpenWorkers(inject('openWorkers'));
 diff --git a/vitest.config.ts b/vitest.config.ts
-index 781d1fe..073c528 100644
+index e414640..db1425d 100644
 --- a/vitest.config.ts
 +++ b/vitest.config.ts
-@@ -22,6 +22,8 @@ const shared = {
+@@ -23,6 +23,8 @@ const shared = {
      soakMinutes: Number(process.env.CIPHER_SOAK_MINUTES ?? 30),
      compatWrite: process.env.CIPHER_COMPAT_WRITE === '1',
      compatRead: (process.env.CIPHER_COMPAT_READ ?? '').split(',').filter(Boolean),
